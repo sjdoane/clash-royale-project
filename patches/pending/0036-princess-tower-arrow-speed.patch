@@ -1,0 +1,221 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 07aed0a..498c975 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -589,6 +589,29 @@ lane no longer saves the tower (two swings); prompt and central still does
+ (`tests/core/test_default_deck_qa.cpp`). Every win rate earned before this
+ date describes faster towers. Checkpoints still load.
+ 
++## 2026-11-21: a Princess Tower's arrow flies 12.5 tiles/s (patch 0036)
++
++Every tower shot flew 2 tiles a tick (20 tiles/s). The published projectile
++speeds are 600 for the Princess Tower's arrow and 1000 for the King's
++cannonball, the Cannoneer and the Dagger Duchess. At the 48 per tile per
++second measured for thrown spells (patch 0030) that is 12.5 and 20.8 tiles/s,
++so only the Princess Tower was wrong.
++
++- `CrownTower::PRINCESS_ARROW_TILES_PER_TICK = 1.25`, carried by
++  `CardStats::towerProjectileTilesPerTick` (set for `None` and
++  `TowerPrincess`), applied to `Tower::projectileTilesPerTick` in
++  `GameManager::addTower`. Every other tower keeps 2.0.
++- Not measured on a recording: over the 2-3 tiles of a tower fight the
++  difference is one 11 fps frame. It rests on the published 600 : 1000 ratio
++  and the thrown-spell divisor.
++- `RangedTroop` still throws everything at 1.5 tiles/tick (Musketeer's
++  published 1000 would be 2.08, Princess's 600 would be 1.25). Not changed.
++- Tests: `tests/core/test_cards_0019.cpp` (`[patch0036]`).
++
++**GAMEPLAY-AFFECTING for every match**, slightly: each arrow lands 1-3 ticks
++later, so each kill by a Princess Tower comes that much later. Checkpoints
++still load.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardStats.h b/include/core/CardStats.h
+index 6bac024..9db6383 100644
+--- a/include/core/CardStats.h
++++ b/include/core/CardStats.h
+@@ -94,6 +94,9 @@ struct CardStats {
+     // spellDelayTicks (CardFactories::thrownSpellFlightTicks). 0 = not thrown:
+     // the effect starts spellDelayTicks after the cast wherever it is cast.
+     int spellProjectileSpeed = 0;
++    // A Tower Troop's shot speed in tiles per tick (TowerTroops.h); 0 = the
++    // Tower's default. Read by GameManager::addTower only.
++    float towerProjectileTilesPerTick = 0.0f;
+     bool spellGroundOnly = false;
+     // Multi-hit spells (Poison, Arrows); see AreaSpell::remainingHits.
+     int spellRemainingHits = 1;
+diff --git a/include/core/GameManager.h b/include/core/GameManager.h
+index 04aa3dd..886afec 100644
+--- a/include/core/GameManager.h
++++ b/include/core/GameManager.h
+@@ -141,6 +141,7 @@ private:
+         CardFactories::applyCardMetadata(tower, stats);
+         tower->name = towerName;
+         tower->cardId = TOWER_PRINCESS_ID;
++        if (stats.towerProjectileTilesPerTick > 0.0f) tower->projectileTilesPerTick = stats.towerProjectileTilesPerTick;
+         board.addEntity(tower);
+     }
+ 
+diff --git a/include/core/TowerTroops.h b/include/core/TowerTroops.h
+index b2c74a8..aa82500 100644
+--- a/include/core/TowerTroops.h
++++ b/include/core/TowerTroops.h
+@@ -24,6 +24,13 @@ namespace CrownTower {
+     constexpr int KING_DAMAGE = 109;
+     constexpr int KING_COOLDOWN_TICKS = 10;      // 1.0 s
+     constexpr int KING_FIRST_HIT_TICKS = 5;
++    // The Princess Tower's arrow. Published projectile speed 600
++    // (TowerPrincessProjectile), against 1000 for the King's cannonball, the
++    // Cannoneer's and the Dagger Duchess's. A published projectile speed is
++    // 48 per tile per second (measured on thrown spells, patch 0030:
++    // CardFactories.h, THROWN_SPEED_PER_TILE_PER_SECOND), so 600 is 12.5
++    // tiles/s. Every tower shot flew 20 tiles/s before patch 0036.
++    constexpr float PRINCESS_ARROW_TILES_PER_TICK = 600.0f / 48.0f / 10.0f;   // 1.25
+ }
+ 
+ // The four selectable Tower Troops; one replaces both Princess Towers for the
+@@ -72,6 +79,7 @@ inline CardStats towerTroopStats(TowerTroopType type) {
+             stats.hp = CrownTower::PRINCESS_HP; stats.attackRange = 7.5f;
+             stats.damage = CrownTower::PRINCESS_DAMAGE; stats.attackCooldown = CrownTower::PRINCESS_COOLDOWN_TICKS;
+             stats.withLoadTicks(CrownTower::PRINCESS_FIRST_HIT_TICKS);
++            stats.towerProjectileTilesPerTick = CrownTower::PRINCESS_ARROW_TILES_PER_TICK;
+             break;
+         case TowerTroopType::Cannoneer:
+             // 2616 hp / 320 dmg, 2.2 s (1 Sep 2025), first hit 0.8 s, no splash.
+@@ -96,6 +104,7 @@ inline CardStats towerTroopStats(TowerTroopType type) {
+             stats.hp = CrownTower::PRINCESS_HP; stats.attackRange = 7.5f;
+             stats.damage = CrownTower::PRINCESS_DAMAGE; stats.attackCooldown = CrownTower::PRINCESS_COOLDOWN_TICKS;
+             stats.withLoadTicks(CrownTower::PRINCESS_FIRST_HIT_TICKS);
++            stats.towerProjectileTilesPerTick = CrownTower::PRINCESS_ARROW_TILES_PER_TICK;
+             break;
+     }
+     return stats;
+diff --git a/include/entities/Tower.h b/include/entities/Tower.h
+index c28edce..628aff3 100644
+--- a/include/entities/Tower.h
++++ b/include/entities/Tower.h
+@@ -17,6 +17,14 @@ public:
+         return (symbol == 'R') ? 2.0f : 1.5f;
+     }
+ 
++    // How far this tower's shot flies per tick. The default is the King's
++    // cannonball (published speed 1000: 1000 / 48 / 10 = 2.08, see
++    // CrownTower::PRINCESS_ARROW_TILES_PER_TICK for the conversion), which the
++    // Cannoneer and Dagger Duchess share. GameManager::addTower sets a tower
++    // troop's own from CardStats::towerProjectileTilesPerTick.
++    static constexpr float DEFAULT_PROJECTILE_TILES_PER_TICK = 2.0f;
++    float projectileTilesPerTick = DEFAULT_PROJECTILE_TILES_PER_TICK;
++
+     // Target-selection footprint, larger than the collision radius and fitted
+     // to real play: a Hog with a Cannon 7-8 tiles off-lane keeps walking at the
+     // Princess Tower and diverts only at 6. Against a Cannon's 1.0 that needs
+@@ -74,7 +82,7 @@ protected:
+     void performAttack(Board& board, std::shared_ptr<Entity> target) override {
+         // lineSplash/lineSplashRange forwarded: a Tower Troop can carry them.
+         auto arrow = std::make_shared<Projectile>(
+-            board.allocateId(), position.x, position.y, team, target, 2.0f, getCurrentDamage(), onHitEffects,
++            board.allocateId(), position.x, position.y, team, target, projectileTilesPerTick, getCurrentDamage(), onHitEffects,
+             false, 0, id, cardId, splashRadius, lineSplash, lineSplashRange);
+         board.addEntity(arrow);
+     }
+diff --git a/tests/core/test_cards_0019.cpp b/tests/core/test_cards_0019.cpp
+index ece410f..49d6761 100644
+--- a/tests/core/test_cards_0019.cpp
++++ b/tests/core/test_cards_0019.cpp
+@@ -28,13 +28,13 @@ struct TowerShots {
+ 
+     // `warmUp`: ticks stepped before the target appears. A tower built from
+     // CardStats deploys for the first second of a match like any card.
+-    explicit TowerShots(TowerTroopType ours, int warmUp = 0)
++    explicit TowerShots(TowerTroopType ours, int warmUp = 0, float tilesInFront = 4.0f)
+         : game(deck(), deck(), ours, TowerTroopType::None) {
+         game.seed(1);
+         game.reset();
+         for (int i = 0; i < warmUp; ++i) game.step();
+         foe = std::make_shared<StationaryCombatant>(game.getBoard().allocateId(),
+-            ArenaLayout::LEFT_LANE_X, ArenaLayout::princessY(0) + 4.0f, 1000000, 1, 0.5f, 0, 1000);
++            ArenaLayout::LEFT_LANE_X, ArenaLayout::princessY(0) + tilesInFront, 1000000, 1, 0.5f, 0, 1000);
+         spawn(game.getBoard(), foe);
+     }
+     void run(int ticks) {
+@@ -51,15 +51,13 @@ struct TowerShots {
+     }
+ };
+ 
+-// The first hit of a tower with no first-hit wind-up on the same setup: the
+-// engine's own engagement and projectile latency. Since patch 0035 the plain
+-// tower winds up 0.8 s like the Tower Princess, so this is its first hit less
+-// that; Dagger Duchess, who has no wind-up, is checked against it below.
++// The first hit of a tower with no first-hit wind-up and the default 2
++// tiles/tick shot on the same setup: the tower's deploy second at the start
++// of a match, the shot loosed on the next tick, 2 ticks of flight. It used to
++// be measured on the plain tower, which since patches 0035 and 0036 has a
++// wind-up and a slower arrow of its own.
+ int plainFirstHit() {
+-    TowerShots s(TowerTroopType::None);
+-    s.run(40);
+-    REQUIRE_FALSE(s.hits.empty());
+-    return s.hits[0].first - CrownTower::PRINCESS_FIRST_HIT_TICKS;
++    return DEPLOY_TIME_TICKS + 1 + 2;
+ }
+ 
+ std::shared_ptr<Entity> leftPrincess(GameManager& game, int team) {
+@@ -88,12 +86,13 @@ TEST_CASE("each side's Tower Troop is its own: hp per team", "[tower_troops][pat
+ TEST_CASE("The plain Princess Tower: 109 every 0.8 s, the first 0.8 s after engaging", "[tower_troops][patch0035]") {
+     // A target that appears 4 tiles in front of a tower with nothing in range,
+     // two seconds into the match. Tick 1 is the first tick the tower sees it:
+-    // 8 wind-up ticks, the arrow loosed on the 9th and landing 2 ticks later.
+-    // Before patch 0035 the plain tower loosed on tick 1.
++    // 8 wind-up ticks, the arrow loosed on the 9th and landing 4 ticks later
++    // (4 tiles at 1.25 a tick, patch 0036). Before patch 0035 the plain tower
++    // loosed on tick 1.
+     TowerShots s(TowerTroopType::None, 20);
+     s.run(60);
+     REQUIRE(s.hits.size() >= 5);
+-    REQUIRE(s.hits[0].first == 11);
++    REQUIRE(s.hits[0].first == 8 + 1 + 4);
+     for (const auto& [tick, dmg] : s.hits) REQUIRE(dmg == 109);
+     for (int g : s.gaps()) REQUIRE(g == 8);
+ 
+@@ -140,8 +139,38 @@ TEST_CASE("The King Tower's first shot comes 0.5 s after it has a target, then e
+     for (size_t i = 1; i < hits.size(); ++i) REQUIRE(hits[i] - hits[i - 1] == CrownTower::KING_COOLDOWN_TICKS);
+ }
+ 
++TEST_CASE("A Princess Tower's arrow flies 12.5 tiles a second; the other towers' shots 20", "[tower_troops][patch0036]") {
++    // Published projectile speed 600 against 1000, at 48 per tile per second.
++    REQUIRE(CrownTower::PRINCESS_ARROW_TILES_PER_TICK == Catch::Approx(1.25f));
++    REQUIRE(towerTroopStats(TowerTroopType::None).towerProjectileTilesPerTick == Catch::Approx(1.25f));
++    REQUIRE(towerTroopStats(TowerTroopType::TowerPrincess).towerProjectileTilesPerTick == Catch::Approx(1.25f));
++    for (TowerTroopType fast : { TowerTroopType::Cannoneer, TowerTroopType::DaggerDuchess, TowerTroopType::RoyalChef }) {
++        REQUIRE(towerTroopStats(fast).towerProjectileTilesPerTick == Catch::Approx(0.0f));   // the Tower's default
++    }
++    GameManager game(deck(), deck());
++    for (const auto& e : game.getBoard().getEntities()) {
++        auto tower = std::dynamic_pointer_cast<Tower>(e);
++        if (!tower) continue;
++        REQUIRE(tower->projectileTilesPerTick == Catch::Approx(tower->symbol == 'R' ? 2.0f : 1.25f));
++    }
++
++    // Flight grows with the distance: loosed on tick 9 either way, the arrow
++    // lands 4 ticks later on a target 4 tiles out and 7 ticks later 8 tiles
++    // out (it was 2 and 4).
++    TowerShots near(TowerTroopType::None, 20, 4.0f);
++    near.run(30);
++    TowerShots far(TowerTroopType::None, 20, 8.0f);
++    far.run(30);
++    REQUIRE(near.hits[0].first == 9 + 4);
++    REQUIRE(far.hits[0].first == 9 + 7);
++    // The rhythm at the target is still the hit speed.
++    for (int g : far.gaps()) REQUIRE(g == 8);
++}
++
+ TEST_CASE("Tower Princess: 109 every 0.8 s, the first 0.8 s after engaging", "[tower_troops][patch0019]") {
+-    const int plain = plainFirstHit();
++    // Its arrow takes 2 ticks longer over these 4 tiles than the 2 tiles/tick
++    // shot plainFirstHit() describes (patch 0036).
++    const int plain = plainFirstHit() + 2;
+     TowerShots s(TowerTroopType::TowerPrincess);
+     s.run(60);
+     REQUIRE(s.hits.size() >= 5);

@@ -1,0 +1,194 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index a15c9c2..eadea06 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -835,6 +835,25 @@ centre with a floor at attack reach.
+ - Tests: `tests/entities/test_combat_entity.cpp` ("sight is measured BODY TO
+   BODY"), `python_ai/tests/test_sight_is_measured_body_to_body.py`.
+ 
++
++## 2026-11-22: three published sight ranges that were the default 5.5 (patch 0045)
++
++**GAMEPLAY-AFFECTING.** The game's unit table (FirstLight-Zero card_specs.json,
++release 15.535.13) gives `AngryBarbarian` (Elite Barbarians) SightRange 6000,
++`ElectroGiant` 7500 and `SuspiciousBush` 7500, the last two with SightClip /
++SightClipSide 2000 / 2000. The registry had no `withSightRange` on any of them,
++so all three read the 5.5 default; the 2026-08-23 catalogue pinned that default
++as if it were sourced.
++
++- Elite Barbarians (17, and both forms of 178): 6.0. They turn for a kiting
++  unit half a tile further out.
++- Electro Giant (84, both forms of 179) and Suspicious Bush (85): 7.5, and
++  their rows join `SightClips.h` (2.0 / 2.0), so they are pulled by a building
++  exactly as a Giant is: 6 tiles to the side yes, 7 no. At 5.5 a Cannon in the
++  middle of the arena did not pull an Electro Giant at all.
++- Tests: `python_ai/tests/test_published_sight_of_elite_barbarians_electro_giant_bush.py`,
++  `tests/core/test_sight_range.cpp` (catalogue rows).
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index 140b84f..bc5a97c 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -550,6 +550,7 @@ private:
+             .withIgnoresRiver());
+ 
+         add(troop(17, "Elite Barbarians", 6.0f, Archetype::MeleeSquad, 1341, SPEED_FAST, 1.2f, 384, 14, 'e')
++            .withSightRange(6.0f)   /* published AngryBarbarian SightRange 6000 (patch 0045) */
+             .withOffsets({ {-0.5f, 0.0f}, {0.5f, 0.0f} }));
+ 
+         // The death-potion radius, multiplier and duration are not sourced.
+@@ -977,9 +978,11 @@ private:
+         // Damage 184: the official 26 Aug 2026 notes (163 -> 184); the wiki
+         // still lists 163.
+         add(troop(84, "Electro Giant", 7.0f, Archetype::MeleeBuildingTargeter, 3952, SPEED_SLOW, 1.2f, 184, 18, '|')
++            .withSightRange(7.5f)   /* published ElectroGiant SightRange 7500 (patch 0045) */
+             .withSplash(1.5f)
+             .withPeriodicEffect(50, std::make_shared<AreaStunEffect>(2.5f, 5)) /* audit 0003: wiki Electro Giant, level 11 */);
+         add(troop(85, "Suspicious Bush", 2.0f, Archetype::MeleeBuildingTargeter, 81, SPEED_MEDIUM, 0.5f, 256, 14, '}')
++            .withSightRange(7.5f)   /* published SuspiciousBush SightRange 7500 (patch 0045) */
+             // Visible from its first hit for as long as it keeps hitting (one
+             // hit interval, patch 0040): the Bush is revealed once it reaches
+             // a building, so the tower it attacks can shoot it.
+@@ -1742,8 +1745,10 @@ private:
+         // here: he walks to his targets and throws once one is in the band.
+         addEvolution(178,
+             troop(17, "Elite Barbarians", 6.0f, Archetype::MeleeSquad, 1341, SPEED_FAST, 1.2f, 384, 14, 'e')
++            .withSightRange(6.0f)   /* published AngryBarbarian SightRange 6000 (patch 0045) */
+                 .withOffsets({ {-0.5f, 0.0f}, {0.5f, 0.0f} }),
+             troop(17, "Elite Barbarians", 6.0f, Archetype::MeleeSquad, 1341, SPEED_FAST, 1.2f, 384, 14, 'e')
++            .withSightRange(6.0f)   /* published AngryBarbarian SightRange 6000 (patch 0045) */
+                 .withOffsets({ {-0.5f, 0.0f}, {0.5f, 0.0f} })
+                 .withSelfPeriodicEffect(1, 50, std::make_shared<EvoEliteBarbarianSpearEffect>(3.0f, 4.5f, 220, 1.35f, 25, 1.5f)),
+             1, 1);
+@@ -1755,9 +1760,11 @@ private:
+         // to level 1. Crown Towers are exempt; no damage.
+         addEvolution(179,
+             troop(84, "Electro Giant", 7.0f, Archetype::MeleeBuildingTargeter, 3952, SPEED_SLOW, 1.2f, 184, 18, '|')
++            .withSightRange(7.5f)   /* published ElectroGiant SightRange 7500 (patch 0045) */
+                 .withSplash(1.5f)
+                 .withPeriodicEffect(50, std::make_shared<AreaStunEffect>(2.5f, 5)),
+             troop(84, "Electro Giant", 7.0f, Archetype::MeleeBuildingTargeter, 3952, SPEED_SLOW, 1.2f, 184, 18, '|')
++            .withSightRange(7.5f)   /* published ElectroGiant SightRange 7500 (patch 0045) */
+                 .withSplash(1.5f)
+                 .withPeriodicEffect(50, std::make_shared<AreaStunEffect>(2.5f, 5))
+                 .withSelfPeriodicEffect(25, 60, std::make_shared<LevelDamperEffect>(6.0f)),
+diff --git a/include/core/SightClips.h b/include/core/SightClips.h
+index 6c5d9f3..ffb1013 100644
+--- a/include/core/SightClips.h
++++ b/include/core/SightClips.h
+@@ -50,9 +50,8 @@
+ // both have a row). HERO rows are ASSUMED equal to the base troop: the hero
+ // forms are not in either file.
+ //
+-// NOT APPLIED: Electro Giant and Suspicious Bush. Their registry rows still
+-// carry the default 5.5 sight, not the published 7.5; a clip on top of that
+-// would shrink it to 3.5. They get their row when their sight is corrected.
++// Electro Giant and Suspicious Bush joined in patch 0045, when their registry
++// sight was corrected from the default 5.5 to the published 7.5.
+ //
+ // Keyed by registry NAME, like LoadTimes.h, so Evolutions inherit the row.
+ namespace SightClips {
+@@ -70,6 +69,8 @@ inline const Row* table(int& count) {
+         { "Giant",           2.0f, 2.0f },   // FLZ, CRAPI
+         { "Royal Giant",     2.0f, 2.0f },   // FLZ, CRAPI
+         { "Goblin Giant",    2.0f, 2.0f },   // FLZ, CRAPI
++        { "Electro Giant",   2.0f, 2.0f },   // FLZ
++        { "Suspicious Bush", 2.0f, 2.0f },   // FLZ
+         { "Ice Golem",       2.0f, 2.0f },   // FLZ, CRAPI
+         { "Golem",           2.0f, 1.9f },   // FLZ, CRAPI
+         { "Golemite",        2.0f, 2.0f },   // CRAPI
+diff --git a/python_ai/tests/test_published_sight_of_elite_barbarians_electro_giant_bush.py b/python_ai/tests/test_published_sight_of_elite_barbarians_electro_giant_bush.py
+new file mode 100644
+index 0000000..805e2e0
+--- /dev/null
++++ b/python_ai/tests/test_published_sight_of_elite_barbarians_electro_giant_bush.py
+@@ -0,0 +1,51 @@
++"""Three sight ranges the registry had at the default 5.5 (patch 0045).
++
++Published (FirstLight-Zero card_specs.json, release 15.535.13): AngryBarbarian
++(Elite Barbarians) SightRange 6000; ElectroGiant 7500 with SightClip /
++SightClipSide 2000 / 2000; SuspiciousBush 7500 with 2000 / 2000. The Electro
++Giant and Bush are building-targeters, so their sight is what a defensive
++building pulls them by: at 5.5 a Cannon in the middle of the arena did not.
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++import pytest
++
++NOOP = 4
++ELITE_BARBARIANS, EVO_ELITE_BARBARIANS, ELECTRO_GIANT, BUSH, CANNON = 17, 178, 84, 85, 129
++OURS = [129, 168, 125, 15, 40, 72, 33, 7]
++
++
++def test_the_values_are_the_published_ones():
++    for card in (ELITE_BARBARIANS, EVO_ELITE_BARBARIANS):
++        stats = E.get_card_stats(card)
++        for form in ("base", "evolved"):
++            if stats.get(form):
++                assert stats[form]["sight_range"] == pytest.approx(6.0), (card, form)
++    for card in (ELECTRO_GIANT, BUSH):
++        base = E.get_card_stats(card)["base"]
++        assert base["sight_range"] == pytest.approx(7.5)
++        assert (base["sight_clip"], base["sight_clip_side"]) == pytest.approx((2.0, 2.0))
++
++
++def test_a_cannon_in_the_middle_pulls_an_electro_giant():
++    # Lane x 3, Cannon at x 9: six tiles to the side. Inside 7.5 - 2.0 = 5.5
++    # body to body (6.9 centre), outside the old 5.5 disc at any useful depth.
++    deck = [ELECTRO_GIANT, 4, 12, 112, 61, 20, 14, 26]
++    env = E.ClashRoyaleEnv(list(OURS), deck, 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    env.set_elixir_for_team(0, 10.0)
++    env.set_elixir_for_team(1, 10.0)
++    assert env.set_hand_for_team(0, [CANNON, 168, 125, 15])
++    assert env.set_hand_for_team(1, deck[:4])
++    env.step_self_play(0, 9.0, 12.0, NOOP, 0.0, 0.0, 12)
++    env.step_self_play(NOOP, 0.0, 0.0, 0, 3.0, 15.0, 1)
++    pulled = False
++    for _ in range(150):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        units = env.get_units()
++        cannon = {u["id"] for u in units if u["team"] == 0 and u["name"] == "Cannon"}
++        if any(u["team"] == 1 and u["name"] == "Electro Giant" and u["target_id"] in cannon for u in units):
++            pulled = True
++            break
++    assert pulled
+diff --git a/tests/core/test_sight_range.cpp b/tests/core/test_sight_range.cpp
+index 49985d4..416cd0f 100644
+--- a/tests/core/test_sight_range.cpp
++++ b/tests/core/test_sight_range.cpp
+@@ -201,7 +201,7 @@ const SightRow SIGHT_CATALOG[] = {
+         {  13, "P.E.K.K.A.", 5.0f },
+         {  14, "Prince", 5.5f },
+         {  15, "Hog Rider", 9.5f },
+-        {  17, "Elite Barbarians", 5.5f },
++        {  17, "Elite Barbarians", 6.0f },
+         {  18, "Royal Giant", 7.5f },
+         {  19, "Golem", 7.0f },
+         {  20, "Dart Goblin", 7.5f },
+@@ -261,8 +261,8 @@ const SightRow SIGHT_CATALOG[] = {
+         {  81, "Battle Ram", 6.5f },   // official September 2026 notes: 5.5 -> 6.5
+         {  82, "Royal Hogs", 9.5f },
+         {  83, "Wall Breakers", 7.0f },
+-        {  84, "Electro Giant", 5.5f },
+-        {  85, "Suspicious Bush", 5.5f },
++        {  84, "Electro Giant", 7.5f },
++        {  85, "Suspicious Bush", 7.5f },
+         {  86, "Rune Giant", 5.5f },
+         {  87, "Ram Rider", 7.5f },
+         {  88, "Goblin Giant", 7.5f },
+@@ -337,8 +337,8 @@ const SightRow SIGHT_CATALOG[] = {
+         { 175, "Hero Ice Golem", 7.0f },
+         { 176, "Minion Giant", 7.5f },
+         { 177, "Giant", 7.5f },
+-        { 178, "Elite Barbarians", 5.5f },
+-        { 179, "Electro Giant", 5.5f },
++        { 178, "Elite Barbarians", 6.0f },
++        { 179, "Electro Giant", 7.5f },
+         { 181, "Hero Balloon", 7.7f },
+         { 182, "Hero Valkyrie", 5.5f },
+         { 183, "Hero Ice Wizard", 5.5f },

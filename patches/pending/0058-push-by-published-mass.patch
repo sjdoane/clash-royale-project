@@ -1,0 +1,605 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index ba05d4d..ecb112b 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1484,6 +1484,93 @@ Existing expectations that moved, and what each had encoded:
+   two tiles to the side; the published 1.1 s freeze and 110 damage are pinned
+   as before, now for any alignment of the freeze with the arrows.
+ 
++## 2026-11-22: two touching troops give way by their published masses (patch 0058)
++
++**GAMEPLAY-AFFECTING for every match.** `Board::resolveCollisions` split the
++overlap of two touching troops in half, a Skeleton against a Golem included.
++The game's unit table gives every troop a `Mass` (FirstLight-Zero
++card_specs.json, release 15.535.13; the fourth column of
++`include/core/BodySizes.h`, copied to the new `Entity::bodyMass` by
++`CardFactories::applyCardMetadata`). Each of the two now moves by the OTHER's
++mass over the sum.
++
++| published Mass | bodies |
++|---|---|
++| 1 | Skeletons, Skeleton Army, the four spirits, Bats, Spear Goblins, Guards |
++| 2 | Goblins, Goblin Gang, Minions, Minion Horde, Royal Hogs, Phoenix, Berserker, Suspicious Bush and its Goblins, Rascal Girls |
++| 3 | Archers, Princess, Dart Goblin, Bandit, Royal Ghost, Magic Archer, Cannon Cart, Flying Machine |
++| 4 | Hog Rider, Barbarians, Elite Barbarians, Mini P.E.K.K.A., Wall Breakers, Bomber, Lumberjack, Night Witch, Executioner, Ram Rider, Zappies, Little Prince, Boss Bandit, Skeleton Dragons, Goblinstein's Doctor |
++| 5 | Musketeer, Three Musketeers, Wizard, Ice Wizard, Electro Wizard, Valkyrie, Baby Dragon, Inferno Dragon, Hunter, Royal Recruits, Lava Hound, Spirit Empress |
++| 6 | Knight, Ice Golem, Miner, Balloon, Prince, Dark Prince, Battle Ram, Mega Minion, Firecracker, Mighty Miner, Battle Healer, Archer Queen, Monk, Mother Witch, Goblin Demolisher, Ronin, Furnace |
++| 7 / 8 | Electro Dragon, Skeleton Barrel / Witch |
++| 10 | Fisherman, Golden Knight, Skeleton King, Rascal Boy |
++| 15 | Elixir Golem |
++| 18 | Giant, Royal Giant, Goblin Giant, Electro Giant, Rune Giant, P.E.K.K.A., Mega Knight, Giant Skeleton, Bowler, Sparky, Goblin Machine, Goblinstein's Monster |
++| 20 | Golem |
++
++Buildings have no Mass (0 in the table) and are never moved; a troop is pushed
++out of a building by the whole overlap, as before. A body with no record (the
++same list as for the radii: Golemite, Lava Pups, Elixir Golemite and Blob,
++Goblin Brawler, Cursed Hog, Minion Giant, what the Hero abilities summon) takes
++`BodySizes::DEFAULT_MASS` 5, the median of the published troops; a troop built
++by hand takes the same (`Entity::IMPLICIT_TROOP_MASS`), so two of them still
++halve their overlap.
++
++**The table publishes the masses, NOT the rule.** No published text or field
++says how two masses share a push; "the other's mass over the sum" is the
++ordinary two-body split and is an inference. A Hog Rider (4) against an Ice
++Golem (6) takes 0.6 of the overlap and the Golem 0.4; against a Golem (20) the
++Hog takes 5/6. Flying and ground bodies still do not collide; allies and
++enemies still do, both sides alike; a body that is deploying is still pushed
++(see below).
++
++**The one recorded pair, and what it does and does not decide**
++(`runs/live/20261120-185026`, Ice Golem tapped on tile (15, 15), Hog Rider on
++(16, 15) 1.06 s later; positions from the detection boxes):
++
++- Recorded: the Hog does not run ahead; it comes in behind the Golem, and from
++  2.7 s to 5.4 s after the Hog's tap both cover about 4.3 rows (1.6 rows/s;
++  the Golem alone walks 0.93-1.0, the Hog alone 2.15-2.3). The Golem is carried
++  forward and to the left (x 14.5 to about 13), the Hog passes it on the right
++  at about 5.4 s, and its first hit is 0.45-0.67 s later than a lone Hog's.
++  The Golem's share of the closing speed comes out near 0.44.
++- A mass split predicts 0.40 and an equal split 0.50. **The recording cannot
++  tell them apart**: this patch rests on the published masses, not on the
++  recording. In the engine the two splits differ by 0.2 s on the Hog's first
++  hit (0.6 s late equal, 0.8 s late by mass) and 0.2 rows on the Golem.
++- **The recorded tiles are NOT reproduced.** From (16, 15) the engine's Hog
++  walks a straight line to the tower, stays a tile to the right of the Golem
++  and never touches it (7 hits, 15 arrows, the same before and after this
++  patch). The recorded Hog is in the Golem's lane by the time it has jumped
++  the river: in 11 recorded crossings from that tile it is at x 14.3-14.4 at
++  engine row 18 where the engine has it at 15.5, and stops at 13.7-14.0
++  against 14.5. The jump covers about (-1.5, +2.0) tiles in 0.55-0.7 s. Not
++  changed: one start tile is recorded, and "lands in the lane" cannot be told
++  from "walks a diagonal grid path" with it. **This corrects the patch-0056
++  table row "river jump: straight diagonal ... agrees": it does not agree.**
++- With the Hog started in the lane behind the Golem (Golem (15, 15), Hog
++  (15, 14) 11 ticks later) the engine now does what the recording shows: the
++  Golem is carried 4.0 rows in 2.7 s and to the left, takes the tower's first
++  arrows, the Hog passes on the right at 5.5-5.8 s, lands its first hit 0.8 s
++  later than a lone Hog from that tile and gets 11 hits in against 7.
++- **Every other pair is untested by any recording.**
++
++Also seen and not changed: in the recording the two overlapped by about 0.3
++while both were still deploying and neither shifted (0.05 column at most over a
++second; the engine's push would move each 0.12-0.18). The engine separates
++deploying bodies at once. One pair, weak.
++
++`get_card_stats(id)["base"]` reports `published_mass` (0 = no record or a
++building) and `body_mass`; `get_units()` reports each unit's `body_mass` (0
++for a building or tower).
++
++Tests: `python_ai/tests/test_mass_push.py` (published values through the
++bindings and on what is spawned, two-body cards, the no-record default, a Hog
++carries an Ice Golem and moves a Golem much less, the lane pair on a tower),
++`tests/core/test_card_registry.cpp` `[patch0058]` (table, 0.6 / 0.4 and
++20/24 / 4/24 of an overlap, hand-built troops halve it). No existing
++expectation moved.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/Board.h b/include/core/Board.h
+index f5d1da5..51ff328 100644
+--- a/include/core/Board.h
++++ b/include/core/Board.h
+@@ -338,18 +338,23 @@ public:
+                     if (dist < minRadius) {
+                         if (dist < 0.001f) { dx = 1.0f; dy = 0.0f; dist = 1.0f; }
+                         float overlap = minRadius - dist;
+-                        float pushX = (dx / dist) * overlap * 0.5f;
+-                        float pushY = (dy / dist) * overlap * 0.5f;
++                        // Each gives way by the OTHER's share of the two
++                        // masses (published Mass, BodySizes.h): a Hog Rider
++                        // (4) against an Ice Golem (6) takes 0.6 of the
++                        // overlap and the Golem 0.4. Equal masses halve it.
++                        const float massSum = e1->bodyMass + e2->bodyMass;
++                        const float share1 = massSum > 0.0f ? e2->bodyMass / massSum : 0.5f;
++                        const float share2 = 1.0f - share1;
++                        const float nx = dx / dist;
++                        const float ny = dy / dist;
+ 
+                         // Tiny orthogonal nudge to prevent jitter lock.
+-                        float noise = 0.01f;
+-                        pushX += (dy / dist) * noise;
+-                        pushY -= (dx / dist) * noise;
+-
+-                        e1->position.x += pushX;
+-                        e1->position.y += pushY;
+-                        e2->position.x -= pushX;
+-                        e2->position.y -= pushY;
++                        const float noise = 0.01f;
++
++                        e1->position.x += nx * overlap * share1 + ny * noise;
++                        e1->position.y += ny * overlap * share1 - nx * noise;
++                        e2->position.x -= nx * overlap * share2 + ny * noise;
++                        e2->position.y -= ny * overlap * share2 - nx * noise;
+                     }
+                 }
+ 
+diff --git a/include/core/BodySizes.h b/include/core/BodySizes.h
+index 89330df..2ee1450 100644
+--- a/include/core/BodySizes.h
++++ b/include/core/BodySizes.h
+@@ -45,54 +45,66 @@
+ //
+ // A troop or building built by hand with no card (the test fixtures) keeps
+ // Entity::IMPLICIT_TROOP_RADIUS / Building::COLLISION_RADIUS.
++//
++// MASS (patch 0058). The same unit records give every troop a Mass, from 1
++// (Skeletons, the spirits, Bats, Spear Goblins, Guards) to 20 (Golem);
++// buildings have none (0 here) and are never moved. Board::resolveCollisions
++// shares the overlap of two touching troops by it: each moves the other's
++// mass over the sum of the two, so the heavier body gives way less. The
++// records publish the masses, NOT the rule; the split is the ordinary
++// two-body one and is checked against one recorded pair (a Hog Rider, mass 4,
++// behind an Ice Golem, mass 6: see the engine notes of patch 0058). A body
++// with no record takes DEFAULT_MASS = 5, the median of the published troops,
++// and so does a troop built by hand (Entity::IMPLICIT_TROOP_MASS).
+ namespace BodySizes {
+ 
+ constexpr float DEFAULT_RADIUS = 0.5f;
+ constexpr float DEFAULT_BUILDING_RADIUS = 0.6f;
++constexpr float DEFAULT_MASS = 5.0f;
+ 
+-struct Row { const char* name; int id; int radiusThousandths; };
++struct Row { const char* name; int id; int radiusThousandths; int mass; };
+ 
+ // id 0 = every card of that name; otherwise only that registry id.
+ inline constexpr Row ROWS[] = {
+-    { "Rascals", -28, 500 },           // RascalGirl
+-    { "Goblinstein", -40, 500 },       // the Doctor
+-    { "Ice Spirit", 0, 400 }, { "Fire Spirit", 0, 400 }, { "Heal Spirit", 0, 400 },
+-    { "Electro Spirit", 0, 400 }, { "Wall Breakers", 0, 400 },
+-    { "Mini PEKKA", 0, 450 }, { "Hero Mini P.E.K.K.A.", 0, 450 }, { "Berserker", 0, 450 },
+-    { "Knight", 0, 500 }, { "Archers", 0, 500 }, { "Goblins", 0, 500 }, { "Minions", 0, 500 },
+-    { "Minion Horde", 0, 500 }, { "Balloon", 0, 500 }, { "Witch", 0, 500 }, { "Barbarians", 0, 500 },
+-    { "Skeletons", 0, 500 }, { "Skeleton Army", 0, 500 }, { "Valkyrie", 0, 500 }, { "Bomber", 0, 500 },
+-    { "Musketeer", 0, 500 }, { "Three Musketeers", 0, 500 }, { "Baby Dragon", 0, 500 },
+-    { "Wizard", 0, 500 }, { "Spear Goblins", 0, 500 }, { "Ice Wizard", 0, 500 }, { "Guards", 0, 500 },
+-    { "Princess", 0, 500 }, { "Miner", 0, 500 }, { "Lumberjack", 0, 500 }, { "Inferno Dragon", 0, 500 },
+-    { "Dart Goblin", 0, 500 }, { "Electro Wizard", 0, 500 }, { "Elite Barbarians", 0, 500 },
+-    { "Royal Recruits", 0, 500 }, { "Night Witch", 0, 500 }, { "Bats", 0, 500 }, { "Cannon Cart", 0, 500 },
+-    { "Skeleton Barrel", 0, 500 }, { "Flying Machine", 0, 500 }, { "Fisherman", 0, 500 },
+-    { "Firecracker", 0, 500 }, { "Mighty Miner", 0, 500 }, { "Battle Healer", 0, 500 },
+-    { "Archer Queen", 0, 500 }, { "Monk", 0, 500 }, { "Mother Witch", 0, 500 }, { "Phoenix", 0, 500 },
+-    { "Little Prince", 0, 500 }, { "Spirit Empress", 0, 500 }, { "Suspicious Bush", 0, 500 },
+-    { "Bush Goblins", 0, 500 }, { "Goblin Gang", 0, 500 },
+-    { "Prince", 0, 600 }, { "Hog Rider", 0, 600 }, { "Dark Prince", 0, 600 }, { "Mega Minion", 0, 600 },
+-    { "Hunter", 0, 600 }, { "Executioner", 0, 600 }, { "Bandit", 0, 600 }, { "Royal Ghost", 0, 600 },
+-    { "Ram Rider", 0, 600 }, { "Zappies", 0, 600 }, { "Royal Hogs", 0, 600 }, { "Magic Archer", 0, 600 },
+-    { "Electro Dragon", 0, 600 }, { "Elixir Golem", 0, 600 }, { "Goblin Demolisher", 0, 600 },
+-    { "Kamikaze Goblin Demolisher", 0, 600 }, { "Boss Bandit", 0, 600 }, { "Ronin", 0, 600 },
+-    { "Furnace", 0, 600 },
+-    { "Ice Golem", 0, 700 },
+-    { "Giant", 0, 750 }, { "P.E.K.K.A.", 0, 750 }, { "Golem", 0, 750 }, { "Giant Skeleton", 0, 750 },
+-    { "Royal Giant", 0, 750 }, { "Lava Hound", 0, 750 }, { "Bowler", 0, 750 }, { "Battle Ram", 0, 750 },
+-    { "Rascals", 0, 750 }, { "Mega Knight", 0, 750 }, { "Goblin Giant", 0, 750 },
+-    { "Electro Giant", 0, 750 }, { "Goblin Machine", 0, 750 }, { "Goblinstein", 0, 750 },
+-    { "Rune Giant", 0, 750 },
+-    { "Golden Knight", 0, 800 },
+-    { "Skeleton Dragons", 0, 900 },
+-    { "Sparky", 0, 1000 }, { "Skeleton King", 0, 1000 },
++    { "Rascals", -28, 500, 2 },           // RascalGirl
++    { "Goblinstein", -40, 500, 4 },       // the Doctor
++    { "Ice Spirit", 0, 400, 1 }, { "Fire Spirit", 0, 400, 1 }, { "Heal Spirit", 0, 400, 1 },
++    { "Electro Spirit", 0, 400, 1 }, { "Wall Breakers", 0, 400, 4 },
++    { "Mini PEKKA", 0, 450, 4 }, { "Hero Mini P.E.K.K.A.", 0, 450, 4 }, { "Berserker", 0, 450, 2 },
++    { "Knight", 0, 500, 6 }, { "Archers", 0, 500, 3 }, { "Goblins", 0, 500, 2 }, { "Minions", 0, 500, 2 },
++    { "Minion Horde", 0, 500, 2 }, { "Balloon", 0, 500, 6 }, { "Witch", 0, 500, 8 }, { "Barbarians", 0, 500, 4 },
++    { "Skeletons", 0, 500, 1 }, { "Skeleton Army", 0, 500, 1 }, { "Valkyrie", 0, 500, 5 }, { "Bomber", 0, 500, 4 },
++    { "Musketeer", 0, 500, 5 }, { "Three Musketeers", 0, 500, 5 }, { "Baby Dragon", 0, 500, 5 },
++    { "Wizard", 0, 500, 5 }, { "Spear Goblins", 0, 500, 1 }, { "Ice Wizard", 0, 500, 5 }, { "Guards", 0, 500, 1 },
++    { "Princess", 0, 500, 3 }, { "Miner", 0, 500, 6 }, { "Lumberjack", 0, 500, 4 }, { "Inferno Dragon", 0, 500, 5 },
++    { "Dart Goblin", 0, 500, 3 }, { "Electro Wizard", 0, 500, 5 }, { "Elite Barbarians", 0, 500, 4 },
++    { "Royal Recruits", 0, 500, 5 }, { "Night Witch", 0, 500, 4 }, { "Bats", 0, 500, 1 }, { "Cannon Cart", 0, 500, 3 },
++    { "Skeleton Barrel", 0, 500, 7 }, { "Flying Machine", 0, 500, 3 }, { "Fisherman", 0, 500, 10 },
++    { "Firecracker", 0, 500, 6 }, { "Mighty Miner", 0, 500, 6 }, { "Battle Healer", 0, 500, 6 },
++    { "Archer Queen", 0, 500, 6 }, { "Monk", 0, 500, 6 }, { "Mother Witch", 0, 500, 6 }, { "Phoenix", 0, 500, 2 },
++    { "Little Prince", 0, 500, 4 }, { "Spirit Empress", 0, 500, 5 }, { "Suspicious Bush", 0, 500, 2 },
++    { "Bush Goblins", 0, 500, 2 }, { "Goblin Gang", 0, 500, 2 },
++    { "Prince", 0, 600, 6 }, { "Hog Rider", 0, 600, 4 }, { "Dark Prince", 0, 600, 6 }, { "Mega Minion", 0, 600, 6 },
++    { "Hunter", 0, 600, 5 }, { "Executioner", 0, 600, 4 }, { "Bandit", 0, 600, 3 }, { "Royal Ghost", 0, 600, 3 },
++    { "Ram Rider", 0, 600, 4 }, { "Zappies", 0, 600, 4 }, { "Royal Hogs", 0, 600, 2 }, { "Magic Archer", 0, 600, 3 },
++    { "Electro Dragon", 0, 600, 7 }, { "Elixir Golem", 0, 600, 15 }, { "Goblin Demolisher", 0, 600, 6 },
++    { "Kamikaze Goblin Demolisher", 0, 600, 6 }, { "Boss Bandit", 0, 600, 4 }, { "Ronin", 0, 600, 6 },
++    { "Furnace", 0, 600, 6 },
++    { "Ice Golem", 0, 700, 6 },
++    { "Giant", 0, 750, 18 }, { "P.E.K.K.A.", 0, 750, 18 }, { "Golem", 0, 750, 20 }, { "Giant Skeleton", 0, 750, 18 },
++    { "Royal Giant", 0, 750, 18 }, { "Lava Hound", 0, 750, 5 }, { "Bowler", 0, 750, 18 }, { "Battle Ram", 0, 750, 6 },
++    { "Rascals", 0, 750, 10 }, { "Mega Knight", 0, 750, 18 }, { "Goblin Giant", 0, 750, 18 },
++    { "Electro Giant", 0, 750, 18 }, { "Goblin Machine", 0, 750, 18 }, { "Goblinstein", 0, 750, 18 },
++    { "Rune Giant", 0, 750, 18 },
++    { "Golden Knight", 0, 800, 10 },
++    { "Skeleton Dragons", 0, 900, 4 },
++    { "Sparky", 0, 1000, 18 }, { "Skeleton King", 0, 1000, 10 },
+     // Buildings.
+-    { "Tesla", 0, 500 }, { "Goblin Drill", 0, 500 },
+-    { "Cannon", 0, 600 }, { "Bomb Tower", 0, 600 }, { "Inferno Tower", 0, 600 }, { "X-Bow", 0, 600 },
+-    { "Mortar", 0, 600 },
+-    { "Barbarian Hut", 0, 1000 }, { "Goblin Hut", 0, 1000 }, { "Tombstone", 0, 1000 },
+-    { "Goblin Cage", 0, 1000 }, { "Elixir Collector", 0, 1000 },
++    { "Tesla", 0, 500, 0 }, { "Goblin Drill", 0, 500, 0 },
++    { "Cannon", 0, 600, 0 }, { "Bomb Tower", 0, 600, 0 }, { "Inferno Tower", 0, 600, 0 }, { "X-Bow", 0, 600, 0 },
++    { "Mortar", 0, 600, 0 },
++    { "Barbarian Hut", 0, 1000, 0 }, { "Goblin Hut", 0, 1000, 0 }, { "Tombstone", 0, 1000, 0 },
++    { "Goblin Cage", 0, 1000, 0 }, { "Elixir Collector", 0, 1000, 0 },
+ };
+ 
+ inline const Row* findExact(const std::string& name, int id) {
+@@ -126,4 +138,16 @@ inline float radius(const std::string& name, int id, bool building = false) {
+     return building ? DEFAULT_BUILDING_RADIUS : DEFAULT_RADIUS;
+ }
+ 
++// Published Mass; 0 = no row, or a building (no Mass is published for one).
++inline int publishedMass(const std::string& name, int id) {
++    const Row* r = find(name, id);
++    return r ? r->mass : 0;
++}
++
++// Mass of a card's troop: the published one, or DEFAULT_MASS.
++inline float mass(const std::string& name, int id) {
++    const int m = publishedMass(name, id);
++    return m > 0 ? static_cast<float>(m) : DEFAULT_MASS;
++}
++
+ }  // namespace BodySizes
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index d2cf0ce..a5a79a7 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -94,6 +94,7 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     // Published body of the card's troop or building (BodySizes.h, patch
+     // 0057).
+     entity->bodyRadius = BodySizes::radius(stats.name, stats.id, stats.archetype == Archetype::DefensiveBuilding);
++    entity->bodyMass = BodySizes::mass(stats.name, stats.id);
+     entity->transformAtHpFraction = stats.transformAtHpFraction;
+     entity->transformCheckMaxHp = stats.hp;
+     entity->transformLifetimeTicks = stats.transformLifetimeTicks;
+diff --git a/include/core/ClashEnv.h b/include/core/ClashEnv.h
+index e284d94..4d9fe77 100644
+--- a/include/core/ClashEnv.h
++++ b/include/core/ClashEnv.h
+@@ -995,6 +995,7 @@ public:
+         bool awake;            // false only for a dormant King Tower
+         bool targetable;       // false while invisible (Royal Ghost, a cloak)
+         float bodyRadius;      // the body used for contact, reach and sight (BodySizes.h)
++        float bodyMass;        // published Mass; 0 for a building or tower (never pushed)
+     };
+     std::vector<UnitView> getUnits() const {
+         std::vector<UnitView> out;
+@@ -1007,7 +1008,8 @@ public:
+                             c->shieldHp, c->isFlying, c->isBuilding(), c->isTower(), c->getCurrentTargetId(),
+                             c->deployTicksRemaining, c->freezeTicks, c->freezeSlow, c->getCurrentCooldown(),
+                             tower ? tower->isAwake() : true, c->isTargetable(),
+-                            c->getCollisionRadius() > 0.0f ? c->getCollisionRadius() : c->bodyRadius });
++                            c->getCollisionRadius() > 0.0f ? c->getCollisionRadius() : c->bodyRadius,
++                            c->getCollisionRadius() > 0.0f ? 0.0f : c->bodyMass });
+         }
+         return out;
+     }
+diff --git a/include/entities/Entity.h b/include/entities/Entity.h
+index 8a29e31..061df03 100644
+--- a/include/entities/Entity.h
++++ b/include/entities/Entity.h
+@@ -29,6 +29,15 @@ public:
+     // has its own.
+     float bodyRadius = IMPLICIT_TROOP_RADIUS;
+ 
++    // The mass of a troop built by hand with no card: the median of the
++    // published troops (BodySizes::DEFAULT_MASS).
++    static constexpr float IMPLICIT_TROOP_MASS = 5.0f;
++
++    // Published Mass of a card's troop (BodySizes.h, patch 0058). Two touching
++    // troops share their overlap by it in Board::resolveCollisions: the
++    // heavier one gives way less. Buildings are never moved and do not read it.
++    float bodyMass = IMPLICIT_TROOP_MASS;
++
+     int id;
+     Vector2D position;
+     int hp;
+diff --git a/python_ai/tests/test_mass_push.py b/python_ai/tests/test_mass_push.py
+new file mode 100644
+index 0000000..fb271c7
+--- /dev/null
++++ b/python_ai/tests/test_mass_push.py
+@@ -0,0 +1,173 @@
++"""Two touching troops give way by their published masses (patch 0058).
++
++The game's unit table gives every troop a Mass (FirstLight-Zero
++card_specs.json, release 15.535.13): 1 for Skeletons and the spirits, 4 for the
++Hog Rider, 6 for the Ice Golem and the Knight, 18 for the giants, 20 for the
++Golem; none for a building. The table is include/core/BodySizes.h; the numbers
++below are the published ones, not a copy of an engine constant.
++
++The table gives the masses, not the rule. The engine shares the overlap of two
++touching troops so that each moves by the OTHER's mass over the sum. The one
++pair that can be read off a recording is a Hog Rider behind an Ice Golem
++(runs/live/20261120-185026): the Golem is pushed ahead at about 1.6 rows a
++second against its own 1.0, is the first body the Princess Tower shoots, and
++the Hog's first hit comes 0.45-0.67 s later than a lone Hog's. That recording
++does not tell this split from an equal one (see the engine notes).
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++import pytest
++
++NOOP = 4
++DECK = [125, 168, 129, 15, 40, 72, 33, 7]
++SKELETONS, KNIGHT, GIANT, GOBLINS, MUSKETEER, HOG, GOLEM, CANNON, ICE_GOLEM, ICE_SPIRIT = (
++    24, 0, 2, 4, 6, 15, 19, 25, 40, 72)
++
++PUBLISHED = [
++    # (card id, published Mass)
++    (24, 1), (125, 1),                 # Skeletons and their evolution
++    (72, 1),                           # Ice Spirit
++    (4, 2), (82, 2),                   # Goblins, Royal Hogs
++    (15, 4), (17, 4),                  # Hog Rider, Elite Barbarians
++    (6, 5), (140, 5), (168, 5),        # Musketeer, evolution, hero
++    (0, 6), (40, 6),                   # Knight, Ice Golem
++    (57, 7),                           # Electro Dragon
++    (117, 10),                         # Skeleton King
++    (90, 15),                          # Elixir Golem
++    (2, 18), (84, 18),                 # Giant, Electro Giant
++    (19, 20),                          # Golem
++]
++
++
++def _match():
++    env = E.ClashRoyaleEnv(list(DECK), list(DECK), 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    return env
++
++
++def _bodies(env, team=0):
++    return [u for u in env.get_units() if not u["tower"] and u["team"] == team]
++
++
++def _one(env, card, team=0):
++    found = [u for u in _bodies(env, team) if u["card_id"] == card]
++    return found[0] if found else None
++
++
++@pytest.mark.parametrize("card,mass", PUBLISHED)
++def test_a_card_carries_its_published_mass(card, mass):
++    base = E.get_card_stats(card)["base"]
++    assert base["published_mass"] == mass
++    assert base["body_mass"] == pytest.approx(float(mass))
++    if E.get_card_info(card)["is_evolution"]:
++        return                                   # inject() places base forms only
++    env = _match()
++    env.inject(card, 9.0, 8.0, 0, -1.0, -1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 2)
++    spawned = [u for u in _bodies(env) if u["card_id"] == card]
++    assert spawned
++    assert {u["body_mass"] for u in spawned} == {float(mass)}
++
++
++def test_buildings_and_towers_have_no_mass():
++    base = E.get_card_stats(CANNON)["base"]
++    assert base["published_mass"] == 0
++    assert base["body_mass"] == 0.0
++    env = _match()
++    env.inject(CANNON, 9.0, 8.0, 0, -1.0, -1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 2)
++    assert _one(env, CANNON)["body_mass"] == 0.0
++    assert {u["body_mass"] for u in env.get_units() if u["tower"]} == {0.0}
++
++
++def test_the_second_body_of_a_two_body_card_has_its_own_mass():
++    # Rascals: the Boy 10, the Girls 2. Goblinstein: the Monster 18, the Doctor 4.
++    for card, first, second in ((113, 10.0, 2.0), (121, 18.0, 4.0)):
++        env = _match()
++        env.inject(card, 9.0, 8.0, 0, -1.0, -1)
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 2)
++        masses = {u["card_id"] == card: u["body_mass"] for u in _bodies(env)}
++        assert masses == {True: first, False: second}
++
++
++def test_a_body_with_no_published_record_takes_the_median_five():
++    # Golemites have no record in the pack; 5 is the median Mass of its troops.
++    env = _match()
++    env.inject(GOLEM, 9.0, 16.0, 1, 1.0, -1)       # a Golem on 1 HP
++    env.inject(MUSKETEER, 9.0, 12.0, 0, -1.0, 0)
++    seen = {}
++    for _ in range(80):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        for u in _bodies(env, 1):
++            seen[u["name"]] = u["body_mass"]
++    assert seen == {"Golem": 20.0, "Golemite": 5.0}
++
++
++def _push(front_card, back_card, ticks=20):
++    """`front_card` walks up the right lane, clear of our towers; `back_card`
++    starts right behind it, in contact. Returns how far the front body got with
++    the one behind it, and alone."""
++    def run(with_back):
++        env = _match()
++        env.inject(front_card, 14.5, 10.0, 0, -1.0, 0)
++        if with_back:
++            env.inject(back_card, 14.5, 8.8, 0, -1.0, 0)
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, ticks)
++        return _one(env, front_card)["y"]
++    return run(True), run(False)
++
++
++def test_a_hog_rider_pushes_an_ice_golem_ahead_of_it():
++    # Very Fast, mass 4, behind Slow, mass 6: the Golem is carried forward
++    # (two rows alone in these 2 s, most of a row more with the Hog behind).
++    pushed, alone = _push(ICE_GOLEM, HOG)
++    assert pushed - alone > 0.6
++
++
++def test_a_hog_rider_moves_a_golem_much_less():
++    # Mass 4 behind mass 20: the Golem takes a sixth of every overlap where the
++    # Ice Golem takes two fifths. With an equal split the two were carried the
++    # same distance.
++    pushed, alone = _push(GOLEM, HOG)
++    ice_pushed, ice_alone = _push(ICE_GOLEM, HOG)
++    assert 0.0 <= pushed - alone < 0.6 * (ice_pushed - ice_alone)
++
++
++def _hog_on_the_tower(golem_tile, hog_tile, lead=11):
++    """Ice Golem on `golem_tile` (None = no Golem), Hog Rider on `hog_tile`
++    `lead` ticks later. Ticks are counted from the Hog's landing."""
++    env = _match()
++    env.set_tower_hit_log(True)
++    start = env.get_current_tick()
++    if golem_tile is None:
++        lead = 0
++    last, first_arrow = {}, {}
++    for k in range(420):
++        if k == 0 and golem_tile is not None:
++            env.inject(ICE_GOLEM, golem_tile[0], golem_tile[1], 0, -1.0, -1)
++        if k == lead:
++            env.inject(HOG, hog_tile[0], hog_tile[1], 0, -1.0, -1)
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        for card in (HOG, ICE_GOLEM):
++            unit = _one(env, card)
++            if unit is None:
++                continue
++            if card in last and unit["hp"] < last[card]:
++                first_arrow.setdefault(card, k + 1 - lead)
++            last[card] = unit["hp"]
++    hits = [h[0] - start - lead for h in env.get_tower_hits() if h[1] == 0 and h[2] == HOG]
++    return hits, first_arrow
++
++
++def test_a_hog_rider_behind_an_ice_golem_in_the_lane_hits_later_and_longer():
++    # The recorded pair: the Golem is the first body in the tower's reach and
++    # takes its arrows, the Hog's first hit comes 0.45-0.67 s later than a lone
++    # Hog's (0.4-1.0 s asked for here: one tile and one seed), and it lands
++    # more hits than a lone Hog because the tower is busy.
++    lone_hits, lone_arrow = _hog_on_the_tower(None, (15.0, 14.0))
++    hits, arrow = _hog_on_the_tower((15.0, 15.0), (15.0, 14.0))
++    assert 4 <= hits[0] - lone_hits[0] <= 10
++    assert arrow[ICE_GOLEM] < lone_arrow[HOG] + 6          # the tower opens on the Golem
++    assert arrow[HOG] - arrow[ICE_GOLEM] >= 50             # and stays on it
++    assert len(hits) >= len(lone_hits) + 3
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index 8b1470f..284b58a 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -85,6 +85,10 @@ py::dict statsDict(const CardStats& s, int depth = 0) {
+     // a tile, 0 = no row; and the radius the engine gives it, in tiles.
+     d["published_collision_radius"] = BodySizes::publishedRadius(s.name, s.id);
+     d["body_radius"] = BodySizes::radius(s.name, s.id, s.archetype == Archetype::DefensiveBuilding);
++    // Published Mass of the card's troop (0 = no row, or a building) and the mass the
++    // engine pushes with (patch 0058); a building is never pushed and reports 0.
++    d["published_mass"] = BodySizes::publishedMass(s.name, s.id);
++    d["body_mass"] = s.archetype == Archetype::DefensiveBuilding ? 0.0f : BodySizes::mass(s.name, s.id);
+     d["deploy_ticks"] = s.deployTicks;
+     d["count"] = static_cast<int>(s.spawnOffsets.size());
+     py::list offs;
+@@ -480,6 +484,7 @@ PYBIND11_MODULE(clash_royale_env, m) {
+                     d["awake"] = u.awake;
+                     d["targetable"] = u.targetable;
+                     d["body_radius"] = u.bodyRadius;
++                    d["body_mass"] = u.bodyMass;
+                     out.append(d);
+                 }
+                 return out;
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index 2604f6b..8efa490 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -2460,3 +2460,81 @@ TEST_CASE("Two troops are pushed apart to the sum of their published bodies",
+     const auto& golem = board.getEntities()[1];
+     REQUIRE(hog->position.distanceTo(golem->position) == Catch::Approx(1.3f).margin(1e-3));
+ }
++
++// Patch 0058: published Mass (BodySizes.h; FirstLight-Zero card_specs.json,
++// release 15.535.13). Two touching troops share their overlap by it.
++TEST_CASE("Two touching troops give way by the other's share of their published masses",
++          "[card_registry][body][patch0058]") {
++    auto& reg = CardRegistry::getInstance();
++
++    // The table.
++    REQUIRE(BodySizes::publishedMass("Skeletons", 24) == 1);
++    REQUIRE(BodySizes::publishedMass("Ice Spirit", 72) == 1);
++    REQUIRE(BodySizes::publishedMass("Goblins", 4) == 2);
++    REQUIRE(BodySizes::publishedMass("Hog Rider", 15) == 4);
++    REQUIRE(BodySizes::publishedMass("Musketeer", 6) == 5);
++    REQUIRE(BodySizes::publishedMass("Knight", 0) == 6);
++    REQUIRE(BodySizes::publishedMass("Ice Golem", 40) == 6);
++    REQUIRE(BodySizes::publishedMass("Elixir Golem", 90) == 15);
++    REQUIRE(BodySizes::publishedMass("Giant", 2) == 18);
++    REQUIRE(BodySizes::publishedMass("Golem", 19) == 20);
++    // The second body of a two-body name has its own.
++    REQUIRE(BodySizes::publishedMass("Rascals", 113) == 10);
++    REQUIRE(BodySizes::publishedMass("Rascals", -28) == 2);
++    REQUIRE(BodySizes::publishedMass("Goblinstein", 121) == 18);
++    REQUIRE(BodySizes::publishedMass("Goblinstein", -40) == 4);
++    // "Hero X" without a row weighs what X does.
++    REQUIRE(BodySizes::publishedMass("Hero Musketeer", 168) == 5);
++    // No Mass is published for a building; a body with no record takes the
++    // median of the published troops.
++    REQUIRE(BodySizes::publishedMass("Cannon", 25) == 0);
++    REQUIRE(BodySizes::publishedMass("Golemite", -1) == 0);
++    REQUIRE(BodySizes::mass("Golemite", -1) == Catch::Approx(BodySizes::DEFAULT_MASS));
++    int troops = 0;
++    for (const auto& row : BodySizes::ROWS) {
++        INFO(row.name);
++        REQUIRE(row.mass >= 0);
++        REQUIRE(row.mass <= 20);
++        if (row.mass > 0) ++troops;
++    }
++    REQUIRE(troops > 90);
++
++    SECTION("a Hog Rider (4) against an Ice Golem (6): 0.6 and 0.4 of the overlap") {
++        Board board;
++        reg.getCard(15)->spawnEntity(5.0f, 5.0f, 0, board);
++        reg.getCard(40)->spawnEntity(5.5f, 5.0f, 0, board);
++        board.commitPendingEntities();
++        REQUIRE(board.getEntities()[0]->bodyMass == Catch::Approx(4.0f));
++        REQUIRE(board.getEntities()[1]->bodyMass == Catch::Approx(6.0f));
++        board.resolveCollisions();
++        // Overlap 1.3 - 0.5 = 0.8.
++        REQUIRE(board.getEntities()[0]->position.x == Catch::Approx(5.0f - 0.48f).margin(1e-3));
++        REQUIRE(board.getEntities()[1]->position.x == Catch::Approx(5.5f + 0.32f).margin(1e-3));
++    }
++
++    SECTION("a Hog Rider (4) hardly moves a Golem (20)") {
++        Board board;
++        reg.getCard(15)->spawnEntity(5.0f, 5.0f, 0, board);
++        reg.getCard(19)->spawnEntity(5.5f, 5.0f, 0, board);
++        board.commitPendingEntities();
++        board.resolveCollisions();
++        // Overlap 0.6 + 0.75 - 0.5 = 0.85: the Golem takes 4/24 of it.
++        REQUIRE(board.getEntities()[1]->position.x == Catch::Approx(5.5f + 0.85f * 4.0f / 24.0f).margin(1e-3));
++        REQUIRE(board.getEntities()[0]->position.x == Catch::Approx(5.0f - 0.85f * 20.0f / 24.0f).margin(1e-3));
++    }
++
++    SECTION("two troops built by hand weigh the same and halve it, as before") {
++        Board board;
++        auto a = std::make_shared<MeleeTroop>(900, 5.0f, 5.0f, 100, 0, 0.1f, 1.0f, 10, 10, 'k');
++        auto b = std::make_shared<MeleeTroop>(901, 5.4f, 5.0f, 100, 0, 0.1f, 1.0f, 10, 10, 'k');
++        REQUIRE(a->bodyMass == Catch::Approx(Entity::IMPLICIT_TROOP_MASS));
++        REQUIRE(Entity::IMPLICIT_TROOP_MASS == Catch::Approx(BodySizes::DEFAULT_MASS));
++        board.addEntity(a);
++        board.addEntity(b);
++        board.commitPendingEntities();
++        board.resolveCollisions();
++        // Overlap 0.8 - 0.4 = 0.4, 0.2 each.
++        REQUIRE(a->position.x == Catch::Approx(4.8f).margin(1e-3));
++        REQUIRE(b->position.x == Catch::Approx(5.6f).margin(1e-3));
++    }
++}

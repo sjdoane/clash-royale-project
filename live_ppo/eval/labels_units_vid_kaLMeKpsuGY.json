@@ -1,0 +1,6847 @@
+{
+ "src": "vid_kaLMeKpsuGY",
+ "protocol": "FRESH TEST labels for live_ppo/eval/eval_units.py: AGENT-LABELLED 2026-11-20, PRE-FILLED FROM WEIGHTS B (runs/det_v3_pod/ab/B/weights/last.pt), PENDING HUMAN CHECK. Test material: nothing from this video may enter a training set or be used to tune anything. Frames: match_audit.py sample --stratify (60 per video, seed 0, no bursts, 15 per tracked-unit-count bin 0-2 / 3-5 / 6-9 / 10+). Method (runs/match_audit/<src>/sample/REVIEW.md): units counted on the clean frame before reading the detector's boxes, then the pre-filled list corrected (false boxes deleted, missed units added, class / form / side fixed) against zoom crops and neighbouring frames. NOT blind to the detector in the sense of the three older files: recall measured here is an upper bound. Schema as labels_units_vid_uVf1EUszTIM.json: tile = continuous detector-grid ground point (x 0..17, y 0..31 from our King side); troops: feet; flyers: bottom of the body; buildings: footprint centre; a pre-filled tile was moved only when it was more than about one tile off. ref = tile_to_ref(tile). Flags: swarm, fly, bld, tower, river (set by rule from class / tile); occ, spell, deploy, formq, sideq, gpq (ground point uncertain, usually a hidden unit placed from its level badge), spl (spell area or projectile, not a unit; dropped by eval_units).",
+ "status": "agent-labelled 2026-11-20, pre-filled from weights B (runs/det_v3_pod/ab/B/weights/last.pt), pending human check",
+ "note": {
+  "conventions": [
+   "deploy = the deploy timer is showing on or next to the unit, in ANY state (part-filled, white completion flash, or full), or the card was just released (card caption and elixir drop up, figure still faint, timer not drawn yet). All units of a deploying group carry it. A timer the unit has already left behind by more than about 2 tiles does not count. A full timer lingers about 0.5 s after the unit becomes active, so some deploy-flagged units are already moving.",
+   "A unit dropping in (drawn high or not drawn yet, badge and timer up) is labelled at its landing spot with deploy + gpq, class from the following frames.",
+   "Not units, not labelled: drag previews (placement square / range circle, no elixir drop), goblin-barrel placement ghosts, the mighty miner's bomb, underground miners, death splashes, rage clouds, captions, emotes, tower decorations, King-tower shots, unit projectiles (hunter pellets, bowler boulder, firecracker rocket, a mace lying at the river in LekrcVeQjiw 61875).",
+   "Spells and projectile cards in flight or active get an spl entry (goblin-barrel, royal-delivery, the-log, earthquake).",
+   "Hidden units known from a level badge plus neighbouring frames are labelled occ + gpq.",
+   "Translucent, just-released skeleton armies are labelled only where single skeletons can be separated (kaLMeKpsuGY 17235: 11 of 15, 37740: 5 of 15, 39510: 8 of 15, 43500: 10 of 15): the unlabelled rest will count against precision if a detector finds them.",
+   "Form: plain shield badge = base, diamond = Evo, crown = hero / champion; hit-flash tint is not a form cue. Where the form could not be read the detector's form is kept with formq.",
+   "LekrcVeQjiw: our gold-skin cannon and our ice golem are formq in every frame (skin vs Evo / hero form not settled; the detector itself flips between ice-golem and ice-golem-hero on the same unit). Our musketeer is musketeer-hero (crown badge). The purple enemy boulder-thrower with a crown badge is bowler-hero + formq.",
+   "kaLMeKpsuGY: bottom / blue side is ours. Own units at full health show no badge; enemy units always show a red one."
+  ],
+  "frame_key": "60-fps-equivalent index, as runs/live/vid_kaLMeKpsuGY/f<key>.jpg; the video is ~60 fps: video frame = key",
+  "check_sheets": "runs/match_audit/fresh_test/check/ (one image per frame + CHECK.md with the 15 least-sure frames)",
+  "per_frame_notes": "runs/match_audit/fresh_test/notes_vid_kaLMeKpsuGY.json (blind count, confidence 1-5, what was changed and why)"
+ },
+ "frames": {
+  "3885": [
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     9.2,
+     11.6
+    ],
+    "ref": [
+     292.4,
+     494.9
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "hog-rider",
+    "side": 1,
+    "tile": [
+     11.0,
+     11.5
+    ],
+    "ref": [
+     339.6,
+     497.0
+    ],
+    "flags": []
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     16.7,
+     5.7
+    ],
+    "ref": [
+     488.8,
+     618.3
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     16.2,
+     7.4
+    ],
+    "ref": [
+     475.7,
+     582.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     16.3,
+     8.4
+    ],
+    "ref": [
+     478.3,
+     561.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.5,
+     8.2
+    ],
+    "ref": [
+     457.4,
+     566.0
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 1,
+    "tile": [
+     14.6,
+     3.5
+    ],
+    "ref": [
+     433.8,
+     664.3
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 1,
+    "tile": [
+     14.2,
+     4.6
+    ],
+    "ref": [
+     423.3,
+     641.3
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 1,
+    "tile": [
+     13.1,
+     4.7
+    ],
+    "ref": [
+     394.5,
+     639.2
+    ],
+    "flags": [
+     "swarm",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.7,
+     4.8
+    ],
+    "ref": [
+     462.6,
+     637.1
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.0,
+     11.0
+    ],
+    "ref": [
+     391.9,
+     507.5
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     12.6,
+     6.7
+    ],
+    "ref": [
+     381.5,
+     597.4
+    ],
+    "flags": [
+     "swarm",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     16.6,
+     6.6
+    ],
+    "ref": [
+     486.2,
+     599.5
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.7,
+     4.3
+    ],
+    "ref": [
+     436.4,
+     647.6
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     16.6,
+     4.8
+    ],
+    "ref": [
+     486.2,
+     637.1
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     16.0,
+     5.5
+    ],
+    "ref": [
+     470.5,
+     622.5
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.2,
+     5.6
+    ],
+    "ref": [
+     449.5,
+     620.4
+    ],
+    "flags": [
+     "swarm",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.9,
+     6.7
+    ],
+    "ref": [
+     467.8,
+     597.4
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.3,
+     7.2
+    ],
+    "ref": [
+     452.1,
+     586.9
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   }
+  ],
+  "4245": [
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.5,
+     11.0
+    ],
+    "ref": [
+     431.2,
+     507.5
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.5,
+     13.1
+    ],
+    "ref": [
+     431.2,
+     463.5
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.0,
+     10.0
+    ],
+    "ref": [
+     444.3,
+     528.4
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.6,
+     12.2
+    ],
+    "ref": [
+     433.8,
+     482.4
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.2,
+     9.0
+    ],
+    "ref": [
+     449.5,
+     549.3
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.2,
+     7.7
+    ],
+    "ref": [
+     449.5,
+     576.5
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.5,
+     13.3
+    ],
+    "ref": [
+     405.0,
+     459.3
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.3,
+     12.1
+    ],
+    "ref": [
+     399.8,
+     484.4
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.3,
+     15.3
+    ],
+    "ref": [
+     426.0,
+     417.5
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.0,
+     14.3
+    ],
+    "ref": [
+     418.1,
+     438.4
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.3,
+     16.4
+    ],
+    "ref": [
+     426.0,
+     394.5
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.9,
+     14.1
+    ],
+    "ref": [
+     441.7,
+     442.6
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "goblin-barrel",
+    "side": 1,
+    "tile": [
+     9.0,
+     8.5
+    ],
+    "ref": [
+     287.2,
+     559.8
+    ],
+    "flags": [
+     "spl"
+    ]
+   }
+  ],
+  "5130": [
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     11.1,
+     11.9
+    ],
+    "ref": [
+     342.2,
+     488.6
+    ],
+    "flags": []
+   },
+   {
+    "cls": "mortar",
+    "side": 1,
+    "tile": [
+     15.2,
+     18.7
+    ],
+    "ref": [
+     449.5,
+     346.4
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "royal-giant",
+    "side": 0,
+    "tile": [
+     16.3,
+     13.0
+    ],
+    "ref": [
+     478.3,
+     465.6
+    ],
+    "flags": [
+     "deploy"
+    ]
+   }
+  ],
+  "6645": [
+   {
+    "cls": "dart-goblin",
+    "side": 0,
+    "tile": [
+     12.9,
+     14.0
+    ],
+    "ref": [
+     389.3,
+     444.7
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "barbarian",
+    "side": 1,
+    "tile": [
+     14.4,
+     12.7
+    ],
+    "ref": [
+     428.6,
+     471.9
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.7,
+     10.2
+    ],
+    "ref": [
+     462.6,
+     524.2
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.4,
+     8.3
+    ],
+    "ref": [
+     454.8,
+     563.9
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.9,
+     9.1
+    ],
+    "ref": [
+     441.7,
+     547.2
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.6,
+     9.9
+    ],
+    "ref": [
+     407.6,
+     530.5
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.5,
+     11.2
+    ],
+    "ref": [
+     457.4,
+     503.3
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.5,
+     11.8
+    ],
+    "ref": [
+     405.0,
+     490.7
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.1,
+     10.7
+    ],
+    "ref": [
+     394.5,
+     513.7
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.7,
+     11.9
+    ],
+    "ref": [
+     462.6,
+     488.6
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     12.7,
+     10.0
+    ],
+    "ref": [
+     384.1,
+     528.4
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     12.5,
+     12.3
+    ],
+    "ref": [
+     378.8,
+     480.3
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.6,
+     10.8
+    ],
+    "ref": [
+     407.6,
+     511.6
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.4,
+     9.1
+    ],
+    "ref": [
+     402.4,
+     547.2
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.2,
+     9.8
+    ],
+    "ref": [
+     423.3,
+     532.6
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.8,
+     10.4
+    ],
+    "ref": [
+     439.0,
+     520.0
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.6,
+     9.5
+    ],
+    "ref": [
+     433.8,
+     538.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "barbarian",
+    "side": 1,
+    "tile": [
+     14.3,
+     13.3
+    ],
+    "ref": [
+     426.0,
+     459.3
+    ],
+    "flags": [
+     "swarm"
+    ]
+   }
+  ],
+  "10830": [
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     8.2,
+     9.7
+    ],
+    "ref": [
+     266.3,
+     534.7
+    ],
+    "flags": [
+     "bld"
+    ]
+   }
+  ],
+  "10845": [
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     8.2,
+     9.7
+    ],
+    "ref": [
+     266.3,
+     534.7
+    ],
+    "flags": [
+     "bld"
+    ]
+   }
+  ],
+  "12255": [
+   {
+    "cls": "lava-hound",
+    "side": 1,
+    "tile": [
+     15.3,
+     14.0
+    ],
+    "ref": [
+     452.1,
+     444.7
+    ],
+    "flags": [
+     "fly",
+     "river"
+    ]
+   },
+   {
+    "cls": "royal-giant",
+    "side": 0,
+    "tile": [
+     3.9,
+     13.8
+    ],
+    "ref": [
+     153.7,
+     448.9
+    ],
+    "flags": []
+   },
+   {
+    "cls": "hunter",
+    "side": 0,
+    "tile": [
+     15.2,
+     11.1
+    ],
+    "ref": [
+     449.5,
+     505.4
+    ],
+    "flags": []
+   },
+   {
+    "cls": "spirit-empress",
+    "side": 1,
+    "tile": [
+     9.0,
+     20.4
+    ],
+    "ref": [
+     287.2,
+     310.8
+    ],
+    "flags": [
+     "deploy"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     3.5,
+     17.3
+    ],
+    "ref": [
+     143.2,
+     375.7
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   }
+  ],
+  "12330": [
+   {
+    "cls": "lava-hound",
+    "side": 1,
+    "tile": [
+     15.3,
+     12.9
+    ],
+    "ref": [
+     452.1,
+     467.7
+    ],
+    "flags": [
+     "fly",
+     "occ"
+    ]
+   },
+   {
+    "cls": "royal-giant",
+    "side": 0,
+    "tile": [
+     3.6,
+     14.7
+    ],
+    "ref": [
+     145.8,
+     430.1
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "hunter",
+    "side": 0,
+    "tile": [
+     15.3,
+     11.2
+    ],
+    "ref": [
+     452.1,
+     503.3
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "spirit-empress",
+    "side": 1,
+    "tile": [
+     8.9,
+     20.1
+    ],
+    "ref": [
+     284.6,
+     317.1
+    ],
+    "flags": []
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     3.5,
+     17.4
+    ],
+    "ref": [
+     143.2,
+     373.6
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   }
+  ],
+  "12780": [
+   {
+    "cls": "royal-giant",
+    "side": 0,
+    "tile": [
+     3.7,
+     18.2
+    ],
+    "ref": [
+     148.5,
+     356.9
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "hunter",
+    "side": 0,
+    "tile": [
+     15.1,
+     11.2
+    ],
+    "ref": [
+     446.9,
+     503.3
+    ],
+    "flags": []
+   },
+   {
+    "cls": "spirit-empress",
+    "side": 1,
+    "tile": [
+     8.9,
+     20.0
+    ],
+    "ref": [
+     284.6,
+     319.2
+    ],
+    "flags": []
+   },
+   {
+    "cls": "valkyrie-hero",
+    "side": 1,
+    "tile": [
+     5.2,
+     17.7
+    ],
+    "ref": [
+     187.7,
+     367.3
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "dart-goblin",
+    "side": 0,
+    "tile": [
+     9.2,
+     11.8
+    ],
+    "ref": [
+     292.4,
+     490.7
+    ],
+    "flags": []
+   },
+   {
+    "cls": "lava-pup",
+    "side": 1,
+    "tile": [
+     17.0,
+     13.1
+    ],
+    "ref": [
+     496.6,
+     463.5
+    ],
+    "flags": [
+     "swarm",
+     "fly"
+    ]
+   },
+   {
+    "cls": "lava-pup",
+    "side": 1,
+    "tile": [
+     16.5,
+     15.1
+    ],
+    "ref": [
+     483.5,
+     421.7
+    ],
+    "flags": [
+     "swarm",
+     "fly",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "lava-pup",
+    "side": 1,
+    "tile": [
+     16.5,
+     10.8
+    ],
+    "ref": [
+     483.5,
+     511.6
+    ],
+    "flags": [
+     "swarm",
+     "fly"
+    ]
+   }
+  ],
+  "15330": [
+   {
+    "cls": "goblin-cage",
+    "side": 1,
+    "tile": [
+     9.2,
+     21.4
+    ],
+    "ref": [
+     292.4,
+     289.9
+    ],
+    "flags": [
+     "bld"
+    ]
+   }
+  ],
+  "15780": [
+   {
+    "cls": "goblin-cage",
+    "side": 1,
+    "tile": [
+     9.2,
+     21.5
+    ],
+    "ref": [
+     292.4,
+     287.8
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "royal-giant-ev1",
+    "side": 0,
+    "tile": [
+     4.6,
+     15.3
+    ],
+    "ref": [
+     172.0,
+     417.5
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     3.2,
+     13.7
+    ],
+    "ref": [
+     135.4,
+     451.0
+    ],
+    "flags": [
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "spirit-empress",
+    "side": 1,
+    "tile": [
+     10.1,
+     19.2
+    ],
+    "ref": [
+     316.0,
+     335.9
+    ],
+    "flags": [
+     "deploy",
+     "gpq"
+    ]
+   }
+  ],
+  "16095": [
+   {
+    "cls": "royal-giant-ev1",
+    "side": 0,
+    "tile": [
+     3.8,
+     17.8
+    ],
+    "ref": [
+     151.1,
+     365.2
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "spirit-empress",
+    "side": 1,
+    "tile": [
+     10.4,
+     18.8
+    ],
+    "ref": [
+     323.9,
+     344.3
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "dart-goblin",
+    "side": 0,
+    "tile": [
+     8.2,
+     11.2
+    ],
+    "ref": [
+     266.3,
+     503.3
+    ],
+    "flags": [
+     "deploy"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     4.3,
+     19.2
+    ],
+    "ref": [
+     164.2,
+     335.9
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "goblin-brawler",
+    "side": 1,
+    "tile": [
+     6.1,
+     20.0
+    ],
+    "ref": [
+     211.3,
+     319.2
+    ],
+    "flags": []
+   }
+  ],
+  "17235": [
+   {
+    "cls": "valkyrie-hero",
+    "side": 1,
+    "tile": [
+     3.1,
+     14.8
+    ],
+    "ref": [
+     132.8,
+     428.0
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 0,
+    "tile": [
+     15.6,
+     24.1
+    ],
+    "ref": [
+     460.0,
+     233.4
+    ],
+    "flags": [
+     "swarm",
+     "tower"
+    ]
+   },
+   {
+    "cls": "hunter",
+    "side": 0,
+    "tile": [
+     14.1,
+     11.2
+    ],
+    "ref": [
+     420.7,
+     503.3
+    ],
+    "flags": []
+   },
+   {
+    "cls": "skeleton-dragon",
+    "side": 1,
+    "tile": [
+     15.4,
+     18.5
+    ],
+    "ref": [
+     454.8,
+     350.6
+    ],
+    "flags": [
+     "swarm",
+     "fly"
+    ]
+   },
+   {
+    "cls": "skeleton-dragon",
+    "side": 1,
+    "tile": [
+     12.9,
+     18.5
+    ],
+    "ref": [
+     389.3,
+     350.6
+    ],
+    "flags": [
+     "swarm",
+     "fly"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     10.2,
+     8.5
+    ],
+    "ref": [
+     318.6,
+     559.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     12.5,
+     8.7
+    ],
+    "ref": [
+     378.8,
+     555.6
+    ],
+    "flags": [
+     "swarm",
+     "tower",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     10.7,
+     7.1
+    ],
+    "ref": [
+     331.7,
+     589.0
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     8.8,
+     7.2
+    ],
+    "ref": [
+     282.0,
+     586.9
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     11.1,
+     8.1
+    ],
+    "ref": [
+     342.2,
+     568.1
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     7.9,
+     8.7
+    ],
+    "ref": [
+     258.4,
+     555.6
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     9.4,
+     9.0
+    ],
+    "ref": [
+     297.7,
+     549.3
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     10.8,
+     9.4
+    ],
+    "ref": [
+     334.3,
+     540.9
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "lava-hound",
+    "side": 1,
+    "tile": [
+     14.2,
+     16.2
+    ],
+    "ref": [
+     423.3,
+     398.7
+    ],
+    "flags": [
+     "fly",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     12.0,
+     6.6
+    ],
+    "ref": [
+     365.7,
+     599.5
+    ],
+    "flags": [
+     "swarm",
+     "tower",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     9.7,
+     8.4
+    ],
+    "ref": [
+     305.5,
+     561.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     10.9,
+     10.0
+    ],
+    "ref": [
+     336.9,
+     528.4
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   }
+  ],
+  "18600": [
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     14.1,
+     17.4
+    ],
+    "ref": [
+     420.7,
+     373.6
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "valkyrie-hero",
+    "side": 1,
+    "tile": [
+     13.3,
+     17.1
+    ],
+    "ref": [
+     399.8,
+     379.9
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "goblin-barrel",
+    "side": 0,
+    "tile": [
+     16.4,
+     24.8
+    ],
+    "ref": [
+     480.9,
+     218.8
+    ],
+    "flags": [
+     "tower",
+     "spl"
+    ]
+   }
+  ],
+  "19485": [
+   {
+    "cls": "valkyrie-hero",
+    "side": 1,
+    "tile": [
+     14.3,
+     15.9
+    ],
+    "ref": [
+     426.0,
+     405.0
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "goblin-cage-ev1",
+    "side": 1,
+    "tile": [
+     12.2,
+     18.1
+    ],
+    "ref": [
+     371.0,
+     358.9
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "royal-giant",
+    "side": 0,
+    "tile": [
+     12.3,
+     18.4
+    ],
+    "ref": [
+     373.6,
+     352.7
+    ],
+    "flags": [
+     "occ",
+     "gpq"
+    ]
+   }
+  ],
+  "20640": [],
+  "22020": [
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     9.2,
+     9.7
+    ],
+    "ref": [
+     292.4,
+     534.7
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "pekka",
+    "side": 1,
+    "tile": [
+     14.5,
+     13.0
+    ],
+    "ref": [
+     431.2,
+     465.6
+    ],
+    "flags": [
+     "occ",
+     "spell"
+    ]
+   },
+   {
+    "cls": "wizard-hero",
+    "side": 1,
+    "tile": [
+     13.1,
+     14.3
+    ],
+    "ref": [
+     394.5,
+     438.4
+    ],
+    "flags": [
+     "occ",
+     "spell",
+     "river"
+    ]
+   },
+   {
+    "cls": "hunter",
+    "side": 0,
+    "tile": [
+     11.3,
+     14.6
+    ],
+    "ref": [
+     347.4,
+     432.2
+    ],
+    "flags": [
+     "spell",
+     "river",
+     "deploy"
+    ]
+   }
+  ],
+  "22455": [
+   {
+    "cls": "pekka",
+    "side": 1,
+    "tile": [
+     13.5,
+     12.2
+    ],
+    "ref": [
+     405.0,
+     482.4
+    ],
+    "flags": [
+     "spell"
+    ]
+   },
+   {
+    "cls": "royal-delivery",
+    "side": 0,
+    "tile": [
+     13.2,
+     15.5
+    ],
+    "ref": [
+     397.2,
+     413.3
+    ],
+    "flags": [
+     "river",
+     "spl"
+    ]
+   }
+  ],
+  "23415": [
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.8,
+     18.2
+    ],
+    "ref": [
+     412.9,
+     356.9
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.6,
+     16.9
+    ],
+    "ref": [
+     433.8,
+     384.0
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.6,
+     15.6
+    ],
+    "ref": [
+     433.8,
+     411.2
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.8,
+     16.0
+    ],
+    "ref": [
+     412.9,
+     402.9
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.6,
+     17.9
+    ],
+    "ref": [
+     433.8,
+     363.1
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.8,
+     16.9
+    ],
+    "ref": [
+     412.9,
+     384.0
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.0,
+     19.0
+    ],
+    "ref": [
+     418.1,
+     340.1
+    ],
+    "flags": [
+     "swarm"
+    ]
+   }
+  ],
+  "24885": [
+   {
+    "cls": "wizard-hero",
+    "side": 1,
+    "tile": [
+     13.2,
+     22.6
+    ],
+    "ref": [
+     397.2,
+     264.8
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     9.2,
+     10.7
+    ],
+    "ref": [
+     292.4,
+     513.7
+    ],
+    "flags": [
+     "bld"
+    ]
+   }
+  ],
+  "27435": [
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     12.7,
+     26.1
+    ],
+    "ref": [
+     384.1,
+     191.6
+    ],
+    "flags": [
+     "swarm",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     12.9,
+     23.6
+    ],
+    "ref": [
+     389.3,
+     243.9
+    ],
+    "flags": [
+     "swarm",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     12.2,
+     24.6
+    ],
+    "ref": [
+     371.0,
+     223.0
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     12.0,
+     25.5
+    ],
+    "ref": [
+     365.7,
+     204.2
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     15.0,
+     23.6
+    ],
+    "ref": [
+     444.3,
+     243.9
+    ],
+    "flags": [
+     "swarm",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     16.2,
+     26.4
+    ],
+    "ref": [
+     475.7,
+     185.3
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     16.4,
+     25.2
+    ],
+    "ref": [
+     480.9,
+     210.4
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     14.8,
+     22.5
+    ],
+    "ref": [
+     439.0,
+     266.9
+    ],
+    "flags": [
+     "swarm",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     15.7,
+     24.8
+    ],
+    "ref": [
+     462.6,
+     218.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     15.9,
+     23.9
+    ],
+    "ref": [
+     467.8,
+     237.6
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     15.6,
+     26.2
+    ],
+    "ref": [
+     460.0,
+     189.5
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     14.0,
+     15.6
+    ],
+    "ref": [
+     418.1,
+     411.2
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     13.3,
+     26.7
+    ],
+    "ref": [
+     399.8,
+     179.1
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "gpq"
+    ]
+   }
+  ],
+  "28500": [
+   {
+    "cls": "pekka",
+    "side": 1,
+    "tile": [
+     13.5,
+     16.8
+    ],
+    "ref": [
+     405.0,
+     386.1
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "lumberjack",
+    "side": 1,
+    "tile": [
+     12.9,
+     14.6
+    ],
+    "ref": [
+     389.3,
+     432.2
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     11.3,
+     14.1
+    ],
+    "ref": [
+     347.4,
+     442.6
+    ],
+    "flags": [
+     "bld",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "hunter",
+    "side": 0,
+    "tile": [
+     12.4,
+     10.2
+    ],
+    "ref": [
+     376.2,
+     524.2
+    ],
+    "flags": [
+     "deploy",
+     "gpq"
+    ]
+   }
+  ],
+  "29190": [
+   {
+    "cls": "pekka",
+    "side": 1,
+    "tile": [
+     13.3,
+     11.1
+    ],
+    "ref": [
+     399.8,
+     505.4
+    ],
+    "flags": []
+   },
+   {
+    "cls": "goblin",
+    "side": 1,
+    "tile": [
+     15.2,
+     18.6
+    ],
+    "ref": [
+     449.5,
+     348.5
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 1,
+    "tile": [
+     15.0,
+     17.3
+    ],
+    "ref": [
+     444.3,
+     375.7
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     14.2,
+     18.6
+    ],
+    "ref": [
+     423.3,
+     348.5
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     13.2,
+     18.5
+    ],
+    "ref": [
+     397.2,
+     350.6
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 1,
+    "tile": [
+     14.2,
+     17.1
+    ],
+    "ref": [
+     423.3,
+     379.9
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river",
+     "deploy",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "little-prince",
+    "side": 1,
+    "tile": [
+     12.5,
+     16.8
+    ],
+    "ref": [
+     378.8,
+     386.1
+    ],
+    "flags": [
+     "occ",
+     "river",
+     "deploy",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     12.5,
+     15.0
+    ],
+    "ref": [
+     378.8,
+     423.8
+    ],
+    "flags": [
+     "river",
+     "deploy"
+    ]
+   }
+  ],
+  "29415": [
+   {
+    "cls": "little-prince",
+    "side": 1,
+    "tile": [
+     13.8,
+     12.5
+    ],
+    "ref": [
+     412.9,
+     476.1
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     14.4,
+     15.9
+    ],
+    "ref": [
+     428.6,
+     405.0
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     15.0,
+     14.7
+    ],
+    "ref": [
+     444.3,
+     430.1
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 1,
+    "tile": [
+     12.9,
+     15.9
+    ],
+    "ref": [
+     389.3,
+     405.0
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 1,
+    "tile": [
+     13.2,
+     13.7
+    ],
+    "ref": [
+     397.2,
+     451.0
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 1,
+    "tile": [
+     12.8,
+     14.7
+    ],
+    "ref": [
+     386.7,
+     430.1
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     5.3,
+     13.8
+    ],
+    "ref": [
+     190.3,
+     448.9
+    ],
+    "flags": [
+     "occ"
+    ]
+   }
+  ],
+  "29520": [
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     4.4,
+     14.6
+    ],
+    "ref": [
+     166.8,
+     432.2
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "dart-goblin",
+    "side": 0,
+    "tile": [
+     14.2,
+     14.1
+    ],
+    "ref": [
+     423.3,
+     442.6
+    ],
+    "flags": [
+     "river",
+     "deploy"
+    ]
+   }
+  ],
+  "29835": [
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     2.3,
+     17.7
+    ],
+    "ref": [
+     111.8,
+     367.3
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     4.0,
+     17.4
+    ],
+    "ref": [
+     156.3,
+     373.6
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     4.9,
+     16.7
+    ],
+    "ref": [
+     179.9,
+     388.2
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     2.5,
+     17.1
+    ],
+    "ref": [
+     117.0,
+     379.9
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     3.0,
+     15.8
+    ],
+    "ref": [
+     130.1,
+     407.1
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     2.4,
+     15.0
+    ],
+    "ref": [
+     114.4,
+     423.8
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     2.9,
+     15.5
+    ],
+    "ref": [
+     127.5,
+     413.3
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     2.0,
+     13.8
+    ],
+    "ref": [
+     104.0,
+     448.9
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     2.2,
+     16.4
+    ],
+    "ref": [
+     109.2,
+     394.5
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     3.2,
+     14.1
+    ],
+    "ref": [
+     135.4,
+     442.6
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     3.9,
+     15.0
+    ],
+    "ref": [
+     153.7,
+     423.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     4.2,
+     16.0
+    ],
+    "ref": [
+     161.5,
+     402.9
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     3.7,
+     16.9
+    ],
+    "ref": [
+     148.5,
+     384.0
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "goblin-barrel",
+    "side": 0,
+    "tile": [
+     9.5,
+     13.0
+    ],
+    "ref": [
+     300.3,
+     465.6
+    ],
+    "flags": [
+     "spl"
+    ]
+   },
+   {
+    "cls": "the-log",
+    "side": 0,
+    "tile": [
+     14.3,
+     12.0
+    ],
+    "ref": [
+     426.0,
+     486.5
+    ],
+    "flags": [
+     "sideq",
+     "spl"
+    ]
+   }
+  ],
+  "30600": [
+   {
+    "cls": "royal-giant-ev1",
+    "side": 0,
+    "tile": [
+     14.4,
+     16.2
+    ],
+    "ref": [
+     428.6,
+     398.7
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     10.2,
+     13.5
+    ],
+    "ref": [
+     318.6,
+     455.2
+    ],
+    "flags": [
+     "bld",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "lumberjack-ev1",
+    "side": 1,
+    "tile": [
+     13.9,
+     13.8
+    ],
+    "ref": [
+     415.5,
+     448.9
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     2.9,
+     18.0
+    ],
+    "ref": [
+     127.5,
+     361.0
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 1,
+    "tile": [
+     4.1,
+     17.4
+    ],
+    "ref": [
+     158.9,
+     373.6
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     4.1,
+     18.2
+    ],
+    "ref": [
+     158.9,
+     356.9
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 1,
+    "tile": [
+     2.7,
+     15.9
+    ],
+    "ref": [
+     122.3,
+     405.0
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     5.1,
+     17.8
+    ],
+    "ref": [
+     185.1,
+     365.2
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 1,
+    "tile": [
+     3.0,
+     16.8
+    ],
+    "ref": [
+     130.1,
+     386.1
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river",
+     "deploy"
+    ]
+   }
+  ],
+  "31875": [
+   {
+    "cls": "pekka-ev1",
+    "side": 1,
+    "tile": [
+     2.8,
+     28.3
+    ],
+    "ref": [
+     124.9,
+     145.6
+    ],
+    "flags": [
+     "occ",
+     "tower",
+     "gpq"
+    ]
+   }
+  ],
+  "33975": [],
+  "34905": [
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     3.2,
+     17.5
+    ],
+    "ref": [
+     135.4,
+     371.5
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "dart-goblin",
+    "side": 0,
+    "tile": [
+     13.7,
+     14.8
+    ],
+    "ref": [
+     410.2,
+     428.0
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     3.1,
+     18.6
+    ],
+    "ref": [
+     132.8,
+     348.5
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     4.2,
+     17.6
+    ],
+    "ref": [
+     161.5,
+     369.4
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     5.6,
+     21.6
+    ],
+    "ref": [
+     198.2,
+     285.7
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     13.0,
+     20.4
+    ],
+    "ref": [
+     391.9,
+     310.8
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     4.6,
+     19.9
+    ],
+    "ref": [
+     172.0,
+     321.3
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     3.9,
+     19.2
+    ],
+    "ref": [
+     153.7,
+     335.9
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     5.9,
+     17.1
+    ],
+    "ref": [
+     206.1,
+     379.9
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     3.8,
+     20.5
+    ],
+    "ref": [
+     151.1,
+     308.7
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     9.9,
+     21.0
+    ],
+    "ref": [
+     310.8,
+     298.3
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     9.3,
+     17.3
+    ],
+    "ref": [
+     295.1,
+     375.7
+    ],
+    "flags": [
+     "river",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "goblin-barrel",
+    "side": 0,
+    "tile": [
+     13.5,
+     26.0
+    ],
+    "ref": [
+     405.0,
+     193.7
+    ],
+    "flags": [
+     "tower",
+     "spl"
+    ]
+   }
+  ],
+  "34980": [
+   {
+    "cls": "dart-goblin",
+    "side": 0,
+    "tile": [
+     13.3,
+     14.5
+    ],
+    "ref": [
+     399.8,
+     434.2
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     4.4,
+     18.7
+    ],
+    "ref": [
+     166.8,
+     346.4
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     5.0,
+     19.6
+    ],
+    "ref": [
+     182.5,
+     327.6
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     5.6,
+     20.3
+    ],
+    "ref": [
+     198.2,
+     312.9
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     3.9,
+     20.9
+    ],
+    "ref": [
+     153.7,
+     300.4
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     4.0,
+     21.9
+    ],
+    "ref": [
+     156.3,
+     279.5
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     8.6,
+     17.3
+    ],
+    "ref": [
+     276.7,
+     375.7
+    ],
+    "flags": [
+     "river",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "the-log",
+    "side": 1,
+    "tile": [
+     14.0,
+     27.0
+    ],
+    "ref": [
+     418.1,
+     172.8
+    ],
+    "flags": [
+     "tower",
+     "spl"
+    ]
+   }
+  ],
+  "36645": [
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     8.1,
+     8.7
+    ],
+    "ref": [
+     263.6,
+     555.6
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "hunter",
+    "side": 0,
+    "tile": [
+     3.4,
+     12.0
+    ],
+    "ref": [
+     140.6,
+     486.5
+    ],
+    "flags": []
+   }
+  ],
+  "37140": [
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     8.1,
+     8.7
+    ],
+    "ref": [
+     263.6,
+     555.6
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 1,
+    "tile": [
+     8.1,
+     21.4
+    ],
+    "ref": [
+     263.6,
+     289.9
+    ],
+    "flags": [
+     "bld"
+    ]
+   }
+  ],
+  "37500": [
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     8.1,
+     8.7
+    ],
+    "ref": [
+     263.6,
+     555.6
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 1,
+    "tile": [
+     8.2,
+     21.4
+    ],
+    "ref": [
+     266.3,
+     289.9
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "firecracker",
+    "side": 1,
+    "tile": [
+     6.0,
+     28.9
+    ],
+    "ref": [
+     208.7,
+     133.0
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     10.2,
+     1.3
+    ],
+    "ref": [
+     318.6,
+     710.4
+    ],
+    "flags": [
+     "tower"
+    ]
+   }
+  ],
+  "37740": [
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     8.1,
+     8.7
+    ],
+    "ref": [
+     263.6,
+     555.6
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 1,
+    "tile": [
+     8.2,
+     21.4
+    ],
+    "ref": [
+     266.3,
+     289.9
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "firecracker",
+    "side": 1,
+    "tile": [
+     3.9,
+     22.6
+    ],
+    "ref": [
+     153.7,
+     264.8
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     13.1,
+     4.9
+    ],
+    "ref": [
+     394.5,
+     635.1
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     5.2,
+     6.4
+    ],
+    "ref": [
+     187.7,
+     603.7
+    ],
+    "flags": [
+     "swarm",
+     "tower",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     6.0,
+     7.1
+    ],
+    "ref": [
+     208.7,
+     589.0
+    ],
+    "flags": [
+     "swarm",
+     "tower",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     7.4,
+     6.9
+    ],
+    "ref": [
+     245.3,
+     593.2
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     3.5,
+     4.8
+    ],
+    "ref": [
+     143.2,
+     637.1
+    ],
+    "flags": [
+     "swarm",
+     "tower",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     6.4,
+     5.4
+    ],
+    "ref": [
+     219.1,
+     624.6
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   }
+  ],
+  "38715": [
+   {
+    "cls": "royal-giant",
+    "side": 0,
+    "tile": [
+     13.3,
+     17.0
+    ],
+    "ref": [
+     399.8,
+     382.0
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 1,
+    "tile": [
+     9.2,
+     22.3
+    ],
+    "ref": [
+     292.4,
+     271.1
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     14.4,
+     17.7
+    ],
+    "ref": [
+     428.6,
+     367.3
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     13.3,
+     22.7
+    ],
+    "ref": [
+     399.8,
+     262.7
+    ],
+    "flags": [
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     14.1,
+     17.7
+    ],
+    "ref": [
+     420.7,
+     367.3
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 0,
+    "tile": [
+     15.9,
+     25.8
+    ],
+    "ref": [
+     467.8,
+     197.9
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 0,
+    "tile": [
+     15.3,
+     27.1
+    ],
+    "ref": [
+     452.1,
+     170.7
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 0,
+    "tile": [
+     15.5,
+     27.1
+    ],
+    "ref": [
+     457.4,
+     170.7
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     13.8,
+     21.4
+    ],
+    "ref": [
+     412.9,
+     289.9
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     13.2,
+     18.8
+    ],
+    "ref": [
+     397.2,
+     344.3
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "gpq"
+    ]
+   }
+  ],
+  "38865": [
+   {
+    "cls": "royal-giant",
+    "side": 0,
+    "tile": [
+     13.1,
+     17.0
+    ],
+    "ref": [
+     394.5,
+     382.0
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 1,
+    "tile": [
+     9.2,
+     22.3
+    ],
+    "ref": [
+     292.4,
+     271.1
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     14.5,
+     17.5
+    ],
+    "ref": [
+     431.2,
+     371.5
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     14.6,
+     18.8
+    ],
+    "ref": [
+     433.8,
+     344.3
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     13.2,
+     20.8
+    ],
+    "ref": [
+     397.2,
+     302.5
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     13.2,
+     18.8
+    ],
+    "ref": [
+     397.2,
+     344.3
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "gpq"
+    ]
+   }
+  ],
+  "38910": [
+   {
+    "cls": "royal-giant",
+    "side": 0,
+    "tile": [
+     13.4,
+     16.9
+    ],
+    "ref": [
+     402.4,
+     384.0
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 1,
+    "tile": [
+     9.2,
+     22.3
+    ],
+    "ref": [
+     292.4,
+     271.1
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     14.7,
+     17.2
+    ],
+    "ref": [
+     436.4,
+     377.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     13.4,
+     19.4
+    ],
+    "ref": [
+     402.4,
+     331.8
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     14.5,
+     18.3
+    ],
+    "ref": [
+     431.2,
+     354.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     13.2,
+     18.8
+    ],
+    "ref": [
+     397.2,
+     344.3
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "gpq"
+    ]
+   }
+  ],
+  "39150": [
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     14.6,
+     14.1
+    ],
+    "ref": [
+     433.8,
+     442.6
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     14.8,
+     15.3
+    ],
+    "ref": [
+     439.0,
+     417.5
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     13.3,
+     17.4
+    ],
+    "ref": [
+     399.8,
+     373.6
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     13.6,
+     15.7
+    ],
+    "ref": [
+     407.6,
+     409.1
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   }
+  ],
+  "39510": [
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     11.9,
+     10.7
+    ],
+    "ref": [
+     363.1,
+     513.7
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     12.8,
+     9.4
+    ],
+    "ref": [
+     386.7,
+     540.9
+    ],
+    "flags": [
+     "swarm",
+     "tower",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.7,
+     11.0
+    ],
+    "ref": [
+     436.4,
+     507.5
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.8,
+     11.1
+    ],
+    "ref": [
+     412.9,
+     505.4
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.3,
+     12.7
+    ],
+    "ref": [
+     452.1,
+     471.9
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     16.2,
+     11.2
+    ],
+    "ref": [
+     475.7,
+     503.3
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     13.5,
+     11.2
+    ],
+    "ref": [
+     405.0,
+     503.3
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     12.3,
+     12.6
+    ],
+    "ref": [
+     373.6,
+     474.0
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.0,
+     11.5
+    ],
+    "ref": [
+     444.3,
+     497.0
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   }
+  ],
+  "40275": [
+   {
+    "cls": "firecracker",
+    "side": 1,
+    "tile": [
+     5.6,
+     21.0
+    ],
+    "ref": [
+     198.2,
+     298.3
+    ],
+    "flags": []
+   },
+   {
+    "cls": "royal-delivery",
+    "side": 0,
+    "tile": [
+     3.2,
+     14.0
+    ],
+    "ref": [
+     135.4,
+     444.7
+    ],
+    "flags": [
+     "river",
+     "spl"
+    ]
+   }
+  ],
+  "41340": [
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     8.1,
+     9.8
+    ],
+    "ref": [
+     263.6,
+     532.6
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     13.3,
+     9.4
+    ],
+    "ref": [
+     399.8,
+     540.9
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     12.5,
+     7.4
+    ],
+    "ref": [
+     378.8,
+     582.8
+    ],
+    "flags": [
+     "swarm",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     12.1,
+     8.4
+    ],
+    "ref": [
+     368.4,
+     561.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     11.6,
+     9.3
+    ],
+    "ref": [
+     355.3,
+     543.0
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     5.2,
+     9.3
+    ],
+    "ref": [
+     187.7,
+     543.0
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     6.2,
+     7.8
+    ],
+    "ref": [
+     213.9,
+     574.4
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     11.6,
+     7.3
+    ],
+    "ref": [
+     355.3,
+     584.9
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     9.6,
+     8.5
+    ],
+    "ref": [
+     302.9,
+     559.8
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     10.1,
+     7.8
+    ],
+    "ref": [
+     316.0,
+     574.4
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     11.1,
+     8.1
+    ],
+    "ref": [
+     342.2,
+     568.1
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     11.7,
+     10.4
+    ],
+    "ref": [
+     357.9,
+     520.0
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     5.3,
+     11.2
+    ],
+    "ref": [
+     190.3,
+     503.3
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     10.5,
+     9.0
+    ],
+    "ref": [
+     326.5,
+     549.3
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     4.3,
+     17.9
+    ],
+    "ref": [
+     164.2,
+     363.1
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     12.3,
+     9.6
+    ],
+    "ref": [
+     373.6,
+     536.7
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     11.1,
+     10.1
+    ],
+    "ref": [
+     342.2,
+     526.3
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   }
+  ],
+  "41490": [
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.7,
+     11.7
+    ],
+    "ref": [
+     436.4,
+     492.8
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.2,
+     10.7
+    ],
+    "ref": [
+     397.2,
+     513.7
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     3.9,
+     11.4
+    ],
+    "ref": [
+     153.7,
+     499.1
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.6,
+     11.3
+    ],
+    "ref": [
+     407.6,
+     501.2
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.7,
+     13.8
+    ],
+    "ref": [
+     410.2,
+     448.9
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     3.4,
+     13.2
+    ],
+    "ref": [
+     140.6,
+     461.4
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.0,
+     13.0
+    ],
+    "ref": [
+     418.1,
+     465.6
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     12.8,
+     13.2
+    ],
+    "ref": [
+     386.7,
+     461.4
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     12.9,
+     11.5
+    ],
+    "ref": [
+     389.3,
+     497.0
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.3,
+     12.6
+    ],
+    "ref": [
+     399.8,
+     474.0
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.6,
+     13.7
+    ],
+    "ref": [
+     433.8,
+     451.0
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     12.9,
+     14.3
+    ],
+    "ref": [
+     389.3,
+     438.4
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.8,
+     14.7
+    ],
+    "ref": [
+     412.9,
+     430.1
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   }
+  ],
+  "41610": [
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.1,
+     15.2
+    ],
+    "ref": [
+     420.7,
+     419.6
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     3.6,
+     15.0
+    ],
+    "ref": [
+     145.8,
+     423.8
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     3.5,
+     16.6
+    ],
+    "ref": [
+     143.2,
+     390.3
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     15.0,
+     15.5
+    ],
+    "ref": [
+     444.3,
+     413.3
+    ],
+    "flags": [
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.5,
+     15.2
+    ],
+    "ref": [
+     405.0,
+     419.6
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.7,
+     14.0
+    ],
+    "ref": [
+     410.2,
+     444.7
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.8,
+     17.4
+    ],
+    "ref": [
+     439.0,
+     373.6
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.7,
+     16.4
+    ],
+    "ref": [
+     410.2,
+     394.5
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.6,
+     16.6
+    ],
+    "ref": [
+     433.8,
+     390.3
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.2,
+     17.7
+    ],
+    "ref": [
+     397.2,
+     367.3
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.1,
+     18.0
+    ],
+    "ref": [
+     420.7,
+     361.0
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.0,
+     19.1
+    ],
+    "ref": [
+     418.1,
+     338.0
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.9,
+     17.4
+    ],
+    "ref": [
+     415.5,
+     373.6
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   }
+  ],
+  "41925": [
+   {
+    "cls": "hog-rider",
+    "side": 1,
+    "tile": [
+     1.1,
+     17.2
+    ],
+    "ref": [
+     80.4,
+     377.8
+    ],
+    "flags": [
+     "river",
+     "deploy"
+    ]
+   }
+  ],
+  "42390": [
+   {
+    "cls": "hog-rider",
+    "side": 1,
+    "tile": [
+     3.1,
+     9.3
+    ],
+    "ref": [
+     132.8,
+     543.0
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "firecracker-ev1",
+    "side": 1,
+    "tile": [
+     3.5,
+     16.6
+    ],
+    "ref": [
+     143.2,
+     390.3
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     2.7,
+     15.6
+    ],
+    "ref": [
+     122.3,
+     411.2
+    ],
+    "flags": [
+     "spell",
+     "river"
+    ]
+   },
+   {
+    "cls": "earthquake",
+    "side": 1,
+    "tile": [
+     2.6,
+     14.3
+    ],
+    "ref": [
+     119.7,
+     438.4
+    ],
+    "flags": [
+     "river",
+     "spl"
+    ]
+   }
+  ],
+  "43005": [
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     4.6,
+     18.7
+    ],
+    "ref": [
+     172.0,
+     346.4
+    ],
+    "flags": []
+   },
+   {
+    "cls": "dart-goblin",
+    "side": 0,
+    "tile": [
+     12.4,
+     14.3
+    ],
+    "ref": [
+     376.2,
+     438.4
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     13.2,
+     16.1
+    ],
+    "ref": [
+     397.2,
+     400.8
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "the-log",
+    "side": 1,
+    "tile": [
+     2.5,
+     20.0
+    ],
+    "ref": [
+     117.0,
+     319.2
+    ],
+    "flags": [
+     "spl"
+    ]
+   }
+  ],
+  "43500": [
+   {
+    "cls": "firecracker",
+    "side": 1,
+    "tile": [
+     3.2,
+     17.1
+    ],
+    "ref": [
+     135.4,
+     379.9
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "hog-rider",
+    "side": 1,
+    "tile": [
+     2.4,
+     11.9
+    ],
+    "ref": [
+     114.4,
+     488.6
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     0.3,
+     10.8
+    ],
+    "ref": [
+     59.4,
+     511.6
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     3.6,
+     10.7
+    ],
+    "ref": [
+     145.8,
+     513.7
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     0.2,
+     9.3
+    ],
+    "ref": [
+     56.8,
+     543.0
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     2.1,
+     11.4
+    ],
+    "ref": [
+     106.6,
+     499.1
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     1.2,
+     10.7
+    ],
+    "ref": [
+     83.0,
+     513.7
+    ],
+    "flags": [
+     "swarm",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     0.4,
+     12.5
+    ],
+    "ref": [
+     62.1,
+     476.1
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     9.9,
+     12.6
+    ],
+    "ref": [
+     310.8,
+     474.0
+    ],
+    "flags": []
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     1.3,
+     14.5
+    ],
+    "ref": [
+     85.6,
+     434.2
+    ],
+    "flags": [
+     "swarm",
+     "river",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     0.1,
+     14.0
+    ],
+    "ref": [
+     54.2,
+     444.7
+    ],
+    "flags": [
+     "swarm",
+     "river",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     1.1,
+     12.5
+    ],
+    "ref": [
+     80.4,
+     476.1
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     3.0,
+     14.3
+    ],
+    "ref": [
+     130.1,
+     438.4
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "hunter",
+    "side": 0,
+    "tile": [
+     8.4,
+     11.0
+    ],
+    "ref": [
+     271.5,
+     507.5
+    ],
+    "flags": []
+   }
+  ],
+  "44700": [
+   {
+    "cls": "hog-rider",
+    "side": 1,
+    "tile": [
+     2.3,
+     11.7
+    ],
+    "ref": [
+     111.8,
+     492.8
+    ],
+    "flags": []
+   },
+   {
+    "cls": "firecracker",
+    "side": 1,
+    "tile": [
+     3.2,
+     17.1
+    ],
+    "ref": [
+     135.4,
+     379.9
+    ],
+    "flags": [
+     "river",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "hunter",
+    "side": 0,
+    "tile": [
+     2.2,
+     8.4
+    ],
+    "ref": [
+     109.2,
+     561.8
+    ],
+    "flags": [
+     "tower",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     2.6,
+     13.4
+    ],
+    "ref": [
+     119.7,
+     457.3
+    ],
+    "flags": [
+     "bld",
+     "occ",
+     "deploy"
+    ]
+   }
+  ],
+  "45930": [
+   {
+    "cls": "royal-giant-ev1",
+    "side": 0,
+    "tile": [
+     13.3,
+     9.9
+    ],
+    "ref": [
+     399.8,
+     530.5
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "cannon-ev1",
+    "side": 1,
+    "tile": [
+     8.2,
+     22.0
+    ],
+    "ref": [
+     266.3,
+     277.4
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     14.9,
+     12.0
+    ],
+    "ref": [
+     441.7,
+     486.5
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "ice-spirit",
+    "side": 1,
+    "tile": [
+     13.3,
+     18.8
+    ],
+    "ref": [
+     399.8,
+     344.3
+    ],
+    "flags": []
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     3.2,
+     14.2
+    ],
+    "ref": [
+     135.4,
+     440.5
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     1.3,
+     11.2
+    ],
+    "ref": [
+     85.6,
+     503.3
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     0.5,
+     12.7
+    ],
+    "ref": [
+     64.7,
+     471.9
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     3.4,
+     11.6
+    ],
+    "ref": [
+     140.6,
+     494.9
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     2.2,
+     9.7
+    ],
+    "ref": [
+     109.2,
+     534.7
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     1.5,
+     11.9
+    ],
+    "ref": [
+     90.9,
+     488.6
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     2.4,
+     11.0
+    ],
+    "ref": [
+     114.4,
+     507.5
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     0.6,
+     11.6
+    ],
+    "ref": [
+     67.3,
+     494.9
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     0.3,
+     13.7
+    ],
+    "ref": [
+     59.4,
+     451.0
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     2.5,
+     12.1
+    ],
+    "ref": [
+     117.0,
+     484.4
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     2.2,
+     12.8
+    ],
+    "ref": [
+     109.2,
+     469.8
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     3.2,
+     12.8
+    ],
+    "ref": [
+     135.4,
+     469.8
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "hog-rider",
+    "side": 1,
+    "tile": [
+     1.6,
+     12.6
+    ],
+    "ref": [
+     93.5,
+     474.0
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "firecracker-ev1",
+    "side": 1,
+    "tile": [
+     16.6,
+     25.8
+    ],
+    "ref": [
+     486.2,
+     197.9
+    ],
+    "flags": [
+     "tower",
+     "deploy",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "dart-goblin",
+    "side": 0,
+    "tile": [
+     3.3,
+     3.6
+    ],
+    "ref": [
+     138.0,
+     662.3
+    ],
+    "flags": [
+     "tower",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "the-log",
+    "side": 1,
+    "tile": [
+     3.3,
+     15.8
+    ],
+    "ref": [
+     138.0,
+     407.1
+    ],
+    "flags": [
+     "river",
+     "spl"
+    ]
+   }
+  ],
+  "45960": [
+   {
+    "cls": "royal-giant-ev1",
+    "side": 0,
+    "tile": [
+     13.5,
+     10.3
+    ],
+    "ref": [
+     405.0,
+     522.1
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "cannon-ev1",
+    "side": 1,
+    "tile": [
+     8.2,
+     22.0
+    ],
+    "ref": [
+     266.3,
+     277.4
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     14.9,
+     12.4
+    ],
+    "ref": [
+     441.7,
+     478.2
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "ice-spirit",
+    "side": 1,
+    "tile": [
+     13.3,
+     17.5
+    ],
+    "ref": [
+     399.8,
+     371.5
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     1.6,
+     11.1
+    ],
+    "ref": [
+     93.5,
+     505.4
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     0.4,
+     12.7
+    ],
+    "ref": [
+     62.1,
+     471.9
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     2.5,
+     10.2
+    ],
+    "ref": [
+     117.0,
+     524.2
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     2.5,
+     11.3
+    ],
+    "ref": [
+     117.0,
+     501.2
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     0.6,
+     11.6
+    ],
+    "ref": [
+     67.3,
+     494.9
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     0.2,
+     13.8
+    ],
+    "ref": [
+     56.8,
+     448.9
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     1.2,
+     10.4
+    ],
+    "ref": [
+     83.0,
+     520.0
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "firecracker-ev1",
+    "side": 1,
+    "tile": [
+     16.9,
+     26.7
+    ],
+    "ref": [
+     494.0,
+     179.1
+    ],
+    "flags": [
+     "tower",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     2.8,
+     14.0
+    ],
+    "ref": [
+     124.9,
+     444.7
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "hog-rider",
+    "side": 1,
+    "tile": [
+     1.6,
+     12.4
+    ],
+    "ref": [
+     93.5,
+     478.2
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "dart-goblin",
+    "side": 0,
+    "tile": [
+     3.3,
+     4.3
+    ],
+    "ref": [
+     138.0,
+     647.6
+    ],
+    "flags": [
+     "tower",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "the-log",
+    "side": 1,
+    "tile": [
+     3.5,
+     13.2
+    ],
+    "ref": [
+     143.2,
+     461.4
+    ],
+    "flags": [
+     "spl"
+    ]
+   }
+  ],
+  "46185": [
+   {
+    "cls": "royal-giant-ev1",
+    "side": 0,
+    "tile": [
+     13.4,
+     13.8
+    ],
+    "ref": [
+     402.4,
+     448.9
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "cannon-ev1",
+    "side": 1,
+    "tile": [
+     8.2,
+     22.1
+    ],
+    "ref": [
+     266.3,
+     275.3
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     14.2,
+     16.5
+    ],
+    "ref": [
+     423.3,
+     392.4
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     2.3,
+     12.3
+    ],
+    "ref": [
+     111.8,
+     480.3
+    ],
+    "flags": []
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     2.2,
+     9.7
+    ],
+    "ref": [
+     109.2,
+     534.7
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "firecracker-ev1",
+    "side": 1,
+    "tile": [
+     15.1,
+     22.6
+    ],
+    "ref": [
+     446.9,
+     264.8
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "dart-goblin",
+    "side": 0,
+    "tile": [
+     3.2,
+     3.3
+    ],
+    "ref": [
+     135.4,
+     668.5
+    ],
+    "flags": []
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     7.2,
+     13.6
+    ],
+    "ref": [
+     240.1,
+     453.1
+    ],
+    "flags": [
+     "bld",
+     "deploy"
+    ]
+   }
+  ],
+  "46245": [
+   {
+    "cls": "royal-giant-ev1",
+    "side": 0,
+    "tile": [
+     13.5,
+     14.9
+    ],
+    "ref": [
+     405.0,
+     425.9
+    ],
+    "flags": [
+     "occ",
+     "spell",
+     "river"
+    ]
+   },
+   {
+    "cls": "cannon-ev1",
+    "side": 1,
+    "tile": [
+     8.2,
+     22.1
+    ],
+    "ref": [
+     266.3,
+     275.3
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     14.0,
+     16.8
+    ],
+    "ref": [
+     418.1,
+     386.1
+    ],
+    "flags": [
+     "occ",
+     "spell",
+     "river"
+    ]
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     2.7,
+     12.0
+    ],
+    "ref": [
+     122.3,
+     486.5
+    ],
+    "flags": []
+   },
+   {
+    "cls": "firecracker-ev1",
+    "side": 1,
+    "tile": [
+     14.9,
+     22.5
+    ],
+    "ref": [
+     441.7,
+     266.9
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     7.2,
+     13.6
+    ],
+    "ref": [
+     240.1,
+     453.1
+    ],
+    "flags": [
+     "bld",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "ice-spirit",
+    "side": 1,
+    "tile": [
+     9.1,
+     17.7
+    ],
+    "ref": [
+     289.8,
+     367.3
+    ],
+    "flags": [
+     "deploy"
+    ]
+   },
+   {
+    "cls": "dart-goblin",
+    "side": 0,
+    "tile": [
+     2.6,
+     5.0
+    ],
+    "ref": [
+     119.7,
+     633.0
+    ],
+    "flags": [
+     "occ",
+     "tower"
+    ]
+   }
+  ],
+  "46740": [
+   {
+    "cls": "royal-giant-ev1",
+    "side": 0,
+    "tile": [
+     11.9,
+     17.5
+    ],
+    "ref": [
+     363.1,
+     371.5
+    ],
+    "flags": [
+     "spell",
+     "river"
+    ]
+   },
+   {
+    "cls": "firecracker-ev1",
+    "side": 1,
+    "tile": [
+     15.8,
+     24.1
+    ],
+    "ref": [
+     465.2,
+     233.4
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     7.2,
+     13.6
+    ],
+    "ref": [
+     240.1,
+     453.1
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "dart-goblin",
+    "side": 0,
+    "tile": [
+     2.8,
+     10.0
+    ],
+    "ref": [
+     124.9,
+     528.4
+    ],
+    "flags": []
+   },
+   {
+    "cls": "knight-hero",
+    "side": 1,
+    "tile": [
+     4.1,
+     15.2
+    ],
+    "ref": [
+     158.9,
+     419.6
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "royal-giant",
+    "side": 0,
+    "tile": [
+     2.4,
+     14.1
+    ],
+    "ref": [
+     114.4,
+     442.6
+    ],
+    "flags": [
+     "occ",
+     "river",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 1,
+    "tile": [
+     9.0,
+     19.3
+    ],
+    "ref": [
+     287.2,
+     333.8
+    ],
+    "flags": [
+     "bld",
+     "deploy"
+    ]
+   }
+  ],
+  "46950": [
+   {
+    "cls": "firecracker-ev1",
+    "side": 1,
+    "tile": [
+     16.4,
+     25.1
+    ],
+    "ref": [
+     480.9,
+     212.5
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     7.2,
+     13.6
+    ],
+    "ref": [
+     240.1,
+     453.1
+    ],
+    "flags": [
+     "bld",
+     "occ"
+    ]
+   },
+   {
+    "cls": "royal-giant",
+    "side": 0,
+    "tile": [
+     3.0,
+     16.3
+    ],
+    "ref": [
+     130.1,
+     396.6
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "goblin-barrel",
+    "side": 0,
+    "tile": [
+     7.3,
+     7.6
+    ],
+    "ref": [
+     242.7,
+     578.6
+    ],
+    "flags": [
+     "spl"
+    ]
+   },
+   {
+    "cls": "goblin-barrel",
+    "side": 0,
+    "tile": [
+     9.7,
+     7.6
+    ],
+    "ref": [
+     305.5,
+     578.6
+    ],
+    "flags": [
+     "spl"
+    ]
+   },
+   {
+    "cls": "the-log",
+    "side": 1,
+    "tile": [
+     3.2,
+     12.5
+    ],
+    "ref": [
+     135.4,
+     476.1
+    ],
+    "flags": [
+     "spl"
+    ]
+   }
+  ],
+  "47160": [
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     7.2,
+     13.7
+    ],
+    "ref": [
+     240.1,
+     451.0
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "royal-giant",
+    "side": 0,
+    "tile": [
+     3.0,
+     18.2
+    ],
+    "ref": [
+     130.1,
+     356.9
+    ],
+    "flags": []
+   },
+   {
+    "cls": "firecracker",
+    "side": 1,
+    "tile": [
+     0.5,
+     25.7
+    ],
+    "ref": [
+     64.7,
+     200.0
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 0,
+    "tile": [
+     2.1,
+     27.7
+    ],
+    "ref": [
+     106.6,
+     158.1
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 0,
+    "tile": [
+     1.7,
+     27.0
+    ],
+    "ref": [
+     96.1,
+     172.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 0,
+    "tile": [
+     15.6,
+     26.9
+    ],
+    "ref": [
+     460.0,
+     174.9
+    ],
+    "flags": [
+     "swarm",
+     "tower"
+    ]
+   },
+   {
+    "cls": "firecracker-ev1",
+    "side": 1,
+    "tile": [
+     14.7,
+     19.5
+    ],
+    "ref": [
+     436.4,
+     329.7
+    ],
+    "flags": []
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     2.2,
+     19.6
+    ],
+    "ref": [
+     109.2,
+     327.6
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     4.0,
+     19.8
+    ],
+    "ref": [
+     156.3,
+     323.4
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "ice-spirit",
+    "side": 1,
+    "tile": [
+     5.2,
+     27.3
+    ],
+    "ref": [
+     187.7,
+     166.5
+    ],
+    "flags": [
+     "occ",
+     "tower",
+     "deploy"
+    ]
+   }
+  ],
+  "47190": [
+   {
+    "cls": "firecracker-ev1",
+    "side": 1,
+    "tile": [
+     14.9,
+     20.1
+    ],
+    "ref": [
+     441.7,
+     317.1
+    ],
+    "flags": []
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     7.2,
+     13.7
+    ],
+    "ref": [
+     240.1,
+     451.0
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "royal-giant",
+    "side": 0,
+    "tile": [
+     3.2,
+     18.2
+    ],
+    "ref": [
+     135.4,
+     356.9
+    ],
+    "flags": []
+   },
+   {
+    "cls": "firecracker",
+    "side": 1,
+    "tile": [
+     0.3,
+     25.7
+    ],
+    "ref": [
+     59.4,
+     200.0
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 0,
+    "tile": [
+     1.7,
+     26.8
+    ],
+    "ref": [
+     96.1,
+     177.0
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "spell",
+     "tower"
+    ]
+   },
+   {
+    "cls": "goblin",
+    "side": 0,
+    "tile": [
+     2.3,
+     27.6
+    ],
+    "ref": [
+     111.8,
+     160.2
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     2.2,
+     19.6
+    ],
+    "ref": [
+     109.2,
+     327.6
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     4.0,
+     19.8
+    ],
+    "ref": [
+     156.3,
+     323.4
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "gpq"
+    ]
+   }
+  ],
+  "48825": [
+   {
+    "cls": "cannon",
+    "side": 1,
+    "tile": [
+     8.2,
+     22.4
+    ],
+    "ref": [
+     266.3,
+     269.0
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "firecracker",
+    "side": 1,
+    "tile": [
+     2.9,
+     15.8
+    ],
+    "ref": [
+     127.5,
+     407.1
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "royal-giant-ev1",
+    "side": 0,
+    "tile": [
+     12.7,
+     5.2
+    ],
+    "ref": [
+     384.1,
+     628.8
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "hog-rider",
+    "side": 1,
+    "tile": [
+     7.3,
+     10.6
+    ],
+    "ref": [
+     242.7,
+     515.8
+    ],
+    "flags": [
+     "spell"
+    ]
+   },
+   {
+    "cls": "royal-delivery",
+    "side": 0,
+    "tile": [
+     5.5,
+     10.5
+    ],
+    "ref": [
+     195.6,
+     517.9
+    ],
+    "flags": [
+     "spl"
+    ]
+   }
+  ],
+  "49005": [
+   {
+    "cls": "cannon",
+    "side": 1,
+    "tile": [
+     8.1,
+     22.4
+    ],
+    "ref": [
+     263.6,
+     269.0
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "royal-giant-ev1",
+    "side": 0,
+    "tile": [
+     13.3,
+     8.5
+    ],
+    "ref": [
+     399.8,
+     559.8
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "royal-recruit",
+    "side": 0,
+    "tile": [
+     2.6,
+     16.0
+    ],
+    "ref": [
+     119.7,
+     402.9
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     3.8,
+     8.6
+    ],
+    "ref": [
+     151.1,
+     557.7
+    ],
+    "flags": [
+     "tower",
+     "deploy"
+    ]
+   }
+  ],
+  "49440": [
+   {
+    "cls": "royal-giant-ev1",
+    "side": 0,
+    "tile": [
+     13.8,
+     14.4
+    ],
+    "ref": [
+     412.9,
+     436.3
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 0,
+    "tile": [
+     4.0,
+     15.8
+    ],
+    "ref": [
+     156.3,
+     407.1
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     4.7,
+     17.7
+    ],
+    "ref": [
+     174.6,
+     367.3
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "dart-goblin",
+    "side": 0,
+    "tile": [
+     15.6,
+     8.1
+    ],
+    "ref": [
+     460.0,
+     568.1
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "royal-giant",
+    "side": 0,
+    "tile": [
+     1.6,
+     14.0
+    ],
+    "ref": [
+     93.5,
+     444.7
+    ],
+    "flags": [
+     "occ",
+     "river",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "firecracker-ev1",
+    "side": 1,
+    "tile": [
+     0.5,
+     25.2
+    ],
+    "ref": [
+     64.7,
+     210.4
+    ],
+    "flags": [
+     "tower",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     4.0,
+     17.8
+    ],
+    "ref": [
+     156.3,
+     365.2
+    ],
+    "flags": [
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "goblin-barrel",
+    "side": 0,
+    "tile": [
+     16.0,
+     27.0
+    ],
+    "ref": [
+     470.5,
+     172.8
+    ],
+    "flags": [
+     "tower",
+     "spl"
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,109 @@
+diff --git a/include/core/PlayerState.h b/include/core/PlayerState.h
+index d677e69..a2c8d5b 100644
+--- a/include/core/PlayerState.h
++++ b/include/core/PlayerState.h
+@@ -48,8 +48,15 @@ public:
+ 
+     float elixir;
+     std::vector<int> hand;
++    // Ticks before a card that has just cycled into the hand can be played.
++    // Measured, not guessed: across 638,300 plays in IL_Replay (RoyaleAPI
++    // replays of real Hog 2.6 matches), the card that entered the hand at play
++    // i is next played at least 1.5 s later, a sharp edge (2,816 at 1.45 s,
++    // 8,188 at 1.50 s on the 20 Hz clock) above a thin human-error floor.
++    // It was 20 (2.0 s). perception/UPSTREAM_REQUESTS.md item 39.
++    static constexpr int CYCLE_IN_COOLDOWN_TICKS = 15;
+     // Parallel to hand. > 0 means the card just cycled in and is not yet
+-    // playable (20 ticks); 0 for the opening hand.
++    // playable (CYCLE_IN_COOLDOWN_TICKS); 0 for the opening hand.
+     std::vector<int> handCooldownTicks;
+     std::deque<int> deckQueue;
+     std::unordered_map<int, EvolutionSlotState> evolutionState;
+@@ -160,7 +167,7 @@ public:
+         deckQueue.pop_front();
+         deckQueue.push_back(cardId);
+         hand[handIndex] = nextCard;
+-        handCooldownTicks[handIndex] = 20;
++        handCooldownTicks[handIndex] = CYCLE_IN_COOLDOWN_TICKS;
+ 
+         bool useEvolvedForm = false;
+         if (cardDef->isEvolution) {
+diff --git a/perception/track/cycle.py b/perception/track/cycle.py
+index 5179899..73ad82b 100644
+--- a/perception/track/cycle.py
++++ b/perception/track/cycle.py
+@@ -7,7 +7,7 @@ does exactly this:
+     deckQueue.pop_front();
+     deckQueue.push_back(cardId);      // the card just played goes to the back
+     hand[handIndex] = nextCard;       // the front fills the slot it vacated
+-    handCooldownTicks[handIndex] = 20;
++    handCooldownTicks[handIndex] = CYCLE_IN_COOLDOWN_TICKS;   // 15 ticks
+ 
+ A strict 8-slot FIFO, preserving hand position as the real game does. The queue
+ is four long and grows only at the back, one entry per play, so:
+@@ -21,7 +21,7 @@ play on the play history alone determines their cycle exactly. Opponent hand
+ prediction is bookkeeping, not a guess, which is why this module has no
+ heuristics.
+ 
+-Not modelled: `handCooldownTicks`, the 2 s before a freshly cycled slot can be
++Not modelled: `handCooldownTicks`, the 1.5 s before a freshly cycled slot can be
+ played. It affects legality, not what the cycle contains, and perception only
+ reports plays that already happened.
+ """
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index 5e86e5c..eda11a9 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -354,7 +354,8 @@ PYBIND11_MODULE(clash_royale_env, m) {
+         // instead of restating them.
+         .def_readonly_static("ELIXIR_REGEN_RATE", &GameManager::ELIXIR_REGEN_RATE)
+         .def_readonly_static("REGULATION_END_TICK", &MatchRules::REGULATION_END_TICK)
+-        .def_readonly_static("MATCH_END_TICK", &MatchRules::MATCH_END_TICK);
++        .def_readonly_static("MATCH_END_TICK", &MatchRules::MATCH_END_TICK)
++        .def_readonly_static("CYCLE_IN_COOLDOWN_TICKS", &PlayerState::CYCLE_IN_COOLDOWN_TICKS);
+ 
+     m.def("get_all_card_ids", &getAllCardIds,
+         "All ids CardRegistry currently has registered (real, playable cards only).");
+diff --git a/tests/core/test_game_manager.cpp b/tests/core/test_game_manager.cpp
+index 36d2154..30ee825 100644
+--- a/tests/core/test_game_manager.cpp
++++ b/tests/core/test_game_manager.cpp
+@@ -487,8 +487,12 @@ TEST_CASE("Random-hand initializeDeck seeds championSlots by ORIGINAL deck index
+     }
+ }
+ 
+-TEST_CASE("A freshly-cycled-in hand slot is unplayable for 19 ticks, playable on the 20th -- the opening hand needs no such wait",
++TEST_CASE("A freshly-cycled-in hand slot is unplayable for CYCLE_IN_COOLDOWN_TICKS - 1 ticks, playable on the next -- the opening hand needs no such wait",
+         "[player_state][cycle_delay]") {
++    // 1.5 s, measured off real replays (UPSTREAM item 39). It was 20.
++    REQUIRE(PlayerState::CYCLE_IN_COOLDOWN_TICKS == 15);
++    const int wait = PlayerState::CYCLE_IN_COOLDOWN_TICKS;
++
+     PlayerState player;
+     player.initializeDeck({ 0, 1, 2, 3, 4, 5, 6, 7 }); // deterministic overload: hand={0,1,2,3}, queue={4,5,6,7}
+     player.elixir = 100.0f;
+@@ -497,19 +501,19 @@ TEST_CASE("A freshly-cycled-in hand slot is unplayable for 19 ticks, playable on
+     auto opening = player.playCard(0);
+     REQUIRE(opening.cardId == 0);
+ 
+-    // hand[0] is now 4, cycled in from the queue with a fresh 20-tick cooldown:
+-    // unplayable for 19 ticks...
++    // hand[0] is now 4, cycled in from the queue with a fresh cooldown:
++    // unplayable for wait - 1 ticks...
+     REQUIRE(player.hand[0] == 4);
+-    for (int i = 0; i < 19; ++i) {
++    for (int i = 0; i < wait - 1; ++i) {
+         auto blocked = player.playCard(0);
+         REQUIRE(blocked.cardId == -1); // still cooling down
+         REQUIRE(player.hand[0] == 4);  // nothing consumed, hand slot untouched
+         player.tick();
+     }
+-    auto stillBlocked = player.playCard(0); // 19 ticks elapsed -- one more needed
++    auto stillBlocked = player.playCard(0); // wait - 1 ticks elapsed -- one more needed
+     REQUIRE(stillBlocked.cardId == -1);
+ 
+-    // ...and playable once the 20th tick lands.
++    // ...and playable once the last tick lands.
+     player.tick();
+     auto afterCooldown = player.playCard(0);
+     REQUIRE(afterCooldown.cardId == 4);

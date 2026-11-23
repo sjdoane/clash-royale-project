@@ -1,0 +1,270 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 28a8334..07aed0a 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -561,6 +561,34 @@ a Princess shoots 2.4 s sooner, a Cannon and a Musketeer answer 0.8 s / 0.4 s
+ later. Every win rate earned before this date describes different first hits.
+ Checkpoints still load.
+ 
++## 2026-11-21: crown towers have a first hit (patch 0035)
++
++The plain Princess Tower (`TowerTroopType::None`, the default everywhere) and
++the King Tower loosed their first shot the tick after a target came into
++range. Only the selectable Tower Troops had the published 0.8 s first hit
++(patch 0019). Now:
++
++- Princess Tower: `CrownTower::PRINCESS_FIRST_HIT_TICKS = 8` (game file: hit
++  speed 0.8 s, load time 0, so first hit 0.8 s; the wiki lists the same).
++  `None` and `TowerPrincess` are now the same tower.
++- King Tower: `CrownTower::KING_FIRST_HIT_TICKS = 5` (hit speed 1.0 s, load
++  time 0.5 s), set in `GameManager::addTower`. Its wake-up is still instant;
++  whether the real King needs time to wake was not measured.
++- With patch 0034's rule the tower winds up only when it had NOTHING in range:
++  between the Goblins of one barrel its arrows stay 0.8 s apart.
++- Evidence: live recording `runs/live/20261120-185026`, second Goblin Barrel:
++  the first arrow lands about 1.0 s after the barrel does and the next ones
++  follow every 0.8 s, and the three Goblins get 3 + 2 + 1 + 1 stabs in. With
++  the instant first shot they got one.
++- Tests: `tests/core/test_cards_0019.cpp` (`[patch0035]`),
++  `tests/core/test_tower_troops.cpp`.
++
++**GAMEPLAY-AFFECTING for every match.** Anything that reaches a tower gets
++0.8 s more before the first arrow. A Cannon two seconds late in the Hog's
++lane no longer saves the tower (two swings); prompt and central still does
++(`tests/core/test_default_deck_qa.cpp`). Every win rate earned before this
++date describes faster towers. Checkpoints still load.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/GameManager.h b/include/core/GameManager.h
+index ed3b5e3..04aa3dd 100644
+--- a/include/core/GameManager.h
++++ b/include/core/GameManager.h
+@@ -123,6 +123,7 @@ private:
+         // overload below.
+         if (symbol == 'R') {
+             tower->sightRange = 7.0f;
++            tower->loadTicks = CrownTower::KING_FIRST_HIT_TICKS;
+             // The King starts dormant (Tower::isAwake); this is the only path
+             // that builds one.
+             tower->sleep();
+diff --git a/include/core/TowerTroops.h b/include/core/TowerTroops.h
+index 56781b7..b2c74a8 100644
+--- a/include/core/TowerTroops.h
++++ b/include/core/TowerTroops.h
+@@ -12,14 +12,24 @@ namespace CrownTower {
+     constexpr int PRINCESS_HP = 3052;
+     constexpr int PRINCESS_DAMAGE = 109;
+     constexpr int PRINCESS_COOLDOWN_TICKS = 8;   // 0.8 s
++    // First hit: how long a tower with nothing in range takes to loose its
++    // first shot once something is (CombatEntity::loadTicks). A tower does
++    // nothing in advance, so it is the whole attack: the game file has the
++    // Princess Tower at hit speed 0.8 s / load time 0 (first hit 0.8 s, as the
++    // wiki lists it) and the King Tower at 1.0 s / 0.5 s (first hit 0.5 s).
++    // Live recording runs/live/20261120-185026: the first arrow lands about
++    // 1.0 s after a Goblin Barrel does (0.8 s + the arrow's flight), not 0.2 s.
++    constexpr int PRINCESS_FIRST_HIT_TICKS = 8;
+     constexpr int KING_HP = 4824;
+     constexpr int KING_DAMAGE = 109;
+     constexpr int KING_COOLDOWN_TICKS = 10;      // 1.0 s
++    constexpr int KING_FIRST_HIT_TICKS = 5;
+ }
+ 
+ // The four selectable Tower Troops; one replaces both Princess Towers for the
+ // match (GameManager::addTower, reset). None is the default: the plain
+-// Princess Tower (CrownTower, 7.5 range), kept byte-for-byte as it was.
++// Princess Tower (CrownTower, 7.5 range). Since patch 0035 it has the Tower
++// Princess's 0.8 s first hit too, so the two are the same tower.
+ enum class TowerTroopType {
+     None,
+     TowerPrincess,
+@@ -61,7 +71,7 @@ inline CardStats towerTroopStats(TowerTroopType type) {
+             // Princess Tower's numbers plus its first-hit time.
+             stats.hp = CrownTower::PRINCESS_HP; stats.attackRange = 7.5f;
+             stats.damage = CrownTower::PRINCESS_DAMAGE; stats.attackCooldown = CrownTower::PRINCESS_COOLDOWN_TICKS;
+-            stats.withLoadTicks(8);
++            stats.withLoadTicks(CrownTower::PRINCESS_FIRST_HIT_TICKS);
+             break;
+         case TowerTroopType::Cannoneer:
+             // 2616 hp / 320 dmg, 2.2 s (1 Sep 2025), first hit 0.8 s, no splash.
+@@ -85,6 +95,7 @@ inline CardStats towerTroopStats(TowerTroopType type) {
+         default:
+             stats.hp = CrownTower::PRINCESS_HP; stats.attackRange = 7.5f;
+             stats.damage = CrownTower::PRINCESS_DAMAGE; stats.attackCooldown = CrownTower::PRINCESS_COOLDOWN_TICKS;
++            stats.withLoadTicks(CrownTower::PRINCESS_FIRST_HIT_TICKS);
+             break;
+     }
+     return stats;
+diff --git a/tests/core/test_cards_0019.cpp b/tests/core/test_cards_0019.cpp
+index 1ba5e32..ece410f 100644
+--- a/tests/core/test_cards_0019.cpp
++++ b/tests/core/test_cards_0019.cpp
+@@ -26,10 +26,13 @@ struct TowerShots {
+     std::shared_ptr<StationaryCombatant> foe;
+     std::vector<std::pair<int, int>> hits;   // (tick, damage)
+ 
+-    explicit TowerShots(TowerTroopType ours)
++    // `warmUp`: ticks stepped before the target appears. A tower built from
++    // CardStats deploys for the first second of a match like any card.
++    explicit TowerShots(TowerTroopType ours, int warmUp = 0)
+         : game(deck(), deck(), ours, TowerTroopType::None) {
+         game.seed(1);
+         game.reset();
++        for (int i = 0; i < warmUp; ++i) game.step();
+         foe = std::make_shared<StationaryCombatant>(game.getBoard().allocateId(),
+             ArenaLayout::LEFT_LANE_X, ArenaLayout::princessY(0) + 4.0f, 1000000, 1, 0.5f, 0, 1000);
+         spawn(game.getBoard(), foe);
+@@ -48,13 +51,15 @@ struct TowerShots {
+     }
+ };
+ 
+-// The plain tower's first hit on the same setup: the engine's own engagement
+-// and projectile latency, before any load time.
++// The first hit of a tower with no first-hit wind-up on the same setup: the
++// engine's own engagement and projectile latency. Since patch 0035 the plain
++// tower winds up 0.8 s like the Tower Princess, so this is its first hit less
++// that; Dagger Duchess, who has no wind-up, is checked against it below.
+ int plainFirstHit() {
+     TowerShots s(TowerTroopType::None);
+     s.run(40);
+     REQUIRE_FALSE(s.hits.empty());
+-    return s.hits[0].first;
++    return s.hits[0].first - CrownTower::PRINCESS_FIRST_HIT_TICKS;
+ }
+ 
+ std::shared_ptr<Entity> leftPrincess(GameManager& game, int team) {
+@@ -80,6 +85,61 @@ TEST_CASE("each side's Tower Troop is its own: hp per team", "[tower_troops][pat
+     }
+ }
+ 
++TEST_CASE("The plain Princess Tower: 109 every 0.8 s, the first 0.8 s after engaging", "[tower_troops][patch0035]") {
++    // A target that appears 4 tiles in front of a tower with nothing in range,
++    // two seconds into the match. Tick 1 is the first tick the tower sees it:
++    // 8 wind-up ticks, the arrow loosed on the 9th and landing 2 ticks later.
++    // Before patch 0035 the plain tower loosed on tick 1.
++    TowerShots s(TowerTroopType::None, 20);
++    s.run(60);
++    REQUIRE(s.hits.size() >= 5);
++    REQUIRE(s.hits[0].first == 11);
++    for (const auto& [tick, dmg] : s.hits) REQUIRE(dmg == 109);
++    for (int g : s.gaps()) REQUIRE(g == 8);
++
++    // And it is the Tower Princess exactly.
++    TowerShots p(TowerTroopType::TowerPrincess, 20);
++    p.run(60);
++    REQUIRE(p.hits == s.hits);
++}
++
++TEST_CASE("The King Tower's first shot comes 0.5 s after it has a target, then every 1.0 s", "[tower_troops][patch0035]") {
++    GameManager game(deck(), deck());
++    game.seed(1);
++    game.reset();
++    std::shared_ptr<Tower> king;
++    for (const auto& e : game.getBoard().getEntities())
++        if (e->isTower() && e->symbol == 'R' && e->team == 0) king = std::dynamic_pointer_cast<Tower>(e);
++    REQUIRE(king != nullptr);
++    REQUIRE(king->loadTicks == CrownTower::KING_FIRST_HIT_TICKS);
++    REQUIRE(CrownTower::KING_FIRST_HIT_TICKS == 5);
++    // Nowhere in the King's reach is out of both Princess Towers', so they
++    // are taken off the board; losing one also wakes the King.
++    game.step();
++    REQUIRE_FALSE(king->isAwake());
++    for (const auto& e : game.getBoard().getEntities())
++        if (e->isTower() && e->symbol != 'R' && e->team == 0) e->hp = 0;
++    for (int i = 0; i < 5; ++i) game.step();
++    REQUIRE(king->isAwake());
++    auto foe = std::make_shared<StationaryCombatant>(game.getBoard().allocateId(),
++        ArenaLayout::CENTER_X, ArenaLayout::kingY(0) + 5.0f, 1000000, 1, 0.5f, 0, 1000);
++    spawn(game.getBoard(), foe);
++    std::vector<int> hits;
++    for (int t = 1; t <= 40; ++t) {
++        const int before = foe->hp;
++        game.step();
++        if (foe->hp < before) {
++            REQUIRE(before - foe->hp == CrownTower::KING_DAMAGE);
++            hits.push_back(t);
++        }
++    }
++    REQUIRE(hits.size() >= 3);
++    // 5 wind-up ticks, loosed on the 6th, 2-3 ticks of flight.
++    REQUIRE(hits[0] >= 8);
++    REQUIRE(hits[0] <= 9);
++    for (size_t i = 1; i < hits.size(); ++i) REQUIRE(hits[i] - hits[i - 1] == CrownTower::KING_COOLDOWN_TICKS);
++}
++
+ TEST_CASE("Tower Princess: 109 every 0.8 s, the first 0.8 s after engaging", "[tower_troops][patch0019]") {
+     const int plain = plainFirstHit();
+     TowerShots s(TowerTroopType::TowerPrincess);
+diff --git a/tests/core/test_default_deck_qa.cpp b/tests/core/test_default_deck_qa.cpp
+index a06f210..2b01ab7 100644
+--- a/tests/core/test_default_deck_qa.cpp
++++ b/tests/core/test_default_deck_qa.cpp
+@@ -265,10 +265,16 @@ TEST_CASE("Skeletons are separated by collision while deploying, not moved by ch
+ // --- defence ---
+ 
+ TEST_CASE("the Cannon fully answers a lone Hog Rider", "[deck_qa][defence]") {
+-    // An unanswered Hog takes 2534 tower hp; with a Cannon down it lands one
+-    // swing (317). The deck's whole defensive premise, a 3-elixir building
+-    // neutralising a 4-elixir win condition. The assertions are relative, so
+-    // they survive engine changes that move the absolute figures.
++    // An unanswered Hog takes most of a tower; with a Cannon down in the
++    // middle a second after the Hog it lands no swing at all. The deck's whole
++    // defensive premise, a 3-elixir building neutralising a 4-elixir win
++    // condition. The assertions are relative, so they survive engine changes
++    // that move the absolute figures.
++    //
++    // The Cannon has to be prompt and central. Since the towers' 0.8 s first
++    // hit (patch 0035) and the Cannon's own 0.9 s (patch 0034), one dropped two
++    // seconds late in the Hog's lane (4, 11) lets it through for two swings;
++    // see the late-Cannon case below.
+     int unanswered = 0;
+     {
+         Match m;
+@@ -282,9 +288,9 @@ TEST_CASE("the Cannon fully answers a lone Hog Rider", "[deck_qa][defence]") {
+     Match m;
+     const int before = m.towerHp(0);
+     m.play(HOG_RIDER, 4.0f, 18.0f, 1);
+-    m.step(20);
+-    m.play(CANNON, 4.0f, 11.0f, 0);
+-    m.step(380);
++    m.step(10);
++    m.play(CANNON, 7.0f, 10.0f, 0);
++    m.step(390);
+     const int withCannon = before - m.towerHp(0);
+ 
+     INFO("unanswered " << unanswered << " hp lost, with a Cannon " << withCannon);
+@@ -292,6 +298,19 @@ TEST_CASE("the Cannon fully answers a lone Hog Rider", "[deck_qa][defence]") {
+     // The Cannon absorbs the overwhelming majority of the push: the Hog, Very
+     // Fast in the real game, reaches the tower for one hit before it dies.
+     REQUIRE(withCannon * 5 < unanswered);
++
++    // Two seconds late and in the lane: the Hog kills the Cannon and reaches
++    // the tower, for less than half of what it takes unanswered.
++    Match late;
++    const int beforeLate = late.towerHp(0);
++    late.play(HOG_RIDER, 4.0f, 18.0f, 1);
++    late.step(20);
++    late.play(CANNON, 4.0f, 11.0f, 0);
++    late.step(380);
++    const int lateCannon = beforeLate - late.towerHp(0);
++    INFO("late Cannon " << lateCannon);
++    REQUIRE(lateCannon >= withCannon);
++    REQUIRE(lateCannon * 2 < unanswered);
+ }
+ 
+ TEST_CASE("Skeletons and a Musketeer both blunt a Hog, a Hog does not",
+diff --git a/tests/core/test_tower_troops.cpp b/tests/core/test_tower_troops.cpp
+index 3175701..60cdf8a 100644
+--- a/tests/core/test_tower_troops.cpp
++++ b/tests/core/test_tower_troops.cpp
+@@ -16,6 +16,9 @@ TEST_CASE("towerTroopStats(None) is the plain level-11 Princess Tower",
+     REQUIRE(stats.attackRange == Catch::Approx(7.5f));
+     REQUIRE(stats.damage == CrownTower::PRINCESS_DAMAGE);
+     REQUIRE(stats.attackCooldown == 8);
++    // Patch 0035: the plain tower has the 0.8 s first hit as well.
++    REQUIRE(stats.loadTicksOverride == CrownTower::PRINCESS_FIRST_HIT_TICKS);
++    REQUIRE(CrownTower::PRINCESS_FIRST_HIT_TICKS == 8);
+ }
+ 
+ // Patch 0019: the wiki's level-11 values (TowerTroops.h). The old ones were

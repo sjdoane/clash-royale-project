@@ -1,0 +1,247 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index f017b75..2a64027 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -732,6 +732,29 @@ match did not have (62 first-excess events per 100 matches it was held in).
+ and dead 10 s after its first hit; before, it was never shot. A lone Bush: one
+ hit, then dead (two Bush Goblins).
+ 
++## 2026-11-22: area damage lands on invisible units (patch 0041)
++
++Every area effect skipped units that could not be targeted, so a cloaked Royal
++Ghost, a Suspicious Bush or a cloaked Archer Queen walked through a Fireball, a
++Log or a Valkyrie's swing unharmed. The game's unit table marks `Ghost` and
++`ArcherQueen` `allow_area_dmg_when_invisible: True`; published descriptions of
++the Bush say spells and splash destroy it. Invisibility now only stops a unit
++being PICKED as a target.
++
++- `Entity::takesAreaDamage()` (default `isTargetable()`, so projectiles and
++  spells stay out; `CombatEntity` returns true).
++- Used by: `applySplashDamage`, `applyLineSplashDamage`, `applyPullNearby`,
++  `AreaSpell` (disc and rolling sweep), `AreaDamageOnDeath`, the Hero
++  Barbarian Barrel's roll. Everything that PICKS a target (findTarget, chains,
++  taunt, nearest-enemy abilities, the area stun of the Electro Giant) still
++  uses `isTargetable()`.
++- Applies to every source of invisibility (Royal Ghost, Bush, Lumberjack
++  ghost, Archer Queen's cloak, Boss Bandit's grenade, Dark Guard); the last two
++  are NOT separately sourced.
++- Test: `python_ai/tests/test_area_damage_lands_on_invisible_units.py`.
++
++**GAMEPLAY-AFFECTING.**
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/AreaDamageOnDeath.h b/include/core/AreaDamageOnDeath.h
+index bd4e56d..e72dd2e 100644
+--- a/include/core/AreaDamageOnDeath.h
++++ b/include/core/AreaDamageOnDeath.h
+@@ -26,7 +26,7 @@ public:
+ 
+     void apply(Board& board, const Vector2D& position, int team) const override {
+         for (const auto& entity : board.getEntities()) {
+-            if (entity->team == team || !entity->isAlive() || !entity->isTargetable()) continue;
++            if (entity->team == team || !entity->isAlive() || !entity->takesAreaDamage()) continue;
+             if (position.distanceTo(entity->position) > radius) continue;
+             entity->takeDamage(damage);
+             if (onHit) {
+diff --git a/include/core/CardStats.h b/include/core/CardStats.h
+index 9db6383..2cfc7c0 100644
+--- a/include/core/CardStats.h
++++ b/include/core/CardStats.h
+@@ -229,9 +229,8 @@ struct CardStats {
+     // Hook (Fisherman).
+     float hookRange = 0.0f;
+ 
+-    // Invisibility (Royal Ghost, Suspicious Bush). Also blocks splash and spell
+-    // damage while invisible, since both gate on isTargetable(); the real game
+-    // still lets area effects land.
++    // Invisibility (Royal Ghost, Suspicious Bush): cannot be targeted. Area
++    // damage and spells still land (Entity::takesAreaDamage, patch 0041).
+     bool startsInvisible = false;
+     int revealTicksAfterAttack = 0;
+ 
+diff --git a/include/core/HeroBarbarianBarrelRerollEffect.h b/include/core/HeroBarbarianBarrelRerollEffect.h
+index 38110f9..162d1fe 100644
+--- a/include/core/HeroBarbarianBarrelRerollEffect.h
++++ b/include/core/HeroBarbarianBarrelRerollEffect.h
+@@ -38,7 +38,7 @@ public:
+         int totalDealt = 0;
+         for (const auto& entity : board.getEntities()) {
+             if (entity->id == self.id) continue;
+-            if (entity->team == self.team || !entity->isAlive() || !entity->isTargetable()) continue;
++            if (entity->team == self.team || !entity->isAlive() || !entity->takesAreaDamage()) continue;
+             if (entity->isFlying) continue; // the barrel rolls along the ground
+ 
+             float proj = (entity->position.x - oldPos.x) * ux + (entity->position.y - oldPos.y) * uy;
+diff --git a/include/entities/AreaSpell.h b/include/entities/AreaSpell.h
+index 3df47ab..948ce71 100644
+--- a/include/entities/AreaSpell.h
++++ b/include/entities/AreaSpell.h
+@@ -187,7 +187,7 @@ public:
+         std::vector<std::shared_ptr<Entity>> candidates;
+         for (const auto& entity : board.getEntities()) {
+             bool teamMatches = alliesOnly ? (entity->team == this->team) : (entity->team != this->team);
+-            if (entity->isAlive() && entity->isTargetable() && teamMatches && entity->id != this->id
++            if (entity->isAlive() && entity->takesAreaDamage() && teamMatches && entity->id != this->id
+                 && (!groundOnly || !entity->isFlying)
+                 && position.distanceTo(entity->position) <= radius + CombatEntity::effectiveRadiusOf(*entity)) {
+                 candidates.push_back(entity);
+@@ -302,7 +302,7 @@ private:
+         const float halfWidth = rollWidth * 0.5f;
+ 
+         for (const auto& entity : board.getEntities()) {
+-            if (!entity->isAlive() || !entity->isTargetable()) continue;
++            if (!entity->isAlive() || !entity->takesAreaDamage()) continue;
+             if (entity->team == this->team || entity->id == this->id) continue;
+             if (groundOnly && entity->isFlying) continue;
+             if (alreadySwept(entity->id)) continue;
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index a47a0d2..5dc96bf 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -500,6 +500,9 @@ public:
+     bool isTargetable() const override {
+         return (!startsInvisible || visibleTicksRemaining > 0) && temporaryInvisibilityTicksRemaining <= 0;
+     }
++    // An invisible unit cannot be picked as a target but is still hit by
++    // whatever lands on its tile (Entity::takesAreaDamage).
++    bool takesAreaDamage() const override { return true; }
+ 
+     // Soul collection: any death within radius, ally or enemy.
+     void onNearbyDeath(Board&, const Vector2D& deathPosition, int) override {
+@@ -1283,7 +1286,7 @@ inline void applySplashDamage(Board& board, const Vector2D& origin, float radius
+     if (radius <= 0.0f) return;
+     for (const auto& entity : board.getEntities()) {
+         if (entity->id == excludeId) continue; // already hit as the primary target
+-        if (entity->team == attackerTeam || !entity->isAlive() || !entity->isTargetable()) continue;
++        if (entity->team == attackerTeam || !entity->isAlive() || !entity->takesAreaDamage()) continue;
+         if (!hitsAir && entity->isFlying) continue;
+         if (origin.distanceTo(entity->position) > radius) continue;
+         entity->takeDamage(dealt);
+@@ -1306,7 +1309,7 @@ inline void applyPullNearby(Board& board, const Vector2D& origin, float radius,
+     if (radius <= 0.0f || distance <= 0.0f) return;
+     for (const auto& entity : board.getEntities()) {
+         if (entity->id == excludeId) continue;
+-        if (entity->team == attackerTeam || !entity->isAlive() || !entity->isTargetable()) continue;
++        if (entity->team == attackerTeam || !entity->isAlive() || !entity->takesAreaDamage()) continue;
+         if (origin.distanceTo(entity->position) > radius) continue;
+         pullToward(*entity, origin, distance);
+     }
+@@ -1341,7 +1344,7 @@ inline void applyLineSplashDamage(Board& board, const Vector2D& origin, const Ve
+ 
+     for (const auto& entity : board.getEntities()) {
+         if (entity->id == excludeId) continue; // already hit as the primary target
+-        if (entity->team == attackerTeam || !entity->isAlive() || !entity->isTargetable()) continue;
++        if (entity->team == attackerTeam || !entity->isAlive() || !entity->takesAreaDamage()) continue;
+ 
+         // Project onto the line, clamped to [0, range], then take the
+         // perpendicular distance.
+diff --git a/include/entities/Entity.h b/include/entities/Entity.h
+index f438973..a6a8bd3 100644
+--- a/include/entities/Entity.h
++++ b/include/entities/Entity.h
+@@ -58,6 +58,13 @@ public:
+ 
+     virtual bool isTargetable() const { return true; }
+ 
++    // Whether area damage and area effects (spells, splash, a rolling Log,
++    // death damage) land on this. Invisibility hides a unit from being picked
++    // as a target, nothing more: the game's unit table marks the Royal Ghost
++    // and the cloaked Archer Queen `allow_area_dmg_when_invisible` (patch
++    // 0041). Things that are never bodies (projectiles, spells) stay out.
++    virtual bool takesAreaDamage() const { return isTargetable(); }
++
+     // True only for Building and Tower. Lets code outside the Building chain
+     // (knockback, pulls) ask without a dynamic_cast, which would need
+     // Building.h and create an include cycle.
+diff --git a/python_ai/tests/test_area_damage_lands_on_invisible_units.py b/python_ai/tests/test_area_damage_lands_on_invisible_units.py
+new file mode 100644
+index 0000000..f52026b
+--- /dev/null
++++ b/python_ai/tests/test_area_damage_lands_on_invisible_units.py
+@@ -0,0 +1,84 @@
++"""Spells and splash hit invisible units (patch 0041).
++
++The game's unit table marks the Royal Ghost (`Ghost`) and the Archer Queen
++`allow_area_dmg_when_invisible: True`: invisibility stops a unit being picked
++as a target, it does not stop a Fireball, a Log or a splash landing on it.
++Before the patch every area effect skipped untargetable units, so a cloaked
++Ghost or a Suspicious Bush walked through spells unharmed.
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++
++NOOP = 4
++GHOST, BUSH, FIREBALL, LOG, VALK = 47, 85, 7, 33, 10
++OURS = [FIREBALL, LOG, VALK, 40, 24, 72, 15, 6]
++
++
++def _env(card):
++    deck = [card] + [c for c in (4, 12, 112, 61, 20, 14, 2, 26) if c != card][:7]
++    env = E.ClashRoyaleEnv(list(OURS), deck, 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    env.set_elixir_for_team(0, 10.0)
++    env.set_elixir_for_team(1, 10.0)
++    assert env.set_hand_for_team(1, deck[:4])
++    assert env.set_hand_for_team(0, OURS[:4])
++    env.step_self_play(NOOP, 0.0, 0.0, 0, 3.0, 15.0, 1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 12)      # deployed and walking
++    return env
++
++
++def _unit(env, card):
++    u = [x for x in env.get_units() if x["card_id"] == card]
++    return u[0] if u else None
++
++
++def _cast(env, slot, lead, ticks):
++    """Team 0 plays hand slot `slot` `lead` tiles ahead of the invisible unit.
++    -> (HP before, unit after `ticks` or None, whether it was ever targetable)."""
++    card = GHOST if _unit(env, GHOST) else BUSH
++    u = _unit(env, card)
++    assert not u["targetable"]
++    hp = u["hp"]
++    spent = env.get_elixir_spent(0)
++    env.step_self_play(slot, round(u["x"]), round(u["y"] - lead), NOOP, 0.0, 0.0, 1)
++    assert env.get_elixir_spent(0) > spent, "the spell was refused"
++    seen = False
++    for _ in range(ticks):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        v = _unit(env, card)
++        seen = seen or bool(v and v["targetable"])
++    return hp, _unit(env, card), seen
++
++
++def test_a_fireball_hits_a_cloaked_royal_ghost():
++    env = _env(GHOST)
++    dmg = E.get_card_stats(FIREBALL)["base"]["damage"]
++    hp, ghost, seen = _cast(env, 0, 2.0, 25)
++    assert not seen, "the Ghost was revealed; this test wants it cloaked"
++    assert ghost is not None and hp - ghost["hp"] == dmg
++
++
++def test_the_log_hits_a_cloaked_royal_ghost():
++    env = _env(GHOST)
++    dmg = E.get_card_stats(LOG)["base"]["damage"]
++    hp, ghost, seen = _cast(env, 1, 4.0, 30)
++    assert not seen
++    assert ghost is not None and hp - ghost["hp"] == dmg
++
++
++def test_a_fireball_destroys_a_suspicious_bush():
++    env = _env(BUSH)
++    hp, bush, seen = _cast(env, 0, 1.0, 25)
++    assert bush is None, "the Bush walked through a Fireball"
++
++
++def test_a_cloaked_ghost_is_still_not_a_target():
++    env = _env(GHOST)
++    for _ in range(20):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        ghost = _unit(env, GHOST)
++        towers = [u for u in env.get_units() if u["tower"] and u["team"] == 0]
++        if ghost["targetable"]:
++            break
++        assert all(t["target_id"] != ghost["id"] for t in towers)

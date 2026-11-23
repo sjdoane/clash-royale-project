@@ -1,0 +1,350 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 498c975..dc5cc45 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -612,6 +612,43 @@ so only the Princess Tower was wrong.
+ later, so each kill by a Princess Tower comes that much later. Checkpoints
+ still load.
+ 
++## 2026-11-21: formations face the enemy; the Goblin Barrel's triangle (patch 0037)
++
++The squad spawners added a card's formation offsets to the placement point
++unmirrored, so team 1 fielded every front-to-back asymmetric formation back to
++front relative to team 0. For the Goblin Barrel (two beside, one 0.4 tiles
++toward +y) that put the third Goblin BEHIND a team-1 tower but on the RIVER
++side of a team-0 tower, where it was pushed out to (4.9, 6.0) and the other
++Princess Tower, 9.1 tiles away with a 9.4 reach, shot it too.
++
++- `CardFactories::formationSlot(x, y, offset, team)`: offsets are in the
++  owner's frame, +y toward the enemy, mirrored in y for team 1. Used by the
++  four squad spawners, so every child spawn (death spawns, periodic spawns,
++  spell spawns) follows it.
++- Goblin Barrel (109): one Goblin half a tile beyond the target, two half a
++  tile short and half a tile to each side (published spawn offsets x 0 / 500 /
++  -500, y 500 apart; which way round is from the 2026-11-20 recording: one
++  behind the tower, two on its river-side corners). Pushed out by the tower
++  they stand at about (0, -1.9) and (+-1.35, +1.35) from its centre; the corner
++  Goblins are 9.7 tiles from the other Princess Tower, out of its reach.
++- Goblinstein's Doctor offset is now (0, -3): "3 tiles behind" was written +3,
++  which is in front in the owner's frame.
++- NOT re-authored: every other formation keeps its numbers, so team 1's now
++  mirror team 0's instead of copying them. Goblin Gang, Barbarians, Bats and
++  the Evolved Goblin Barrel (six Goblins, own offsets) have front/back
++  asymmetries nobody has checked against footage.
++- Tests: `tests/core/test_card_registry.cpp` (`[patch0037]`, and the Goblins
++  squad for both teams), `tests/core/test_champion_abilities.cpp`,
++  `python_ai/tests/test_goblin_barrel_on_a_tower.py` (seven stabs, only the
++  target tower, the same for both sides), `python_ai/tests/test_log_rolls_past.py`.
++
++**GAMEPLAY-AFFECTING.** An unanswered Goblin Barrel now costs a Princess Tower
++seven stabs (840; the recording shows 3 + 2 + 1 + 1 = 7), up from five after
++patches 0034-0036 and one before them. A Log cast from the tile below the tower
++(3, 4) saves it when cast 18 to 28 ticks after the throw; cast 8 to 16 ticks
++after, it has left the Goblin behind the tower before the barrel lands and one
++stab gets through. Checkpoints still load.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index 5e24986..e209cb8 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -170,10 +170,22 @@ inline void spawnDeployEffect(const CardStats& stats, float x, float y, int team
+     }
+ }
+ 
++// A squad's formation is written in its owner's frame: +x to the right as the
++// board is stored, +y toward the enemy. Team 1 faces -y, so its formation is
++// mirrored in y (patch 0037). Before this the offsets were added unmirrored and
++// the two sides fielded front-to-back mirror images of each other: a Goblin
++// Barrel's third goblin landed behind a team-1 tower but on the river side of a
++// team-0 tower, where the other Princess Tower could reach it.
++inline Vector2D formationSlot(float x, float y, const Vector2D& offset, int team) {
++    const float forward = (team == 0) ? 1.0f : -1.0f;
++    return Vector2D{ x + offset.x, y + forward * offset.y };
++}
++
+ inline void spawnMeleeSquad(const CardStats& stats, float x, float y, int team, Board& board) {
+     for (const auto& offset : stats.spawnOffsets) {
++        const Vector2D slot = formationSlot(x, y, offset, team);
+         auto troop = std::make_shared<MeleeTroop>(
+-            board.allocateId(), x + offset.x, y + offset.y, stats.hp, team,
++            board.allocateId(), slot.x, slot.y, stats.hp, team,
+             stats.speed, stats.attackRange, stats.damage, stats.attackCooldown, stats.symbol);
+         if (shouldIgnoreRiver(stats)) troop->setIgnoresRiver(true);
+         applyCardMetadata(troop, stats);
+@@ -184,8 +196,9 @@ inline void spawnMeleeSquad(const CardStats& stats, float x, float y, int team,
+ 
+ inline void spawnRangedSquad(const CardStats& stats, float x, float y, int team, Board& board) {
+     for (const auto& offset : stats.spawnOffsets) {
++        const Vector2D slot = formationSlot(x, y, offset, team);
+         auto troop = std::make_shared<RangedTroop>(
+-            board.allocateId(), x + offset.x, y + offset.y, stats.hp, team,
++            board.allocateId(), slot.x, slot.y, stats.hp, team,
+             stats.speed, stats.attackRange, stats.damage, stats.attackCooldown, stats.symbol);
+         if (shouldIgnoreRiver(stats)) troop->setIgnoresRiver(true);
+         troop->boomerang = stats.boomerang;
+@@ -199,8 +212,9 @@ inline void spawnRangedSquad(const CardStats& stats, float x, float y, int team,
+ inline void spawnMeleeBuildingTargeter(const CardStats& stats, float x, float y, int team, Board& board) {
+     // Loops over spawnOffsets for multi-unit children such as Golemites.
+     for (const auto& offset : stats.spawnOffsets) {
++        const Vector2D slot = formationSlot(x, y, offset, team);
+         auto troop = std::make_shared<BuildingTargeter>(
+-            board.allocateId(), x + offset.x, y + offset.y, stats.hp, team,
++            board.allocateId(), slot.x, slot.y, stats.hp, team,
+             stats.speed, stats.attackRange, stats.damage, stats.attackCooldown, stats.symbol);
+         if (shouldIgnoreRiver(stats)) troop->setIgnoresRiver(true);
+         applyCardMetadata(troop, stats);
+@@ -211,8 +225,9 @@ inline void spawnMeleeBuildingTargeter(const CardStats& stats, float x, float y,
+ 
+ inline void spawnRangedBuildingTargeter(const CardStats& stats, float x, float y, int team, Board& board) {
+     for (const auto& offset : stats.spawnOffsets) {
++        const Vector2D slot = formationSlot(x, y, offset, team);
+         auto troop = std::make_shared<RangedBuildingTargeter>(
+-            board.allocateId(), x + offset.x, y + offset.y, stats.hp, team,
++            board.allocateId(), slot.x, slot.y, stats.hp, team,
+             stats.speed, stats.attackRange, stats.damage, stats.attackCooldown, stats.symbol);
+         if (shouldIgnoreRiver(stats)) troop->setIgnoresRiver(true);
+         applyCardMetadata(troop, stats);
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index c8d49e9..db65268 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -235,9 +235,17 @@ private:
+             .withFlying().withTargetsAir();
+     }
+     // Spell-spawn children (Goblin Barrel, Royal Delivery, Graveyard).
++    // The Goblin Barrel's triangle (patch 0037): one Goblin half a tile beyond
++    // the target point and two half a tile short of it, half a tile to either
++    // side (published spawn offsets x 0 / 500 / -500, y 500 apart). On a
++    // Princess Tower that is one behind the tower and one on each river-side
++    // corner, as every barrel in the 2026-11-20 recording lands; the tower
++    // pushes them out to its edge, and the corner pair then stand out of the
++    // other Princess Tower's reach. It was two beside and one on the river
++    // side (0.4 tiles), unmirrored, so the other tower shot at team 1's.
+     static CardStats goblinBarrelGoblinStats() {
+         return troop(-20, "Goblins", 0.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 120, 11, 'g')
+-            .withOffsets({ {-0.4f, 0.0f}, {0.4f, 0.0f}, {0.0f, 0.4f} });
++            .withOffsets({ {0.0f, 0.5f}, {0.5f, -0.5f}, {-0.5f, -0.5f} });
+     }
+     static CardStats graveyardSkeletonStats() {
+         return troop(-21, "Skeletons", 0.0f, Archetype::MeleeSquad, 81, SPEED_FAST, 0.5f, 81, 11, 'k');
+@@ -1180,13 +1188,14 @@ private:
+ 
+         // Goblinstein: the Monster (front, building-only tank, carries the
+         // ability) plus the Doctor (secondary, 3 tiles behind at a fixed
+-        // offset, a brief stun on hit). "Lightning Link": see
++        // offset, a brief stun on hit). Behind is -y in the owner's frame
++        // (patch 0037; it was +3, which put team 0's Doctor in front). "Lightning Link": see
+         // GoblinsteinLightningLinkEffect.
+         add(troop(121, "Goblinstein", 5.0f, Archetype::MeleeBuildingTargeter, 2385, 0.5f, 1.2f, 128, 15, 'G')
+             .withChampionAbility(2.0f, 170, std::make_shared<GoblinsteinLightningLinkEffect>(2.0f, 107, 5, 40))
+             .withSecondaryUnit(
+                 troop(-40, "Goblinstein", 0.0f, Archetype::RangedSquad, 721, 0.5f, 5.5f, 92, 18, 'D')
+-                    .withOffsets({ {0.0f, 3.0f} })
++                    .withOffsets({ {0.0f, -3.0f} })
+                     .withTargetsAir()
+                     .withOnHit(std::make_shared<FreezeOnHit>(5, 0.0f))));
+ 
+diff --git a/python_ai/tests/test_goblin_barrel_on_a_tower.py b/python_ai/tests/test_goblin_barrel_on_a_tower.py
+new file mode 100644
+index 0000000..929097f
+--- /dev/null
++++ b/python_ai/tests/test_goblin_barrel_on_a_tower.py
+@@ -0,0 +1,60 @@
++"""An unanswered Goblin Barrel on a Princess Tower (patches 0034-0037).
++
++Measured on the recording of 2026-11-20 (runs/live/20261120-185026, two
++unanswered barrels, towers and Goblins level 11): the Goblins stab 3, 2, 1, 1
++times, seven stabs, while the tower's arrows land 0.8 s apart and kill them two
++arrows each. Gen-2 before these patches let one stab through: the tower fired
++on the tick it acquired a target (no first hit), its arrow flew 20 tiles/s, and
++the Goblins landed where the OTHER Princess Tower could reach them.
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++
++ID = {E.get_card_info(c)["name"]: c for c in E.get_all_card_ids()}
++NOOP = 4
++BARREL = ID["Goblin Barrel"]
++BAIT = [BARREL, 4, 12, 112, 61, 20, 14, 2]
++PLAIN = [15, 6, 25, 40, 24, 72, 33, 7]
++MIRROR_Y = E.ClashRoyaleEnv.BOARD_HEIGHT - 1
++LEFT_X, RIGHT_X = 3.0, 14.0
++
++
++def _barrel(caster, x):
++    """Tower HP lost by each of the defender's three towers (King, left,
++    right) to one unanswered Barrel thrown by `caster` at the Princess Tower in
++    column x."""
++    decks = (BAIT, PLAIN) if caster == 0 else (PLAIN, BAIT)
++    env = E.ClashRoyaleEnv(list(decks[0]), list(decks[1]), 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    defender = 1 - caster
++    before = [env.get_tower_hp(defender, s) for s in (0, 1, 2)]
++    env.set_elixir_for_team(caster, 10.0)
++    assert env.set_hand_for_team(caster, BAIT[:4])
++    spent = env.get_elixir_spent(caster)
++    # Both sides aim in their own frame: the enemy Princess Towers are at the
++    # mirror of our own row.
++    y = MIRROR_Y - E.arena_princess_y(0)
++    if caster == 0:
++        env.step_self_play(0, x, y, NOOP, 0.0, 0.0, 1)
++    else:
++        env.step_self_play(NOOP, 0.0, 0.0, 0, x, y, 1)
++    assert env.get_elixir_spent(caster) > spent, "the Barrel was refused"
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 150)
++    return [b - env.get_tower_hp(defender, s) for b, s in zip(before, (0, 1, 2))]
++
++
++def test_seven_stabs_reach_the_tower_and_only_that_tower():
++    left = _barrel(1, LEFT_X)
++    assert left[0] == 0 and left[2] == 0
++    assert left[1] % 7 == 0
++    assert 110 <= left[1] // 7 <= 130          # one Goblin stab at level 11
++    right = _barrel(1, RIGHT_X)
++    assert right == [0, 0, left[1]]
++
++
++def test_the_barrel_is_the_same_for_both_sides():
++    ours = _barrel(0, LEFT_X)
++    theirs = _barrel(1, LEFT_X)
++    assert ours == theirs
++    assert _barrel(0, RIGHT_X) == _barrel(1, RIGHT_X)
+diff --git a/python_ai/tests/test_log_rolls_past.py b/python_ai/tests/test_log_rolls_past.py
+index b61afd2..c97c09a 100644
+--- a/python_ai/tests/test_log_rolls_past.py
++++ b/python_ai/tests/test_log_rolls_past.py
+@@ -4,6 +4,11 @@ A Goblin Barrel thrown at our Princess Tower lands 28 ticks after the cast. A
+ Log cast on the tile in front of the tower as the Barrel is thrown has rolled
+ by before the Goblins land and does not touch them; one cast two seconds later
+ meets them. (Body 1.2 tiles long: published projectile_radius_y 600.)
++
++Patch 0037 put one of the three Goblins behind the tower, where the real barrel
++lands it. The Log starts there, so it leaves that Goblin first: a Log cast
++about a second after the throw now gets the two river-side Goblins and misses
++the one behind.
+ """
+ import pytest
+ 
+@@ -61,9 +66,15 @@ def test_a_log_cast_as_the_barrel_is_thrown_rolls_past_before_the_goblins_land()
+ 
+ 
+ def test_a_log_cast_two_seconds_after_the_throw_saves_the_tower():
+-    for delay in (16, 20, 24):
++    for delay in (18, 20, 24):
+         assert _tower_loss(delay) == 0, delay
+ 
+ 
++def test_a_log_cast_a_second_after_the_throw_misses_the_goblin_behind_the_tower():
++    unanswered = _tower_loss(None)
++    for delay in (10, 14):
++        assert 0 < _tower_loss(delay) < unanswered / 3, delay
++
++
+ def test_a_log_cast_after_the_first_stab_is_too_late():
+     assert _tower_loss(40) > 0
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index fdaaf80..b01eb3e 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -232,18 +232,30 @@ TEST_CASE("MeleeSquad archetype: multiple units at their offsets (Goblins)", "[c
+     const CardDefinition* goblins = CardRegistry::getInstance().getCard(4);
+     REQUIRE(goblins != nullptr);
+ 
++    // Patch 0037: a formation is written in its owner's frame (+y toward the
++    // enemy), so team 1's is the mirror image in y of team 0's. Offsets:
++    // (-0.5,-0.5) (0.5,-0.5) (-0.5,0.5) (0.5,0.5).
+     goblins->spawnEntity(10.0f, 10.0f, 1, board);
+     board.commitPendingEntities();
+ 
+     REQUIRE(board.getEntities().size() == 4);
+     REQUIRE(board.getEntities()[0]->position.x == Catch::Approx(9.5f));
+-    REQUIRE(board.getEntities()[0]->position.y == Catch::Approx(9.5f));
++    REQUIRE(board.getEntities()[0]->position.y == Catch::Approx(10.5f));
+     REQUIRE(board.getEntities()[1]->position.x == Catch::Approx(10.5f));
+-    REQUIRE(board.getEntities()[1]->position.y == Catch::Approx(9.5f));
++    REQUIRE(board.getEntities()[1]->position.y == Catch::Approx(10.5f));
+     REQUIRE(board.getEntities()[2]->position.x == Catch::Approx(9.5f));
+-    REQUIRE(board.getEntities()[2]->position.y == Catch::Approx(10.5f));
++    REQUIRE(board.getEntities()[2]->position.y == Catch::Approx(9.5f));
+     REQUIRE(board.getEntities()[3]->position.x == Catch::Approx(10.5f));
+-    REQUIRE(board.getEntities()[3]->position.y == Catch::Approx(10.5f));
++    REQUIRE(board.getEntities()[3]->position.y == Catch::Approx(9.5f));
++
++    Board ours;
++    goblins->spawnEntity(10.0f, 10.0f, 0, ours);
++    ours.commitPendingEntities();
++    REQUIRE(ours.getEntities().size() == 4);
++    REQUIRE(ours.getEntities()[0]->position.y == Catch::Approx(9.5f));
++    REQUIRE(ours.getEntities()[1]->position.y == Catch::Approx(9.5f));
++    REQUIRE(ours.getEntities()[2]->position.y == Catch::Approx(10.5f));
++    REQUIRE(ours.getEntities()[3]->position.y == Catch::Approx(10.5f));
+     for (const auto& e : board.getEntities()) {
+         REQUIRE(e->team == 1);
+         REQUIRE(std::dynamic_pointer_cast<MeleeTroop>(e) != nullptr);
+@@ -1188,6 +1200,36 @@ TEST_CASE("Goblin Barrel drops 3 Goblins directly at the target, dealing no sepa
+     REQUIRE(goblinCount == 3);
+ }
+ 
++TEST_CASE("Goblin Barrel lands one Goblin beyond the target and two short of it, for either side", "[card_registry][spell][spawn][patch0037]") {
++    // Published spawn offsets (x 0 / 500 / -500, y 500 apart); the recording of
++    // 2026-11-20 shows which way round: on a Princess Tower one Goblin lands
++    // behind it and two on its river-side corners. "Beyond" is +y for team 0
++    // and -y for team 1.
++    for (int team : { 0, 1 }) {
++        Board board;
++        const float targetY = team == 0 ? 20.0f : 13.0f;
++        CardRegistry::getInstance().getCard(109)->spawnEntity(9.0f, targetY, team, board);
++        board.commitPendingEntities();
++        auto spell = std::dynamic_pointer_cast<AreaSpell>(board.getEntities().back());
++        REQUIRE(spell != nullptr);
++        while (spell->isAlive()) spell->update(board);
++        board.commitPendingEntities();
++
++        const float forward = team == 0 ? 1.0f : -1.0f;
++        std::vector<Vector2D> landed;
++        for (const auto& e : board.getEntities()) {
++            if (e->name == "Goblins") landed.push_back(e->position);
++        }
++        REQUIRE(landed.size() == 3);
++        REQUIRE(landed[0].x == Catch::Approx(9.0f));
++        REQUIRE(landed[0].y == Catch::Approx(targetY + forward * 0.5f));
++        REQUIRE(landed[1].x == Catch::Approx(9.5f));
++        REQUIRE(landed[1].y == Catch::Approx(targetY - forward * 0.5f));
++        REQUIRE(landed[2].x == Catch::Approx(8.5f));
++        REQUIRE(landed[2].y == Catch::Approx(targetY - forward * 0.5f));
++    }
++}
++
+ TEST_CASE("Graveyard rains Skeletons over its duration, one small batch per tick", "[card_registry][spell][spawn]") {
+     Board board;
+     CardRegistry::getInstance().getCard(110)->spawnEntity(9.0f, 9.0f, 0, board);
+diff --git a/tests/core/test_champion_abilities.cpp b/tests/core/test_champion_abilities.cpp
+index 7ad16e8..00c2a27 100644
+--- a/tests/core/test_champion_abilities.cpp
++++ b/tests/core/test_champion_abilities.cpp
+@@ -101,6 +101,21 @@ TEST_CASE("Goblinstein (121) spawns both the Monster (champion) and the Doctor",
+     REQUIRE(monster->hp == 2385);
+     REQUIRE(doctor->hp == 721);
+     REQUIRE(doctor->targetsAir);
++    // Patch 0037: the Doctor stands 3 tiles behind the Monster for either side
++    // (team 0 advances toward +y, team 1 toward -y).
++    REQUIRE(doctor->position.y == Catch::Approx(monster->position.y - 3.0f));
++
++    Board theirs;
++    CardRegistry::getInstance().getCard(121)->spawnEntity(5.0f, 25.0f, 1, theirs);
++    theirs.commitPendingEntities();
++    REQUIRE(theirs.getEntities().size() == 2);
++    float monsterY = 0.0f, doctorY = 0.0f;
++    for (const auto& e : theirs.getEntities()) {
++        auto ce = std::dynamic_pointer_cast<CombatEntity>(e);
++        REQUIRE(ce != nullptr);
++        (ce->isChampion ? monsterY : doctorY) = ce->position.y;
++    }
++    REQUIRE(doctorY == Catch::Approx(monsterY + 3.0f));
+ }
+ 
+ TEST_CASE("Boss Bandit (122) is registered with charge and a limited-use ability", "[card_registry][champion]") {

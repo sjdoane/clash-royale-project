@@ -1,0 +1,209 @@
+{
+ "fix_spans": [
+  {
+   "from": 8640,
+   "to": 8685,
+   "set": {
+    "next": "musketeer"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 25905,
+   "to": 25950,
+   "set": {
+    "next": "the_log"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 33030,
+   "to": 33060,
+   "set": {
+    "next": "ice_spirit"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 54435,
+   "to": 54495,
+   "set": {
+    "next": "skeletons"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 65040,
+   "to": 65100,
+   "set": {
+    "next": "the_log"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 82770,
+   "to": 82830,
+   "set": {
+    "next": "musketeer"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 94470,
+   "to": 94515,
+   "set": {
+    "next": "skeletons"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 112110,
+   "to": 112170,
+   "set": {
+    "next": "hog_rider"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 122385,
+   "to": 122430,
+   "set": {
+    "next": "skeletons"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 138930,
+   "to": 138990,
+   "set": {
+    "next": "hog_rider"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 156255,
+   "to": 156315,
+   "set": {
+    "next": "ice_golem"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 166185,
+   "to": 166245,
+   "set": {
+    "next": "skeletons"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 23955,
+   "to": 23970,
+   "set": {
+    "next": "ice_spirit"
+   },
+   "why": "hog play at 23985 brings Ice Spirit (seen in slot 4 at 24090, raised, played by 24105): it was next; label skipped the quick Ice Spirit cycle",
+   "by": "eye"
+  },
+  {
+   "from": 23985,
+   "to": 24090,
+   "set": {
+    "hand": [
+     "skeletons",
+     "musketeer",
+     "cannon",
+     "ice_spirit"
+    ],
+    "next": "the_log"
+   },
+   "why": "same: slot 4 held Ice Spirit until its play at 24105",
+   "by": "eye"
+  },
+  {
+   "from": 33015,
+   "to": 33015,
+   "set": {
+    "hand": [
+     "fireball",
+     "cannon",
+     "musketeer",
+     "ice_golem"
+    ],
+    "next": "ice_spirit"
+   },
+   "why": "video cut to a new match at 33000 (clock 1:08 -> 2:47); label had Skeletons x3",
+   "by": "eye"
+  },
+  {
+   "from": 80640,
+   "to": 80730,
+   "set": {
+    "next": "hog_rider"
+   },
+   "why": "preview shows Hog after Ice Spirit leaves it (80715); Ice Spirit and Hog were each played selected (never read in slot 3); label skipped the Hog cycle",
+   "by": "eye"
+  },
+  {
+   "from": 80745,
+   "to": 80805,
+   "set": {
+    "hand": [
+     "skeletons",
+     "musketeer",
+     "hog_rider",
+     "cannon"
+    ],
+    "next": "fireball"
+   },
+   "why": "Hog in slot 3 (flying in at 80805, played ~80820), Fireball next (preview 80805+)",
+   "by": "eye"
+  },
+  {
+   "from": 137505,
+   "to": 137595,
+   "set": {
+    "next": "hog_rider"
+   },
+   "why": "preview shows Hog 137580-137670 after Ice Golem; label skipped the Hog cycle",
+   "by": "eye"
+  },
+  {
+   "from": 137610,
+   "to": 137700,
+   "set": {
+    "hand": [
+     "musketeer",
+     "hog_rider",
+     "the_log",
+     "cannon"
+    ],
+    "next": "ice_spirit"
+   },
+   "why": "Ice Golem played 137610 -> Hog in slot 2 (played selected ~137700, preview Ice Spirit -> Fireball 1.1 s later)",
+   "by": "eye"
+  },
+  {
+   "from": 154290,
+   "to": 154305,
+   "set": {
+    "hand": [
+     "the_log",
+     "skeletons",
+     "fireball",
+     "hog_rider"
+    ],
+    "next": "ice_golem"
+   },
+   "why": "Skeletons still in slot 2 (raised, 154305), occluded by the Fireball refill at 154290; played at 154320",
+   "by": "eye"
+  }
+ ],
+ "exclude": [
+  33000,
+  [
+   80730,
+   80745
+  ]
+ ]
+}

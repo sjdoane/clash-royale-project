@@ -1,0 +1,422 @@
+diff --git a/include/core/Board.h b/include/core/Board.h
+index 109600d..91ee08b 100644
+--- a/include/core/Board.h
++++ b/include/core/Board.h
+@@ -4,6 +4,7 @@
+ #include <algorithm>
+ #include <unordered_map>
+ #include "ArenaLayout.h"
++#include "CardLevels.h"
+ #include "Entity.h"
+ #include "StatsEventBus.h"
+ 
+@@ -96,6 +97,10 @@ public:
+         copy.currentTick = currentTick;
+         copy.pendingElixirGrant[0] = pendingElixirGrant[0];
+         copy.pendingElixirGrant[1] = pendingElixirGrant[1];
++        for (int t = 0; t < 2; ++t) {
++            copy.cardLevel[t] = cardLevel[t];
++            copy.towerLevel[t] = towerLevel[t];
++        }
+ 
+         std::unordered_map<int, std::shared_ptr<Entity>> byOldId;
+         byOldId.reserve(activeEntities.size() + pendingEntities.size());
+@@ -161,9 +166,26 @@ public:
+     const std::shared_ptr<Entity>& getPendingEntity(size_t index) const { return pendingEntities[index]; }
+ 
+     // GameManager::step passes the real tick; tests call it without one.
++    // Per-team levels (CardLevels.h, UPSTREAM_REQUESTS.md item 42), applied
++    // once to every entity as it enters play: the played card, and everything
++    // spawned later (death spawns, spawner buildings, Graveyard). Crown Towers
++    // take towerLevel. GameManager owns the setting and writes it into each
++    // fresh Board; 11 everywhere is the unscaled engine.
++    int cardLevel[2] = { CardLevels::TOURNAMENT_LEVEL, CardLevels::TOURNAMENT_LEVEL };
++    int towerLevel[2] = { CardLevels::TOURNAMENT_LEVEL, CardLevels::TOURNAMENT_LEVEL };
++
++    void applyTeamLevel(Entity& e) const {
++        if (e.levelApplied) return;
++        e.levelApplied = true;
++        if (e.team != 0 && e.team != 1) return;
++        const int level = e.isTower() ? towerLevel[e.team] : cardLevel[e.team];
++        if (level != CardLevels::TOURNAMENT_LEVEL) e.scaleToLevel(level);
++    }
++
+     void commitPendingEntities(int tick = 0) {
+         if (!pendingEntities.empty()) {
+             for (const auto& e : pendingEntities) {
++                applyTeamLevel(*e);
+                 statsEvents.notifyEntitySpawned({ e->id, e->cardId, e->team, tick });
+             }
+             activeEntities.insert(activeEntities.end(), pendingEntities.begin(), pendingEntities.end());
+diff --git a/include/core/CardLevels.h b/include/core/CardLevels.h
+new file mode 100644
+index 0000000..7e10e4d
+--- /dev/null
++++ b/include/core/CardLevels.h
+@@ -0,0 +1,44 @@
++#pragma once
++#include <cmath>
++
++// Card and Crown Tower levels (perception/UPSTREAM_REQUESTS.md item 42).
++//
++// Every stat in CardRegistry and TowerTroops is the level-11 (tournament)
++// value. A real opponent is often over-levelled -- the Training Camp trainer
++// that beat us at level 15 -- so Board scales each team's bodies and spells
++// to that team's level as they enter play (Board::commitPendingEntities).
++//
++// The curve is the game's single power-level table, the same for every rarity
++// once levels are on the 1..16 "card level" scale: FirstLight Zero's published
++// native_runner/data/competitive/card_logic.json, rarity_curves.Common
++// .active_power_level_multipliers_percent (release 15.535.13), projected as
++// base * percent / 100. Level 11 is 256, so a level-L value is the level-11
++// value * percent[L] / 256.
++//
++// Checked against values read off our own recordings and the wiki:
++//   Princess Tower 2534 (lv 9) 3052 (11) 4032 (14) 4424 (15); this curve gives
++//   2527, 3052, 4041, 4435 -- within 0.3%. Hog Rider 1697 hp / 317 dmg at 11
++//   give 2466 / 461 at 15, the same as 663 * 3.72 and 124 * 3.72.
++namespace CardLevels {
++
++static constexpr int MIN_LEVEL = 1;
++static constexpr int MAX_LEVEL = 16;
++// The level every registry stat is written at.
++static constexpr int TOURNAMENT_LEVEL = 11;
++
++static constexpr int MULTIPLIER_PERCENT[MAX_LEVEL] = {
++    100, 110, 121, 133, 146, 160, 176, 193, 212, 233, 256, 281, 309, 339, 372, 409,
++};
++
++inline constexpr bool isValid(int level) { return level >= MIN_LEVEL && level <= MAX_LEVEL; }
++
++// A level-11 hp or damage value at `level`. 0 and negative sentinels (-1 =
++// "use the default") pass through unchanged.
++inline int scale(int level11Value, int level) {
++    if (level11Value <= 0 || level == TOURNAMENT_LEVEL || !isValid(level)) return level11Value;
++    const double v = static_cast<double>(level11Value) * MULTIPLIER_PERCENT[level - 1]
++                   / MULTIPLIER_PERCENT[TOURNAMENT_LEVEL - 1];
++    return static_cast<int>(std::lround(v));
++}
++
++} // namespace CardLevels
+diff --git a/include/core/ClashEnv.h b/include/core/ClashEnv.h
+index 90d72b3..9ce24e1 100644
+--- a/include/core/ClashEnv.h
++++ b/include/core/ClashEnv.h
+@@ -692,6 +692,12 @@ public:
+         game.setOpponentElixirMultiplier(multiplier);
+     }
+ 
++    bool setTeamLevel(int team, int cardLevel, int towerLevel = -1) {
++        return game.setTeamLevel(team, cardLevel, towerLevel);
++    }
++    int getTeamCardLevel(int team) const { return game.getTeamCardLevel(team); }
++    int getTeamTowerLevel(int team) const { return game.getTeamTowerLevel(team); }
++
+     void saveLog(const std::string& filepath) {
+         logger.save(filepath);
+     }
+diff --git a/include/core/GameManager.h b/include/core/GameManager.h
+index f5cb11f..b19509c 100644
+--- a/include/core/GameManager.h
++++ b/include/core/GameManager.h
+@@ -55,6 +55,9 @@ private:
+     CycleTable lastPlayedTick = neverPlayed();
+     // Curriculum hook: scales the opponent's regen. 1.0 is a normal opponent.
+     float oppElixirMultiplier = 1.0f;
++    // setTeamLevel; written into each fresh Board by reset().
++    int teamCardLevel[2] = { CardLevels::TOURNAMENT_LEVEL, CardLevels::TOURNAMENT_LEVEL };
++    int teamTowerLevel[2] = { CardLevels::TOURNAMENT_LEVEL, CardLevels::TOURNAMENT_LEVEL };
+ 
+     // How far short of the river a non-spell placement must stay on its own
+     // side; Board enforces the river only during movement.
+@@ -248,6 +251,24 @@ public:
+         oppElixirMultiplier = std::max(0.0f, multiplier);
+     }
+ 
++    // Per-team card and Crown Tower level, 1..16 (CardLevels.h, UPSTREAM item
++    // 41). Cards take effect from the next entity to enter play; towers are
++    // built at reset(), so a tower level waits for the next match.
++    // towerLevel < 0 follows cardLevel (a real account's King level is near
++    // its card level). Returns false and changes nothing on a bad value.
++    bool setTeamLevel(int team, int cardLevel, int towerLevel = -1) {
++        if (team != 0 && team != 1) return false;
++        if (towerLevel < 0) towerLevel = cardLevel;
++        if (!CardLevels::isValid(cardLevel) || !CardLevels::isValid(towerLevel)) return false;
++        teamCardLevel[team] = cardLevel;
++        teamTowerLevel[team] = towerLevel;
++        board.cardLevel[team] = cardLevel;
++        board.towerLevel[team] = towerLevel;
++        return true;
++    }
++    int getTeamCardLevel(int team) const { return teamCardLevel[team == 1 ? 1 : 0]; }
++    int getTeamTowerLevel(int team) const { return teamTowerLevel[team == 1 ? 1 : 0]; }
++
+     Board& getBoard() { return board; }
+     const Board& getBoard() const { return board; }
+     const MatchStatistics& getStatistics() const { return stats; }
+@@ -652,6 +673,10 @@ public:
+ 
+     void reset() {
+         board = Board();
++        for (int t = 0; t < 2; ++t) {
++            board.cardLevel[t] = teamCardLevel[t];
++            board.towerLevel[t] = teamTowerLevel[t];
++        }
+         // Right after replacing the board, whose subscriber list died with it:
+         // fresh collectors before any event fires.
+         stats.attach(board);
+diff --git a/include/entities/AreaSpell.h b/include/entities/AreaSpell.h
+index cd8dd95..c163564 100644
+--- a/include/entities/AreaSpell.h
++++ b/include/entities/AreaSpell.h
+@@ -70,6 +70,17 @@ public:
+     // CardFactories::spawnSpell, like configureRoll.
+     int crownTowerDamage = -1;
+ 
++    // Card level (CardLevels.h): the damage of every application and the
++    // published crown-tower figure. Bodies the spell spawns (Graveyard) are
++    // scaled on their own as they enter play.
++    void scaleToLevel(int level) override {
++        damage = CardLevels::scale(damage, level);
++        tierSingleDamage = CardLevels::scale(tierSingleDamage, level);
++        tierFewDamage = CardLevels::scale(tierFewDamage, level);
++        tierManyDamage = CardLevels::scale(tierManyDamage, level);
++        crownTowerDamage = CardLevels::scale(crownTowerDamage, level);
++    }
++
+     // With a ring (Graveyard: 3.3 tiles), application k spawns at the k-th of
+     // seven fixed points, cycled: the cast point, then six on the ring 60
+     // degrees apart, starting on the caster's forward axis. The real layout is
+diff --git a/include/entities/Building.h b/include/entities/Building.h
+index 0caef3f..81fe7d3 100644
+--- a/include/entities/Building.h
++++ b/include/entities/Building.h
+@@ -22,6 +22,11 @@ public:
+     // outside.
+     int getMaxHp() const { return maxHp; }
+ 
++    void scaleToLevel(int level) override {
++        CombatEntity::scaleToLevel(level);
++        maxHp = CardLevels::scale(maxHp, level);
++    }
++
+     float getCollisionRadius() const override { return COLLISION_RADIUS; }
+ 
+     bool isBuilding() const override { return true; }
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index ebfc25d..8f928ba 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -1,5 +1,6 @@
+ #pragma once
+ #include "CardEntity.h"
++#include "CardLevels.h"
+ #include "Board.h"
+ #include "LanePath.h"
+ #include "OnHitEffect.h"
+@@ -1043,6 +1044,19 @@ public:
+         return static_cast<float>(getCurrentDamage()) / static_cast<float>(cooldown);
+     }
+ 
++    // Card level (CardLevels.h, Board::commitPendingEntities). hp, damage and
++    // the flat secondary hits scale; multipliers and timings do not. Effect
++    // objects (on-hit, death, ability) keep their level-11 damage.
++    void scaleToLevel(int level) override {
++        hp = CardLevels::scale(hp, level);
++        damage = CardLevels::scale(damage, level);
++        shieldHp = CardLevels::scale(shieldHp, level);
++        onHitPullDamage = CardLevels::scale(onHitPullDamage, level);
++        flightPulseDamage = CardLevels::scale(flightPulseDamage, level);
++        healOnHitMaxHp = CardLevels::scale(healOnHitMaxHp, level);
++        transformCheckMaxHp = CardLevels::scale(transformCheckMaxHp, level);
++    }
++
+ protected:
+ 
+     int getCurrentDamage() const {
+diff --git a/include/entities/Entity.h b/include/entities/Entity.h
+index b0f4e94..836442a 100644
+--- a/include/entities/Entity.h
++++ b/include/entities/Entity.h
+@@ -40,6 +40,11 @@ public:
+     // tight loops.
+     bool isFlying = false;
+ 
++    // Set by Board::commitPendingEntities once this entity carries its team's
++    // level (CardLevels.h). Copied with the entity, so a snapshot or a Clone
++    // copy of a scaled body is never scaled twice.
++    bool levelApplied = false;
++
+     Entity(int id, float x, float y, int hp, int team, char symbol = '?')
+         : id(id), position{ x, y }, hp(hp), team(team), symbol(symbol) {}
+ 
+@@ -62,6 +67,12 @@ public:
+     // fallback without a cast.
+     virtual bool isTower() const { return false; }
+ 
++    // Rescales this entity's level-11 hp and damage to `level`
++    // (CardLevels::scale). Board calls it once per entity. The default does
++    // nothing: a Projectile carries damage copied from an already-scaled
++    // shooter or spell.
++    virtual void scaleToLevel(int level) { (void)level; }
++
+     virtual float getCollisionRadius() const { return 0.0f; }
+ 
+     // Footprint for target-selection distance only, never collision or attack
+diff --git a/python_ai/tests/test_team_level.py b/python_ai/tests/test_team_level.py
+new file mode 100644
+index 0000000..4b26bfe
+--- /dev/null
++++ b/python_ai/tests/test_team_level.py
+@@ -0,0 +1,26 @@
++"""Per-team card and Crown Tower level (UPSTREAM_REQUESTS.md item 42)."""
++import clash_royale_env as E
++
++DECK = [0, 1, 2, 3, 4, 5, 6, 7]
++
++
++def test_level_11_is_the_default_and_leaves_the_engine_unscaled():
++    env = E.ClashRoyaleEnv(DECK, DECK, 3600)
++    env.reset()
++    assert env.get_team_card_level(0) == env.get_team_card_level(1) == 11
++    assert env.get_tower_max_hp(1, 1) == env.get_tower_max_hp(0, 1)
++
++
++def test_an_over_levelled_opponent_has_stronger_towers_from_the_next_match():
++    env = E.ClashRoyaleEnv(DECK, DECK, 3600)
++    env.reset()
++    princess11 = env.get_tower_max_hp(1, 1)
++    assert env.set_team_level(1, 15)
++    assert env.get_team_tower_level(1) == 15
++    env.reset()
++    # 372 / 256: the published level-15 multiplier over level 11.
++    assert env.get_tower_max_hp(1, 1) == round(princess11 * 372 / 256)
++    assert env.get_tower_max_hp(0, 1) == princess11
++    assert not env.set_team_level(1, 17)
++    assert not env.set_team_level(3, 12)
++    assert env.get_team_card_level(1) == 15
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index aeda2e4..10e478c 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -244,6 +244,12 @@ PYBIND11_MODULE(clash_royale_env, m) {
+              py::arg("team"), py::arg("hp") = -1.0f, py::arg("deploy_ticks") = -1)
+         .def("set_opponent_deck", &ClashEnv::setOpponentDeck, py::arg("deck"))
+         .def("set_opponent_elixir_multiplier", &ClashEnv::setOpponentElixirMultiplier, py::arg("multiplier"))
++        // Card level 1..16 for `team` (CardLevels.h); tower_level -1 follows it.
++        // Towers change at the next reset(). Returns False on a bad value.
++        .def("set_team_level", &ClashEnv::setTeamLevel, py::arg("team"), py::arg("card_level"),
++            py::arg("tower_level") = -1)
++        .def("get_team_card_level", &ClashEnv::getTeamCardLevel, py::arg("team"))
++        .def("get_team_tower_level", &ClashEnv::getTeamTowerLevel, py::arg("team"))
+         .def("save_log", &ClashEnv::saveLog, py::arg("filepath"))
+         .def("get_troop_damage_dealt", &ClashEnv::getTroopDamageDealt, py::arg("team"))
+         .def("get_building_damage_dealt", &ClashEnv::getBuildingDamageDealt, py::arg("team"))
+diff --git a/tests/core/test_card_levels.cpp b/tests/core/test_card_levels.cpp
+new file mode 100644
+index 0000000..e29e447
+--- /dev/null
++++ b/tests/core/test_card_levels.cpp
+@@ -0,0 +1,102 @@
++#include <catch_amalgamated.hpp>
++#include "CardLevels.h"
++#include "GameManager.h"
++#include "TowerTroops.h"
++#include "ArenaLayout.h"
++#include <memory>
++
++// UPSTREAM_REQUESTS.md item 42: per-team card and Crown Tower levels.
++
++namespace {
++// hp of the first non-tower entity `team` has on the board.
++int firstUnitHp(const GameManager& game, int team) {
++    for (const auto& e : game.getBoard().getEntities()) {
++        if (e->team == team && !e->isTower()) return e->hp;
++    }
++    return -1;
++}
++} // namespace
++
++TEST_CASE("the level curve is the published power-level table, pinned to level 11", "[card_levels]") {
++    REQUIRE(CardLevels::MULTIPLIER_PERCENT[CardLevels::TOURNAMENT_LEVEL - 1] == 256);
++    for (int l = CardLevels::MIN_LEVEL; l < CardLevels::MAX_LEVEL; ++l) {
++        REQUIRE(CardLevels::MULTIPLIER_PERCENT[l] > CardLevels::MULTIPLIER_PERCENT[l - 1]);
++    }
++    // Hog Rider, level 11 -> 15: 663 * 3.72 and 124 * 3.72 in the real table.
++    REQUIRE(CardLevels::scale(1697, 15) == 2466);
++    REQUIRE(CardLevels::scale(317, 15) == 461);
++    // Princess Tower: 4424 read live at level 15, 4032 at 14 (within 0.3%).
++    REQUIRE(CardLevels::scale(CrownTower::PRINCESS_HP, 15) == Catch::Approx(4424).epsilon(0.003));
++    REQUIRE(CardLevels::scale(CrownTower::PRINCESS_HP, 14) == Catch::Approx(4032).epsilon(0.003));
++    // Level 11, sentinels and out-of-range levels pass through.
++    REQUIRE(CardLevels::scale(1697, 11) == 1697);
++    REQUIRE(CardLevels::scale(-1, 15) == -1);
++    REQUIRE(CardLevels::scale(0, 15) == 0);
++    REQUIRE(CardLevels::scale(1697, 0) == 1697);
++    REQUIRE(CardLevels::scale(1697, 17) == 1697);
++}
++
++TEST_CASE("setTeamLevel refuses bad values and changes nothing", "[card_levels]") {
++    GameManager game({ 0,1,2,3,4,5,6,7 }, { 0,1,2,3,4,5,6,7 });
++    REQUIRE_FALSE(game.setTeamLevel(2, 15));
++    REQUIRE_FALSE(game.setTeamLevel(1, 0));
++    REQUIRE_FALSE(game.setTeamLevel(1, 17));
++    REQUIRE_FALSE(game.setTeamLevel(1, 15, 17));
++    REQUIRE(game.getTeamCardLevel(1) == CardLevels::TOURNAMENT_LEVEL);
++    REQUIRE(game.getTeamTowerLevel(1) == CardLevels::TOURNAMENT_LEVEL);
++    REQUIRE(game.setTeamLevel(1, 15));
++    REQUIRE(game.getTeamTowerLevel(1) == 15);   // -1 follows the card level
++    REQUIRE(game.setTeamLevel(1, 15, 13));
++    REQUIRE(game.getTeamTowerLevel(1) == 13);
++}
++
++TEST_CASE("a team's Crown Towers take its tower level at reset; the other side's do not move",
++        "[card_levels]") {
++    GameManager game({ 0,1,2,3,4,5,6,7 }, { 0,1,2,3,4,5,6,7 });
++    REQUIRE(game.getTowerMaxHp(1, 0) == CrownTower::KING_HP);
++    REQUIRE(game.setTeamLevel(1, 15));
++    // Towers were built at construction: unchanged until the next match.
++    REQUIRE(game.getTowerMaxHp(1, 1) == CrownTower::PRINCESS_HP);
++    game.reset();
++    REQUIRE(game.getTowerMaxHp(1, 0) == CardLevels::scale(CrownTower::KING_HP, 15));
++    REQUIRE(game.getTowerMaxHp(1, 1) == CardLevels::scale(CrownTower::PRINCESS_HP, 15));
++    REQUIRE(game.getTowerHp(1, 1) == game.getTowerMaxHp(1, 1));
++    REQUIRE(game.getTowerMaxHp(0, 0) == CrownTower::KING_HP);
++    REQUIRE(game.getTowerMaxHp(0, 1) == CrownTower::PRINCESS_HP);
++}
++
++TEST_CASE("a played troop enters play at its team's level, once", "[card_levels]") {
++    auto knightHp = [](int level) {
++        GameManager game({ 0,1,2,3,4,5,6,7 }, { 0,1,2,3,4,5,6,7 });
++        REQUIRE(game.setTeamLevel(0, level));
++        REQUIRE(game.setHand(0, { 0, 1, 2, 3 }));
++        REQUIRE(game.playCard(0, 0, 9.0f, 10.0f));   // Knight
++        game.step();
++        const int hp = firstUnitHp(game, 0);
++        // A snapshot (rollouts) and further commits never scale it again.
++        GameManager copy = game.snapshot();
++        copy.step();
++        REQUIRE(firstUnitHp(copy, 0) == hp);
++        return hp;
++    };
++    const int at11 = knightHp(11);
++    REQUIRE(at11 > 0);
++    REQUIRE(knightHp(15) == CardLevels::scale(at11, 15));
++    REQUIRE(knightHp(9) == CardLevels::scale(at11, 9));
++}
++
++TEST_CASE("a spell's crown-tower damage follows its team's level", "[card_levels]") {
++    auto fireballOnTower = [](int level) {
++        GameManager game({ 0,1,2,3,4,5,6,7 }, { 0,1,2,3,4,5,6,7 });
++        REQUIRE(game.setTeamLevel(0, level));
++        REQUIRE(game.setHand(0, { 7, 1, 2, 3 }));     // Fireball
++        game.setElixir(0, 10.0f);
++        const int hp0 = game.getTowerHp(1, 1);
++        REQUIRE(game.playCard(0, 7, ArenaLayout::LEFT_LANE_X, ArenaLayout::princessY(1)));
++        for (int i = 0; i < 40; ++i) game.step();
++        return hp0 - game.getTowerHp(1, 1);
++    };
++    const int at11 = fireballOnTower(11);
++    REQUIRE(at11 == 159);   // audit 0003: wiki Fireball crown-tower damage, level 11
++    REQUIRE(fireballOnTower(15) == CardLevels::scale(159, 15));
++}

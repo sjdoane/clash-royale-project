@@ -1,0 +1,458 @@
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index 39a7b86..9468d85 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -1,5 +1,6 @@
+ #pragma once
+ #include "CardStats.h"
++#include "LoadTimes.h"
+ #include "Board.h"
+ #include "MeleeTroop.h"
+ #include "RangedTroop.h"
+@@ -28,6 +29,7 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     // its own). Set here because every troop and building passes through;
+     // spells and deploy effects do not, since a spell has its own delay.
+     entity->deployTicksRemaining = stats.deployTicks;
++    entity->loadTicks = LoadTimes::forName(stats.name);
+     entity->isFlying = stats.isFlying;
+     entity->targetsAir = stats.targetsAir;
+     entity->deathEffect = stats.deathEffect;
+diff --git a/include/core/LoadTimes.h b/include/core/LoadTimes.h
+new file mode 100644
+index 0000000..3239fe6
+--- /dev/null
++++ b/include/core/LoadTimes.h
+@@ -0,0 +1,141 @@
++#pragma once
++
++#include <string>
++
++// Attack load time ("first hit"): how long a unit winds up after it comes
++// into range of a new target before its first hit lands, in ticks (10 = 1 s).
++// After that it hits every CardStats::attackCooldown. Read by
++// CardFactories::applyCardMetadata, used in CombatEntity::update.
++//
++// Before this every unit hit the instant it came into range (a Hog 0.1 s after
++// reaching a tower; the real game is 1.0 s), because the cooldown runs down
++// while a unit walks. perception/UPSTREAM_REQUESTS.md item 40.
++//
++// Keyed by the registry NAME, not the id, because Evolutions reuse the base
++// card's name verbatim and their load time is the base card's. A name not in
++// the table has no load time (the old behaviour): buildings that only spawn,
++// spawned bodies with their own names, and the Crown Towers.
++//
++// Sources, as the comment on each row says:
++//   FLZ   - FirstLight-Zero's published card_specs.json (release 15.535.13),
++//           "LoadTime" in ms. Preferred: it is the current release.
++//   CRAPI - RoyaleAPI cr-api-data cards_stats.json "load_time" in ms, where
++//           FLZ has no row. Older game files.
++// Rounded to the nearest tick.
++namespace LoadTimes {
++
++enum class Source { FLZ, CRAPI };
++
++struct Row {
++    const char* name;
++    int ticks;
++    Source source;
++};
++
++inline const Row* table(int& count) {
++    static const Row rows[] = {
++        { "Archer Queen", 9, Source::FLZ }, // ArcherQueen 900 ms
++        { "Archers", 4, Source::CRAPI }, // Archer 400 ms
++        { "Baby Dragon", 12, Source::FLZ }, // BabyDragon 1200 ms
++        { "Balloon", 18, Source::FLZ }, // Balloon 1800 ms
++        { "Bandit", 6, Source::CRAPI }, // Assassin 600 ms
++        { "Barbarians", 10, Source::FLZ }, // Barbarians 1000 ms
++        { "Bats", 6, Source::FLZ }, // Bats 600 ms
++        { "Battle Healer", 16, Source::FLZ }, // BattleHealer 1600 ms
++        { "Battle Ram", 4, Source::FLZ }, // BattleRam 350 ms
++        { "Bomb Tower", 13, Source::FLZ }, // BombTower 1300 ms
++        { "Bomber", 16, Source::FLZ }, // Bomber 1600 ms
++        { "Bowler", 20, Source::FLZ }, // Bowler 2000 ms
++        { "Cannon", 1, Source::FLZ }, // Cannon 100 ms
++        { "Cannon Cart", 4, Source::CRAPI }, // BrokenCannon 400 ms
++        { "Dark Prince", 10, Source::FLZ }, // DarkPrince 1000 ms
++        { "Dart Goblin", 4, Source::CRAPI }, // BlowdartGoblin 350 ms
++        { "Electro Dragon", 14, Source::FLZ }, // ElectroDragon 1400 ms
++        { "Electro Giant", 8, Source::FLZ }, // ElectroGiant 800 ms
++        { "Electro Spirit", 1, Source::FLZ }, // ElectroSpirit 100 ms
++        { "Electro Wizard", 12, Source::FLZ }, // ElectroWizard 1200 ms
++        { "Elite Barbarians", 9, Source::CRAPI }, // AngryBarbarian 900 ms
++        { "Elixir Golem", 3, Source::FLZ }, // ElixirGolem 300 ms
++        { "Executioner", 4, Source::CRAPI }, // AxeMan 400 ms
++        { "Fire Spirit", 1, Source::CRAPI }, // FireSpirits 100 ms
++        { "Firecracker", 24, Source::FLZ }, // Firecracker 2350 ms
++        { "Fisherman", 12, Source::FLZ }, // Fisherman 1200 ms
++        { "Flying Machine", 6, Source::CRAPI }, // DartBarrell 600 ms
++        { "Giant", 10, Source::FLZ }, // Giant 1000 ms
++        { "Giant Skeleton", 10, Source::FLZ }, // GiantSkeleton 1000 ms
++        { "Goblin Drill", 2, Source::FLZ }, // GoblinDrill 200 ms
++        { "Goblin Gang", 5, Source::FLZ }, // GoblinGang 500 ms
++        { "Goblin Giant", 7, Source::FLZ }, // GoblinGiant 700 ms
++        { "Goblins", 5, Source::FLZ }, // Goblins 500 ms
++        { "Golden Knight", 7, Source::FLZ }, // GoldenKnight 700 ms
++        { "Golem", 15, Source::FLZ }, // Golem 1500 ms
++        { "Guards", 6, Source::CRAPI }, // SkeletonWarrior 600 ms
++        { "Heal Spirit", 1, Source::CRAPI }, // HealSpirit 100 ms
++        { "Hero Giant", 10, Source::FLZ }, // Giant 1000 ms
++        { "Hero Goblins", 5, Source::FLZ }, // Goblins 500 ms
++        { "Hero Ice Golem", 15, Source::CRAPI }, // IceGolemite 1500 ms
++        { "Hero Knight", 7, Source::FLZ }, // Knight 700 ms
++        { "Hero Magic Archer", 6, Source::CRAPI }, // EliteArcher 600 ms
++        { "Hero Mega Minion", 11, Source::FLZ }, // MegaMinion 1100 ms
++        { "Hero Mini P.E.K.K.A.", 11, Source::FLZ }, // MiniPekka 1100 ms
++        { "Hero Musketeer", 3, Source::FLZ }, // Musketeer 300 ms
++        { "Hero Wizard", 10, Source::FLZ }, // Wizard 1000 ms
++        { "Hog Rider", 10, Source::FLZ }, // HogRider 1000 ms
++        { "Hunter", 15, Source::FLZ }, // Hunter 1500 ms
++        { "Ice Golem", 15, Source::CRAPI }, // IceGolemite 1500 ms
++        { "Ice Spirit", 1, Source::FLZ }, // IceSpirits 100 ms
++        { "Ice Wizard", 12, Source::FLZ }, // IceWizard 1200 ms
++        { "Inferno Dragon", 12, Source::FLZ }, // InfernoDragon 1200 ms
++        { "Inferno Tower", 12, Source::FLZ }, // InfernoTower 1200 ms
++        { "Knight", 7, Source::FLZ }, // Knight 700 ms
++        { "Lava Hound", 3, Source::FLZ }, // LavaHound 300 ms
++        { "Lumberjack", 4, Source::CRAPI }, // RageBarbarian 400 ms
++        { "Magic Archer", 6, Source::CRAPI }, // EliteArcher 600 ms
++        { "Mega Knight", 12, Source::FLZ }, // MegaKnight 1200 ms
++        { "Mega Minion", 11, Source::FLZ }, // MegaMinion 1100 ms
++        { "Mighty Miner", 7, Source::FLZ }, // MightyMiner 700 ms
++        { "Miner", 8, Source::FLZ }, // Miner 800 ms
++        { "Mini PEKKA", 11, Source::FLZ }, // MiniPekka 1100 ms
++        { "Minion Horde", 7, Source::FLZ }, // MinionHorde 700 ms
++        { "Minions", 7, Source::FLZ }, // Minions 700 ms
++        { "Monk", 6, Source::FLZ }, // Monk 600 ms
++        { "Mortar", 37, Source::FLZ }, // Mortar 3700 ms
++        { "Mother Witch", 7, Source::CRAPI }, // WitchMother 700 ms
++        { "Musketeer", 3, Source::FLZ }, // Musketeer 300 ms
++        { "Night Witch", 6, Source::CRAPI }, // DarkWitch 550 ms
++        { "P.E.K.K.A.", 13, Source::FLZ }, // Pekka 1300 ms
++        { "Phoenix", 4, Source::FLZ }, // Phoenix 400 ms
++        { "Prince", 9, Source::FLZ }, // Prince 900 ms
++        { "Princess", 27, Source::FLZ }, // Princess 2700 ms
++        { "Ram Rider", 11, Source::FLZ }, // RamRider 1100 ms
++        { "Rascals", 11, Source::FLZ }, // Rascals 1100 ms
++        { "Royal Ghost", 12, Source::CRAPI }, // Ghost 1200 ms
++        { "Royal Giant", 9, Source::FLZ }, // RoyalGiant 900 ms
++        { "Royal Hogs", 8, Source::FLZ }, // RoyalHogs 800 ms
++        { "Skeleton Army", 6, Source::FLZ }, // SkeletonArmy 600 ms
++        { "Skeleton Dragons", 16, Source::FLZ }, // SkeletonDragons 1600 ms
++        { "Skeleton King", 13, Source::FLZ }, // SkeletonKing 1300 ms
++        { "Skeletons", 6, Source::FLZ }, // Skeletons 600 ms
++        { "Sparky", 30, Source::CRAPI }, // ZapMachine 3000 ms
++        { "Spear Goblins", 11, Source::FLZ }, // SpearGoblins 1100 ms
++        { "Tesla", 7, Source::FLZ }, // Tesla 700 ms
++        { "Three Musketeers", 7, Source::FLZ }, // ThreeMusketeers 700 ms
++        { "Valkyrie", 14, Source::FLZ }, // Valkyrie 1400 ms
++        { "Wall Breakers", 10, Source::FLZ }, // Wallbreakers 1000 ms
++        { "Witch", 4, Source::FLZ }, // Witch 400 ms
++        { "Wizard", 10, Source::FLZ }, // Wizard 1000 ms
++    };
++    count = static_cast<int>(sizeof(rows) / sizeof(rows[0]));
++    return rows;
++}
++
++inline int forName(const std::string& name) {
++    int n = 0;
++    const Row* rows = table(n);
++    for (int i = 0; i < n; ++i) {
++        if (name == rows[i].name) return rows[i].ticks;
++    }
++    return 0;
++}
++
++} // namespace LoadTimes
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index eabc072..ebfc25d 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -61,6 +61,7 @@ protected:
+     static constexpr int TICKS_SINCE_ATTACK_NEVER = 1 << 20;
+     int ticksSinceAttack = TICKS_SINCE_ATTACK_NEVER;
+ 
++
+     // The freezes in force, each running its own duration (see applyFreeze).
+     struct FreezeSlot { int ticks = 0; float factor = 1.0f; };
+     static constexpr int FREEZE_SLOT_COUNT = 3;
+@@ -103,6 +104,14 @@ public:
+     // and a new unit has not been stunned. The implicit copy carries it, so
+     // snapshots keep the exact remaining deploy time.
+     int deployTicksRemaining = 0;
++    // Attack load time (LoadTimes.h): after coming into range of a new
++    // target, wind up this many ticks before the first hit. 0 = hit at once.
++    int loadTicks = 0;
++    // The target the current wind-up is for, -1 for none. A stun, leaving
++    // range, losing the target or switching target cancels it, so the next
++    // engagement winds up from the start, as in the real game.
++    int windupTargetId = -1;
++    float windupRemaining = 0.0f;
+ 
+     // Damage-over-time mark (Dart Goblin / Firecracker Evolutions; see
+     // applyDot, PoisonOnHit). Ticks down independently of freeze and curse.
+@@ -708,6 +717,9 @@ public:
+             }
+         }
+ 
++        // A stun, or no target at all, cancels a wind-up.
++        if (!target || stunned) windupTargetId = -1;
++
+         if (target) {
+             if (wasFrozen) {
+                 // A stun resets unconditionally, grace period or not.
+@@ -728,9 +740,27 @@ public:
+             float effectiveAttackRange = effectiveRangeTo(target);
+ 
+             if (dist <= effectiveAttackRange) {
++                // Load time: a new engagement winds up for loadTicks first,
++                // so the first hit lands loadTicks after coming into range
++                // and later hits follow every attackCooldown. A slow slows
++                // the wind-up as it slows the cooldown.
++                bool loading = false;
++                if (!stunned && loadTicks > 0) {
++                    if (target->id != windupTargetId) {
++                        windupTargetId = target->id;
++                        windupRemaining = static_cast<float>(loadTicks);
++                    }
++                    if (windupRemaining > 0.0f) {
++                        windupRemaining -= wasFrozen ? slowThisTick : 1.0f;
++                        if (windupRemaining < 0.0f) windupRemaining = 0.0f;
++                        loading = true;
++                        // A damage ramp (Inferno) starts at the first hit.
++                        ticksOnTarget = 0;
++                    }
++                }
+                 // Not while stunned: a stun holds the cooldown still, and a
+                 // unit that was already ready must not swing through it.
+-                if (!stunned && currentCooldown == 0.0f) {
++                if (!stunned && !loading && currentCooldown == 0.0f) {
+                     // Effects are applied by performAttack, since when they
+                     // fire depends on when the damage lands (at once for a
+                     // direct hit, on arrival for a projectile).
+@@ -838,6 +868,7 @@ public:
+                 pullToward(*target, position, dist - effectiveAttackRange + 0.1f);
+                 currentCooldown = static_cast<float>(attackCooldown);
+             } else {
++                windupTargetId = -1; // out of range: the next engagement winds up again
+                 Vector2D beforeMove = position;
+                 // Lane-aware approach: a King objective is walked to up this
+                 // unit's own lane; any other target is its own position
+diff --git a/python_ai/tests/test_teacher_combos.py b/python_ai/tests/test_teacher_combos.py
+index 7da847f..ddeb264 100644
+--- a/python_ai/tests/test_teacher_combos.py
++++ b/python_ai/tests/test_teacher_combos.py
+@@ -400,7 +400,11 @@ def test_the_teacher_actually_executes_a_planned_pair_end_to_end():
+     """
+     env = _env()
+     _stage_hand(env, 0, [ICE_GOLEM, HOG, CANNON, SKELETONS], 10.0)
+-    t = _teacher(horizon=50)
++    # 100 ticks, the top rung's horizon. The follow-up is re-scored when it
++    # falls due, and since the Hog winds up 1.0 s before its first hit
++    # (LoadTimes.h, UPSTREAM item 40) a 50-tick rollout no longer reaches
++    # the tower damage that makes it the best play here.
++    t = _teacher(horizon=100)
+     spent0 = env.get_elixir_spent(0)
+ 
+     slot, x, y = t.act(env, _obs(env))
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index eda11a9..aeda2e4 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -54,6 +54,7 @@ py::dict statsDict(const CardStats& s, int depth = 0) {
+     d["hp"] = s.hp;
+     d["damage"] = s.damage;
+     d["attack_cooldown_ticks"] = s.attackCooldown;
++    d["load_ticks"] = LoadTimes::forName(s.name);
+     d["hit_speed_s"] = s.attackCooldown / TICKS_PER_SECOND;
+     d["first_hit_ticks"] = s.initialCooldownTicks;   // 0 = no seeded first-hit delay
+     d["speed_tiles_per_tick"] = s.speed;
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index 58a833f..4692044 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -263,6 +263,7 @@ TEST_CASE("Executioner's axe hits its target twice: on arrival, then again on th
+     REQUIRE(executioner != nullptr);
+ 
+     advancePastDeploy(executioner, board);
++    windUp(executioner, board);
+     executioner->update(board); // fires: spawns the boomerang projectile
+     board.commitPendingEntities();
+     auto axe = std::dynamic_pointer_cast<Projectile>(board.getEntities().back());
+@@ -500,6 +501,7 @@ TEST_CASE("Inferno Tower's damage ramps up the longer it stays locked onto the s
+     REQUIRE(tower != nullptr);
+ 
+     advancePastDeploy(tower, board);
++    windUp(tower, board);
+     tower->update(board); // ticksOnTarget == 0 on first lock: stage 1 (5% of 847)
+     REQUIRE(enemy->hp == 1000000 - 42);
+ 
+@@ -689,6 +691,7 @@ TEST_CASE("Ice Wizard is genuinely ranged: freeze lands with the arrow, not when
+     REQUIRE(std::dynamic_pointer_cast<RangedTroop>(iceWizardEntity) != nullptr);
+ 
+     advancePastDeploy(iceWizardEntity, board);
++    windUp(iceWizardEntity, board);
+     iceWizardEntity->update(board); // fires: spawns a projectile, does not freeze yet
+     board.commitPendingEntities();
+     REQUIRE(enemy->freezeTicks == 0);
+@@ -717,6 +720,7 @@ TEST_CASE("Ice Golem's slow is on its death explosion, never on its attack",
+ 
+     auto golem = board.getEntities().back();
+     advancePastDeploy(golem, board);
++    windUp(golem, board);
+     const int hpBeforeAttack = enemy->hp;
+     golem->update(board);
+ 
+@@ -907,6 +911,7 @@ TEST_CASE("Battle Ram breaks on its first hit on a building and releases its 2 B
+             auto building = std::make_shared<Building>(999, 5.0f, 5.4f, 5000, 1, 'C', 5.0f, 10, 10);
+             spawn(board, building);
+             advancePastDeploy(ram, board);
++            windUp(ram, board);
+             ram->update(board);
+ 
+             REQUIRE(building->hp == 5000 - 286);   // one uncharged hit: it never travelled
+@@ -968,6 +973,7 @@ TEST_CASE("Bomb Tower splashes, and drops a 3-second bomb when destroyed", "[car
+         spawn(board, away);
+         spawn(board, flier);
+         advancePastDeploy(tower, board);
++        windUp(tower, board);
+         tower->update(board);
+         REQUIRE(target->hp == 100000 - 222);
+         REQUIRE(beside->hp == 100000 - 222);
+@@ -1039,6 +1045,7 @@ TEST_CASE("Inferno Dragon's beam damage ramps up like Inferno Tower's, while fly
+     REQUIRE(dragon->targetsAir);
+ 
+     advancePastDeploy(dragon, board);
++    windUp(dragon, board);
+     dragon->update(board); // ticksOnTarget == 0 on first lock: stage 1 (~8.3% of 422)
+     REQUIRE(enemy->hp == 1000000 - 35);
+ }
+@@ -1079,6 +1086,7 @@ TEST_CASE("Valkyrie's splash hits a second enemy standing near her primary targe
+     board.commitPendingEntities();
+ 
+     advancePastDeploy(board.getEntities().back(), board);
++    windUp(board.getEntities().back(), board);
+     board.getEntities().back()->update(board);
+ 
+     REQUIRE(primary->hp == 734);  // 1000 - 266
+@@ -1550,6 +1558,7 @@ TEST_CASE("Bowler's piercing line hits a bystander behind the primary target, no
+     auto bowler = board.getEntities().back();
+ 
+     advancePastDeploy(bowler, board);
++    windUp(bowler, board);
+     bowler->update(board); // fires the projectile
+     board.commitPendingEntities();
+     for (int i = 0; i < 10; ++i) {
+@@ -1771,3 +1780,77 @@ TEST_CASE("every spawned unit moves at the speed of its own playable card",
+     }
+     REQUIRE(offenders.empty());
+ }
++
++// ---------------- attack load time (UPSTREAM item 40) ----------------
++
++namespace {
++// Updates `unit` until `target` loses hp, returning how many updates it took;
++// -1 if it never does within `limit`.
++int updatesUntilHit(const std::shared_ptr<Entity>& unit, const std::shared_ptr<Entity>& target,
++                    Board& board, int limit = 100) {
++    const int before = target->hp;
++    for (int i = 1; i <= limit; ++i) {
++        unit->update(board);
++        board.commitPendingEntities();
++        if (target->hp < before) return i;
++    }
++    return -1;
++}
++}
++
++TEST_CASE("A Hog Rider's first hit lands its load time after it reaches the building, then every hit speed",
++          "[card_registry][load_time]") {
++    // 1.0 s load, 1.6 s hit speed (FLZ HogRider).
++    REQUIRE(LoadTimes::forName("Hog Rider") == 10);
++    Board board;
++    auto building = std::make_shared<Building>(999, 5.0f, 5.5f, 100000, 1, 'C', 5.0f, 10, 10);
++    spawn(board, building);
++    CardRegistry::getInstance().getCard(15)->spawnEntity(5.0f, 5.0f, 0, board);
++    board.commitPendingEntities();
++    auto hog = board.getEntities().back();
++    REQUIRE(std::dynamic_pointer_cast<CombatEntity>(hog)->loadTicks == 10);
++    advancePastDeploy(hog, board);
++
++    // In range from the first live tick: wind up 10 ticks, hit on the 11th.
++    REQUIRE(updatesUntilHit(hog, building, board) == 11);
++    // Then the period is the hit speed, with no second wind-up on the same target.
++    REQUIRE(updatesUntilHit(hog, building, board) == CardRegistry::getInstance().getCard(15)->stats->attackCooldown);
++}
++
++TEST_CASE("A stun during the wind-up restarts it", "[card_registry][load_time]") {
++    Board board;
++    auto building = std::make_shared<Building>(999, 5.0f, 5.5f, 100000, 1, 'C', 5.0f, 10, 10);
++    spawn(board, building);
++    CardRegistry::getInstance().getCard(15)->spawnEntity(5.0f, 5.0f, 0, board);
++    board.commitPendingEntities();
++    auto hog = std::dynamic_pointer_cast<CombatEntity>(board.getEntities().back());
++    advancePastDeploy(hog, board);
++
++    for (int i = 0; i < 6; ++i) hog->update(board); // 6 of the 10 wind-up ticks
++    REQUIRE(building->hp == 100000);
++    hog->applyFreeze(3, 0.0f);
++    // 3 stunned ticks, then the full 10-tick wind-up again, then the hit.
++    REQUIRE(updatesUntilHit(hog, building, board) == 3 + 10 + 1);
++}
++
++TEST_CASE("An Evolution winds up like its base card, and every load-time row names a registered card",
++          "[card_registry][load_time]") {
++    auto& reg = CardRegistry::getInstance();
++    REQUIRE(reg.getCard(125)->name == "Skeletons"); // Evo Skeletons
++    REQUIRE(LoadTimes::forName(reg.getCard(125)->name) == LoadTimes::forName(reg.getCard(24)->name));
++    REQUIRE(LoadTimes::forName("Skeletons") == 6);
++
++    // A typo'd row would silently leave its card at no load time.
++    std::vector<std::string> names;
++    for (int id = 0; id <= 200; ++id) {
++        if (const CardDefinition* c = reg.getCard(id)) names.push_back(c->name);
++    }
++    int n = 0;
++    const LoadTimes::Row* rows = LoadTimes::table(n);
++    REQUIRE(n > 80);
++    for (int i = 0; i < n; ++i) {
++        INFO(rows[i].name);
++        REQUIRE(std::find(names.begin(), names.end(), std::string(rows[i].name)) != names.end());
++        REQUIRE(rows[i].ticks > 0);
++    }
++}
+diff --git a/tests/core/test_game_manager.cpp b/tests/core/test_game_manager.cpp
+index 30ee825..11ce5d6 100644
+--- a/tests/core/test_game_manager.cpp
++++ b/tests/core/test_game_manager.cpp
+@@ -388,8 +388,8 @@ TEST_CASE("A full scripted mini-match produces sane getStatistics() output", "[g
+     auto enemy = std::make_shared<DummyEntity>(board.allocateId(), 9.0f, 10.5f, 1000, 1);
+     spawn(board, enemy);
+ 
+-    // 5 ticks of combat after the Knight's 10-tick deploy time.
+-    for (int i = 0; i < 5 + DEPLOY_TIME_TICKS; ++i) game.step();
++    // 5 ticks of combat after the Knight's 10-tick deploy time and its load time.
++    for (int i = 0; i < 5 + DEPLOY_TIME_TICKS + LoadTimes::forName("Knight"); ++i) game.step();
+ 
+     const auto& stats = game.getStatistics();
+     REQUIRE(stats.elixirSpent(0) == Catch::Approx(3.0f));
+diff --git a/tests/entities/test_helpers.h b/tests/entities/test_helpers.h
+index 36e533c..fd124a2 100644
+--- a/tests/entities/test_helpers.h
++++ b/tests/entities/test_helpers.h
+@@ -22,6 +22,15 @@ inline void advancePastDeploy(const std::shared_ptr<Entity>& entity, Board& boar
+     for (int i = 0; i < DEPLOY_TIME_TICKS; ++i) entity->update(board);
+ }
+ 
++// Steps a deployed unit that already has its target in range through its
++// attack load time (LoadTimes.h), so its next update() lands the first hit. For
++// tests about what a hit does, not when.
++inline void windUp(const std::shared_ptr<Entity>& entity, Board& board) {
++    auto ce = std::dynamic_pointer_cast<CombatEntity>(entity);
++    const int ticks = ce ? ce->loadTicks : 0;
++    for (int i = 0; i < ticks; ++i) entity->update(board);
++}
++
+ // A bare Entity with a no-op update(), for Entity's own state; a valid target,
+ // since targeting is Entity-typed. Use StationaryCombatant only where freeze or
+ // on-hit effects are needed.

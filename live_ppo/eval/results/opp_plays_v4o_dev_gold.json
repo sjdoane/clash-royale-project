@@ -1,0 +1,2064 @@
+{
+ "srcs": [
+  "rec_dry1",
+  "vid_QD_1suWFNKo"
+ ],
+ "mode": "v4o",
+ "metrics": {
+  "all": {
+   "recall": {
+    "k": 42,
+    "n": 43,
+    "p": 0.9767441860465116,
+    "wilson": [
+     0.8794073213878312,
+     0.9958830188225801
+    ],
+    "boot": [
+     0.9411764705882353,
+     1.0
+    ]
+   },
+   "card": {
+    "k": 29,
+    "n": 32,
+    "p": 0.90625,
+    "wilson": [
+     0.7578150066422116,
+     0.9675990373736805
+    ],
+    "boot": [
+     0.8333333333333334,
+     1.0
+    ]
+   },
+   "form": {
+    "k": 32,
+    "n": 32,
+    "p": 1.0,
+    "wilson": [
+     0.8928172849426366,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "time": {
+    "k": 42,
+    "n": 42,
+    "p": 1.0,
+    "wilson": [
+     0.9161983874908382,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "tile": {
+    "k": 42,
+    "n": 42,
+    "p": 1.0,
+    "wilson": [
+     0.9161983874908382,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "strict": {
+    "k": 39,
+    "n": 43,
+    "p": 0.9069767441860465,
+    "wilson": [
+     0.7839701160146731,
+     0.9632289548966534
+    ],
+    "boot": [
+     0.8235294117647058,
+     1.0
+    ]
+   }
+  },
+  "troop": {
+   "recall": {
+    "k": 39,
+    "n": 40,
+    "p": 0.975,
+    "wilson": [
+     0.8711834051199223,
+     0.9955732825922052
+    ],
+    "boot": [
+     0.9333333333333333,
+     1.0
+    ]
+   },
+   "card": {
+    "k": 26,
+    "n": 29,
+    "p": 0.896551724137931,
+    "wilson": [
+     0.7361455275293085,
+     0.9641857596186989
+    ],
+    "boot": [
+     0.8,
+     1.0
+    ]
+   },
+   "form": {
+    "k": 29,
+    "n": 29,
+    "p": 1.0,
+    "wilson": [
+     0.8830264055344442,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "time": {
+    "k": 39,
+    "n": 39,
+    "p": 1.0,
+    "wilson": [
+     0.9103301463997611,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "tile": {
+    "k": 39,
+    "n": 39,
+    "p": 1.0,
+    "wilson": [
+     0.9103301463997611,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "strict": {
+    "k": 36,
+    "n": 40,
+    "p": 0.9,
+    "wilson": [
+     0.7694792561952611,
+     0.9604211124044252
+    ],
+    "boot": [
+     0.8,
+     1.0
+    ]
+   }
+  },
+  "building": {
+   "recall": {
+    "k": 3,
+    "n": 3,
+    "p": 1.0,
+    "wilson": [
+     0.43849391955098227,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "card": {
+    "k": 3,
+    "n": 3,
+    "p": 1.0,
+    "wilson": [
+     0.43849391955098227,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "form": {
+    "k": 3,
+    "n": 3,
+    "p": 1.0,
+    "wilson": [
+     0.43849391955098227,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "time": {
+    "k": 3,
+    "n": 3,
+    "p": 1.0,
+    "wilson": [
+     0.43849391955098227,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "tile": {
+    "k": 3,
+    "n": 3,
+    "p": 1.0,
+    "wilson": [
+     0.43849391955098227,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "strict": {
+    "k": 3,
+    "n": 3,
+    "p": 1.0,
+    "wilson": [
+     0.43849391955098227,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   }
+  },
+  "spell": {
+   "recall": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "card": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "form": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "time": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "tile": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "strict": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   }
+  },
+  "spawner": {
+   "recall": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "card": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "form": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "time": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "tile": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "strict": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   }
+  },
+  "hidden": {
+   "recall": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "card": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "form": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "time": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "tile": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "strict": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   }
+  },
+  "simultaneous": {
+   "recall": {
+    "k": 2,
+    "n": 2,
+    "p": 1.0,
+    "wilson": [
+     0.34237195288961925,
+     1.0
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "card": {
+    "k": 1,
+    "n": 1,
+    "p": 1.0,
+    "wilson": [
+     0.20654329147389294,
+     1.0
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "form": {
+    "k": 1,
+    "n": 1,
+    "p": 1.0,
+    "wilson": [
+     0.20654329147389294,
+     1.0
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "time": {
+    "k": 2,
+    "n": 2,
+    "p": 1.0,
+    "wilson": [
+     0.34237195288961925,
+     1.0
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "tile": {
+    "k": 2,
+    "n": 2,
+    "p": 1.0,
+    "wilson": [
+     0.34237195288961925,
+     1.0
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "strict": {
+    "k": 2,
+    "n": 2,
+    "p": 1.0,
+    "wilson": [
+     0.34237195288961925,
+     1.0
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   }
+  },
+  "precision": {
+   "k": 42,
+   "n": 45,
+   "p": 0.9333333333333333,
+   "wilson": [
+    0.8214312561135918,
+    0.977068383537853
+   ],
+   "boot": [
+    0.75,
+    1.0
+   ]
+  },
+  "precision_spell": {
+   "p": NaN,
+   "lo": NaN,
+   "hi": NaN,
+   "k": 0,
+   "n": 0
+  },
+  "precision_troop": {
+   "p": 0.9333333333333333,
+   "lo": 0.8214312561135918,
+   "hi": 0.977068383537853,
+   "k": 42,
+   "n": 45
+  },
+  "time_err_s": {
+   "median": 0.0,
+   "p90": 0.0
+  },
+  "tile_err": {
+   "median": 0.05000000000000071,
+   "p90": 0.09905538513813547
+  },
+  "opp_elixir": {
+   "windows": [
+    "rec_dry1:0"
+   ],
+   "frames": 410,
+   "mae": 1.2493937282229943,
+   "within_1": 0.775609756097561,
+   "within_0.5": 0.7585365853658537
+  },
+  "cycle_block": {
+   "frames": 410,
+   "mean_feature_agreement": 0.9966974291364538,
+   "all_features_ok": 0.23414634146341465
+  },
+  "tolerances": {
+   "time_s": 1.0,
+   "tile": 1.5,
+   "tile_spell": 2.0,
+   "gate_s": 3.0,
+   "gate_tiles": 5.0
+  },
+  "per_card": {
+   "Archer Queen": {
+    "n_label": 2,
+    "hit": 2,
+    "n_pred": 3,
+    "pred_ok": 2,
+    "recall": 1.0,
+    "recall_w": [
+     0.34237195288961925,
+     1.0
+    ],
+    "precision": 0.6666666666666666,
+    "precision_w": [
+     0.2076549551264879,
+     0.9385096847238394
+    ]
+   },
+   "Bats": {
+    "n_label": 2,
+    "hit": 2,
+    "n_pred": 2,
+    "pred_ok": 2,
+    "recall": 1.0,
+    "recall_w": [
+     0.34237195288961925,
+     1.0
+    ],
+    "precision": 1.0,
+    "precision_w": [
+     0.34237195288961925,
+     1.0
+    ]
+   },
+   "Electro Wizard": {
+    "n_label": 1,
+    "hit": 0,
+    "n_pred": 0,
+    "pred_ok": 0,
+    "recall": 0.0,
+    "recall_w": [
+     0.0,
+     0.7934567085261071
+    ],
+    "precision": NaN,
+    "precision_w": [
+     NaN,
+     NaN
+    ]
+   },
+   "Elite Barbarians": {
+    "n_label": 2,
+    "hit": 2,
+    "n_pred": 2,
+    "pred_ok": 2,
+    "recall": 1.0,
+    "recall_w": [
+     0.34237195288961925,
+     1.0
+    ],
+    "precision": 1.0,
+    "precision_w": [
+     0.34237195288961925,
+     1.0
+    ]
+   },
+   "Giant": {
+    "n_label": 4,
+    "hit": 4,
+    "n_pred": 4,
+    "pred_ok": 4,
+    "recall": 1.0,
+    "recall_w": [
+     0.5100999795960008,
+     1.0
+    ],
+    "precision": 1.0,
+    "precision_w": [
+     0.5100999795960008,
+     1.0
+    ]
+   },
+   "Goblin Gang": {
+    "n_label": 1,
+    "hit": 1,
+    "n_pred": 1,
+    "pred_ok": 1,
+    "recall": 1.0,
+    "recall_w": [
+     0.20654329147389294,
+     1.0
+    ],
+    "precision": 1.0,
+    "precision_w": [
+     0.20654329147389294,
+     1.0
+    ]
+   },
+   "Goblin Hut": {
+    "n_label": 2,
+    "hit": 2,
+    "n_pred": 2,
+    "pred_ok": 2,
+    "recall": 1.0,
+    "recall_w": [
+     0.34237195288961925,
+     1.0
+    ],
+    "precision": 1.0,
+    "precision_w": [
+     0.34237195288961925,
+     1.0
+    ]
+   },
+   "Hog Rider": {
+    "n_label": 2,
+    "hit": 2,
+    "n_pred": 3,
+    "pred_ok": 2,
+    "recall": 1.0,
+    "recall_w": [
+     0.34237195288961925,
+     1.0
+    ],
+    "precision": 0.6666666666666666,
+    "precision_w": [
+     0.2076549551264879,
+     0.9385096847238394
+    ]
+   },
+   "Ice Spirit": {
+    "n_label": 1,
+    "hit": 1,
+    "n_pred": 1,
+    "pred_ok": 1,
+    "recall": 1.0,
+    "recall_w": [
+     0.20654329147389294,
+     1.0
+    ],
+    "precision": 1.0,
+    "precision_w": [
+     0.20654329147389294,
+     1.0
+    ]
+   },
+   "Minion Horde": {
+    "n_label": 2,
+    "hit": 1,
+    "n_pred": 1,
+    "pred_ok": 1,
+    "recall": 0.5,
+    "recall_w": [
+     0.09452865480086614,
+     0.9054713451991339
+    ],
+    "precision": 1.0,
+    "precision_w": [
+     0.20654329147389294,
+     1.0
+    ]
+   },
+   "Minions": {
+    "n_label": 0,
+    "hit": 0,
+    "n_pred": 1,
+    "pred_ok": 0,
+    "recall": NaN,
+    "recall_w": [
+     NaN,
+     NaN
+    ],
+    "precision": 0.0,
+    "precision_w": [
+     0.0,
+     0.7934567085261071
+    ]
+   },
+   "Royal Ghost": {
+    "n_label": 4,
+    "hit": 3,
+    "n_pred": 3,
+    "pred_ok": 3,
+    "recall": 0.75,
+    "recall_w": [
+     0.3006360524426366,
+     0.9544139373553637
+    ],
+    "precision": 1.0,
+    "precision_w": [
+     0.43849391955098227,
+     1.0
+    ]
+   },
+   "Royal Hogs": {
+    "n_label": 4,
+    "hit": 3,
+    "n_pred": 3,
+    "pred_ok": 3,
+    "recall": 0.75,
+    "recall_w": [
+     0.3006360524426366,
+     0.9544139373553637
+    ],
+    "precision": 1.0,
+    "precision_w": [
+     0.43849391955098227,
+     1.0
+    ]
+   },
+   "Skeleton Army": {
+    "n_label": 1,
+    "hit": 1,
+    "n_pred": 1,
+    "pred_ok": 1,
+    "recall": 1.0,
+    "recall_w": [
+     0.20654329147389294,
+     1.0
+    ],
+    "precision": 1.0,
+    "precision_w": [
+     0.20654329147389294,
+     1.0
+    ]
+   },
+   "Skeletons": {
+    "n_label": 2,
+    "hit": 2,
+    "n_pred": 2,
+    "pred_ok": 2,
+    "recall": 1.0,
+    "recall_w": [
+     0.34237195288961925,
+     1.0
+    ],
+    "precision": 1.0,
+    "precision_w": [
+     0.34237195288961925,
+     1.0
+    ]
+   },
+   "Sparky": {
+    "n_label": 2,
+    "hit": 2,
+    "n_pred": 2,
+    "pred_ok": 2,
+    "recall": 1.0,
+    "recall_w": [
+     0.34237195288961925,
+     1.0
+    ],
+    "precision": 1.0,
+    "precision_w": [
+     0.34237195288961925,
+     1.0
+    ]
+   },
+   "Tesla": {
+    "n_label": 1,
+    "hit": 1,
+    "n_pred": 1,
+    "pred_ok": 1,
+    "recall": 1.0,
+    "recall_w": [
+     0.20654329147389294,
+     1.0
+    ],
+    "precision": 1.0,
+    "precision_w": [
+     0.20654329147389294,
+     1.0
+    ]
+   }
+  }
+ },
+ "rows": [
+  {
+   "src": "rec_dry1",
+   "match": "rec_dry1:0",
+   "id": "0.0",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Hog Rider",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.02236067977499752,
+   "pred": "Hog Rider",
+   "psrc": "watch",
+   "pxy": [
+    1.0,
+    17.9
+   ],
+   "gxy": [
+    1.01,
+    17.88
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "rec_dry1",
+   "match": "rec_dry1:0",
+   "id": "0.1",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Ice Spirit",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.014142135623731905,
+   "pred": "Ice Spirit",
+   "psrc": "watch",
+   "pxy": [
+    10.0,
+    27.9
+   ],
+   "gxy": [
+    9.99,
+    27.91
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "rec_dry1",
+   "match": "rec_dry1:0",
+   "id": "0.2",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Archer Queen",
+   "matched": true,
+   "dt": 0.25,
+   "dd": 0.031622776601684804,
+   "pred": "Archer Queen",
+   "psrc": "watch",
+   "pxy": [
+    9.0,
+    33.0
+   ],
+   "gxy": [
+    9.03,
+    33.010000000000005
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "rec_dry1",
+   "match": "rec_dry1:0",
+   "id": "0.3",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Elite Barbarians",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.044721359549995635,
+   "pred": "Elite Barbarians",
+   "psrc": "watch",
+   "pxy": [
+    2.0,
+    24.0
+   ],
+   "gxy": [
+    2.04,
+    24.02
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "rec_dry1",
+   "match": "rec_dry1:0",
+   "id": "0.4",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Goblin Gang",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.019999999999999574,
+   "pred": "Goblin Gang",
+   "psrc": "watch",
+   "pxy": [
+    13.0,
+    18.0
+   ],
+   "gxy": [
+    12.98,
+    18.0
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "rec_dry1",
+   "match": "rec_dry1:0",
+   "id": "0.5",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Hog Rider",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.019999999999999574,
+   "pred": "Hog Rider",
+   "psrc": "watch",
+   "pxy": [
+    16.0,
+    18.0
+   ],
+   "gxy": [
+    15.98,
+    18.0
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "rec_dry1",
+   "match": "rec_dry1:0",
+   "id": "0.6",
+   "cat": "building",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Tesla",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.05656854249492323,
+   "pred": "Tesla",
+   "psrc": "watch",
+   "pxy": [
+    5.5,
+    22.5
+   ],
+   "gxy": [
+    5.54,
+    22.46
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "rec_dry1",
+   "match": "rec_dry1:0",
+   "id": "0.7",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Archer Queen",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.06403124237432851,
+   "pred": "Archer Queen",
+   "psrc": "watch",
+   "pxy": [
+    9.0,
+    33.0
+   ],
+   "gxy": [
+    8.95,
+    32.96
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "rec_dry1",
+   "match": "rec_dry1:0",
+   "id": "0.8",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Elite Barbarians",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.058309518948453744,
+   "pred": "Elite Barbarians",
+   "psrc": "watch",
+   "pxy": [
+    3.1,
+    17.9
+   ],
+   "gxy": [
+    3.07,
+    17.95
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.0",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Royal Hogs",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.04999999999999716,
+   "pred": "Royal Hogs",
+   "psrc": "watch",
+   "pxy": [
+    2.0,
+    17.9
+   ],
+   "gxy": [
+    2.0,
+    17.85
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.1",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.10440306508910341,
+   "pred": "Electro Spirit",
+   "psrc": "watch",
+   "pxy": [
+    3.0,
+    17.8
+   ],
+   "gxy": [
+    3.03,
+    17.9
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.2",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Royal Ghost",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.11401754250991397,
+   "pred": "Royal Ghost",
+   "psrc": "watch",
+   "pxy": [
+    3.1,
+    22.8
+   ],
+   "gxy": [
+    2.99,
+    22.77
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.3",
+   "cat": "building",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Goblin Hut",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.019999999999999574,
+   "pred": "Goblin Hut",
+   "psrc": "watch",
+   "pxy": [
+    8.0,
+    23.8
+   ],
+   "gxy": [
+    8.0,
+    23.78
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.4",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Skeletons",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.050990195135925016,
+   "pred": "Skeletons",
+   "psrc": "watch",
+   "pxy": [
+    12.0,
+    17.9
+   ],
+   "gxy": [
+    12.01,
+    17.85
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.5",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Royal Hogs",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.014142135623729393,
+   "pred": "Royal Hogs",
+   "psrc": "watch",
+   "pxy": [
+    6.0,
+    17.8
+   ],
+   "gxy": [
+    6.01,
+    17.81
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.6",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.08544003745317681,
+   "pred": "Royal Ghost",
+   "psrc": "watch",
+   "pxy": [
+    14.0,
+    24.7
+   ],
+   "gxy": [
+    14.03,
+    24.78
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.7",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Royal Ghost",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.05000000000000071,
+   "pred": "Royal Ghost",
+   "psrc": "watch",
+   "pxy": [
+    13.0,
+    28.8
+   ],
+   "gxy": [
+    13.0,
+    28.75
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.8",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.09999999999999787,
+   "pred": "Skeletons",
+   "psrc": "watch",
+   "pxy": [
+    14.0,
+    17.8
+   ],
+   "gxy": [
+    14.0,
+    17.9
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.9",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Royal Hogs",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.04999999999999716,
+   "pred": "??",
+   "psrc": "watch",
+   "pxy": [
+    2.0,
+    17.9
+   ],
+   "gxy": [
+    2.0,
+    17.85
+   ],
+   "card_ok": false,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.10",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Royal Ghost",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.031622776601684804,
+   "pred": "Hog Rider",
+   "psrc": "watch",
+   "pxy": [
+    9.0,
+    32.8
+   ],
+   "gxy": [
+    8.99,
+    32.769999999999996
+   ],
+   "card_ok": false,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.11",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Skeletons",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.0806225774829873,
+   "pred": "Skeletons",
+   "psrc": "watch",
+   "pxy": [
+    9.0,
+    23.7
+   ],
+   "gxy": [
+    8.99,
+    23.78
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.12",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Royal Hogs",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.05000000000000071,
+   "pred": "Royal Hogs",
+   "psrc": "watch",
+   "pxy": [
+    2.0,
+    17.8
+   ],
+   "gxy": [
+    2.0,
+    17.85
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.13",
+   "cat": "building",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Goblin Hut",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.070710678118655,
+   "pred": "Goblin Hut",
+   "psrc": "watch",
+   "pxy": [
+    9.0,
+    23.9
+   ],
+   "gxy": [
+    8.99,
+    23.83
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.14",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Royal Ghost",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.022360679774997422,
+   "pred": "Royal Ghost",
+   "psrc": "watch",
+   "pxy": [
+    15.0,
+    24.8
+   ],
+   "gxy": [
+    14.99,
+    24.78
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.15",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.04999999999999716,
+   "pred": "Spear Goblins",
+   "psrc": "watch",
+   "pxy": [
+    14.0,
+    17.9
+   ],
+   "gxy": [
+    14.0,
+    17.85
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:0",
+   "id": "0.x3045",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Electro Wizard",
+   "matched": false
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.0",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Sparky",
+   "matched": true,
+   "dt": -0.25,
+   "dd": 0.014142135623731905,
+   "pred": "Sparky",
+   "psrc": "watch",
+   "pxy": [
+    9.0,
+    25.8
+   ],
+   "gxy": [
+    8.99,
+    25.79
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.1",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Giant",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.050990195135925016,
+   "pred": "Giant",
+   "psrc": "watch",
+   "pxy": [
+    4.0,
+    17.9
+   ],
+   "gxy": [
+    3.99,
+    17.85
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.2",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Bats",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.04999999999999716,
+   "pred": "Bats",
+   "psrc": "watch",
+   "pxy": [
+    8.0,
+    17.9
+   ],
+   "gxy": [
+    8.0,
+    17.85
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.3",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.08602325267042692,
+   "pred": "Skeletons",
+   "psrc": "watch",
+   "pxy": [
+    15.1,
+    17.9
+   ],
+   "gxy": [
+    15.03,
+    17.95
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.4",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Minion Horde",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.00999999999999801,
+   "pred": "Minion Horde",
+   "psrc": "watch",
+   "pxy": [
+    2.0,
+    17.8
+   ],
+   "gxy": [
+    2.0,
+    17.81
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.5",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Skeleton Army",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.022360679774998216,
+   "pred": "Skeleton Army",
+   "psrc": "watch",
+   "pxy": [
+    16.0,
+    26.8
+   ],
+   "gxy": [
+    16.02,
+    26.79
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.6",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Sparky",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.05000000000000071,
+   "pred": "Sparky",
+   "psrc": "watch",
+   "pxy": [
+    8.0,
+    32.8
+   ],
+   "gxy": [
+    7.96,
+    32.769999999999996
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.7",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Giant",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.15811388300841808,
+   "pred": "Giant",
+   "psrc": "watch",
+   "pxy": [
+    0.9,
+    17.9
+   ],
+   "gxy": [
+    1.05,
+    17.85
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.8",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.08062257748298378,
+   "pred": "??",
+   "psrc": "watch",
+   "pxy": [
+    3.0,
+    19.799999999999997
+   ],
+   "gxy": [
+    2.99,
+    19.72
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.9",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Bats",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.08999999999999986,
+   "pred": "Bats",
+   "psrc": "watch",
+   "pxy": [
+    2.0,
+    17.9
+   ],
+   "gxy": [
+    2.0,
+    17.81
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.10",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.014142135623734417,
+   "pred": "Sparky",
+   "psrc": "watch",
+   "pxy": [
+    9.0,
+    32.8
+   ],
+   "gxy": [
+    8.99,
+    32.81
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.11",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Giant",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.010000000000001563,
+   "pred": "Giant",
+   "psrc": "watch",
+   "pxy": [
+    13.0,
+    26.8
+   ],
+   "gxy": [
+    13.0,
+    26.79
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.12",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.060000000000002274,
+   "pred": "??",
+   "psrc": "watch",
+   "pxy": [
+    8.0,
+    32.8
+   ],
+   "gxy": [
+    8.0,
+    32.86
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.13",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Minion Horde",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.090553851381374,
+   "pred": "Minions",
+   "psrc": "watch",
+   "pxy": [
+    4.0,
+    17.9
+   ],
+   "gxy": [
+    3.99,
+    17.81
+   ],
+   "card_ok": false,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.15",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.050990195135925016,
+   "pred": "Bats",
+   "psrc": "watch",
+   "pxy": [
+    15.0,
+    17.9
+   ],
+   "gxy": [
+    14.99,
+    17.85
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.16",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Giant",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.014142135623729393,
+   "pred": "Giant",
+   "psrc": "watch",
+   "pxy": [
+    4.0,
+    17.8
+   ],
+   "gxy": [
+    3.99,
+    17.81
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_QD_1suWFNKo",
+   "match": "vid_QD_1suWFNKo:3",
+   "id": "3.17",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "?",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.1004987562112088,
+   "pred": "Giant",
+   "psrc": "watch",
+   "pxy": [
+    2.1,
+    17.8
+   ],
+   "gxy": [
+    2.0,
+    17.81
+   ],
+   "t_ok": true,
+   "d_ok": true
+  }
+ ],
+ "false_positives": [
+  {
+   "src": "rec_dry1",
+   "match": "rec_dry1:0",
+   "t": 5.25,
+   "pred": "??",
+   "xy": [
+    13.0,
+    16.3
+   ],
+   "spell": false,
+   "psrc": "watch"
+  },
+  {
+   "src": "rec_dry1",
+   "match": "rec_dry1:0",
+   "t": 17.5,
+   "pred": "??",
+   "xy": [
+    2.1,
+    16.4
+   ],
+   "spell": false,
+   "psrc": "watch"
+  },
+  {
+   "src": "rec_dry1",
+   "match": "rec_dry1:0",
+   "t": 100.0,
+   "pred": "Archer Queen",
+   "xy": [
+    13.0,
+    16.3
+   ],
+   "spell": false,
+   "psrc": "watch"
+  }
+ ]
+}

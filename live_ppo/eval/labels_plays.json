@@ -1,0 +1,7 @@
+{
+  "_doc": "Opponent card plays, hand-labelled by eye from frames (2026-11-18). frame = first frame the card is on the board. rec = runs/live/rec_dry1 raw frames (4 fps, ladder vs a level-14 opponent); enemy units carry pink level badges and walk down. Card names are engine names.",
+  "rec": {"fps": 4, "frames": [546, 956], "plays": [
+    [572, "Hog Rider"], [580, "Ice Spirit"], [632, "Archer Queen"], [652, "Elite Barbarians"],
+    [700, "Goblin Gang"], [756, "Hog Rider"], [832, "Tesla"], [864, "Archer Queen"], [924, "Elite Barbarians"]
+  ]}
+}

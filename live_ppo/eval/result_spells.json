@@ -1,0 +1,342 @@
+{
+ "Barbarian Barrel": {
+  "n": 11,
+  "det": 10,
+  "tp": 10,
+  "lat_first": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "lat_emit": [
+   0.25,
+   0.25,
+   0.25,
+   0.5,
+   0.5,
+   0.25,
+   0.25,
+   0.25,
+   0.25,
+   0.25
+  ],
+  "recall": 0.9090909090909091,
+  "precision": 1.0
+ },
+ "Fireball": {
+  "n": 10,
+  "det": 10,
+  "tp": 10,
+  "lat_first": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "lat_emit": [
+   0.25,
+   0.25,
+   0.25,
+   0.25,
+   0.25,
+   0.5,
+   0.25,
+   0.25,
+   0.25,
+   0.25
+  ],
+  "recall": 1.0,
+  "precision": 1.0
+ },
+ "Poison": {
+  "n": 9,
+  "det": 9,
+  "tp": 9,
+  "lat_first": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "lat_emit": [
+   0.25,
+   0.25,
+   0.25,
+   0.25,
+   0.25,
+   0.25,
+   0.25,
+   0.25,
+   0.25
+  ],
+  "recall": 1.0,
+  "precision": 1.0
+ },
+ "Graveyard": {
+  "n": 9,
+  "det": 9,
+  "tp": 9,
+  "lat_first": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "lat_emit": [
+   0.25,
+   0.25,
+   0.25,
+   0.25,
+   0.25,
+   0.25,
+   0.25,
+   0.25,
+   0.25
+  ],
+  "recall": 1.0,
+  "precision": 1.0
+ },
+ "Goblin Barrel": {
+  "n": 6,
+  "det": 6,
+  "tp": 6,
+  "lat_first": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "lat_emit": [
+   0.25,
+   0.5,
+   0.75,
+   0.5,
+   0.25,
+   0.75
+  ],
+  "recall": 1.0,
+  "precision": 1.0
+ },
+ "Giant Snowball": {
+  "n": 6,
+  "det": 7,
+  "tp": 6,
+  "lat_first": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "lat_emit": [
+   0.25,
+   0.25,
+   0.25,
+   1.25,
+   0.25,
+   0.25
+  ],
+  "recall": 1.0,
+  "precision": 0.8571428571428571
+ },
+ "Zap": {
+  "n": 0,
+  "det": 1,
+  "tp": 0,
+  "lat_first": [],
+  "lat_emit": [],
+  "recall": null,
+  "precision": 0.0
+ },
+ "ALL": {
+  "n": 51,
+  "det": 52,
+  "tp": 50
+ },
+ "false": [
+  [
+   "iVgm",
+   4.5,
+   "Giant Snowball"
+  ],
+  [
+   "iVgm",
+   839.25,
+   "Zap"
+  ]
+ ],
+ "missed": [
+  [
+   "QD_1",
+   379.0,
+   "Barbarian Barrel"
+  ]
+ ],
+ "body_plays": [
+  [
+   "QD_1",
+   70.25,
+   "skeleton"
+  ],
+  [
+   "QD_1",
+   224.25,
+   "skeleton"
+  ],
+  [
+   "QD_1",
+   302.5,
+   "skeleton"
+  ],
+  [
+   "QD_1",
+   345.75,
+   "skeleton"
+  ],
+  [
+   "QD_1",
+   386.0,
+   "skeleton"
+  ],
+  [
+   "QD_1",
+   432.25,
+   "skeleton"
+  ],
+  [
+   "uVf1",
+   631.25,
+   "goblin"
+  ],
+  [
+   "iVgm",
+   26.0,
+   "skeleton"
+  ],
+  [
+   "iVgm",
+   100.0,
+   "skeleton"
+  ],
+  [
+   "iVgm",
+   107.0,
+   "skeleton"
+  ],
+  [
+   "iVgm",
+   143.25,
+   "skeleton"
+  ],
+  [
+   "iVgm",
+   227.25,
+   "skeleton"
+  ],
+  [
+   "iVgm",
+   228.75,
+   "skeleton"
+  ],
+  [
+   "iVgm",
+   621.5,
+   "skeleton"
+  ],
+  [
+   "iVgm",
+   667.25,
+   "skeleton"
+  ],
+  [
+   "iVgm",
+   737.0,
+   "skeleton"
+  ],
+  [
+   "iVgm",
+   741.25,
+   "skeleton"
+  ]
+ ],
+ "body_taken_back": [
+  [
+   "QD_1",
+   84.0,
+   "barbarian"
+  ],
+  [
+   "QD_1",
+   229.0,
+   "barbarian"
+  ]
+ ],
+ "_every2": {
+  "Barbarian Barrel": {
+   "n": 11,
+   "det": 6,
+   "tp": 6
+  },
+  "Fireball": {
+   "n": 10,
+   "det": 8,
+   "tp": 7
+  },
+  "Poison": {
+   "n": 9,
+   "det": 9,
+   "tp": 9
+  },
+  "Graveyard": {
+   "n": 9,
+   "det": 9,
+   "tp": 9
+  },
+  "Goblin Barrel": {
+   "n": 6,
+   "det": 5,
+   "tp": 5
+  },
+  "Giant Snowball": {
+   "n": 6,
+   "det": 7,
+   "tp": 6
+  },
+  "The Log": {
+   "n": 0,
+   "det": 1,
+   "tp": 0
+  },
+  "ALL": {
+   "n": 51,
+   "det": 45,
+   "tp": 42
+  }
+ }
+}

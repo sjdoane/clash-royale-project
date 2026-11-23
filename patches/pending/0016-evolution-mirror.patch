@@ -1,0 +1,240 @@
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index f0d4e50..9f63695 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -1695,6 +1695,12 @@ private:
+         // substitutes the last card played (cost + 1), so this entry's own
+         // cost, flags and footprint are never read at play time.
+         add(spell(164, "Mirror", 3.0f, 0.0f, 0, 0, '='));
++        // Evolved Mirror (released 9 Nov 2026; wiki Mirror/Evolution): 2
++        // cycles. Its evolved play copies the last card as that card's
++        // Evolution (base form if it has none), still one level up and at
++        // +1 elixir; GameManager::playCard does all of it.
++        addEvolution(180, spell(164, "Mirror", 3.0f, 0.0f, 0, 0, '='),
++            spell(164, "Mirror", 3.0f, 0.0f, 0, 0, '='), 2, 1);
+ 
+         // === Spirit Empress ===
+         // Registered at the ground form's cost (3.0) for the hand display and
+@@ -1915,3 +1921,20 @@ inline int faceCardIdOf(int cardId) {
+     }();
+     return (cardId >= 0 && cardId < CARD_ID_COUNT) ? table[cardId] : cardId;
+ }
++
++// The Evolution id of `cardId`'s card (patch 0016, Evolved Mirror): itself
++// for an Evolution, the Evolution registered against a base card, else -1
++// (Heroes, Champions, cards with no Evolution).
++inline int evolutionIdOf(int cardId) {
++    static const std::vector<int> table = [] {
++        std::vector<int> t(CARD_ID_COUNT, -1);
++        for (const auto& [id, def] : CardRegistry::getInstance().getAllCards()) {
++            if (id < 0 || id >= CARD_ID_COUNT || !def.isEvolution) continue;
++            t[id] = id;
++            const int base = faceCardIdOf(id);
++            if (base != id) t[base] = id;
++        }
++        return t;
++    }();
++    return (cardId >= 0 && cardId < CARD_ID_COUNT) ? table[cardId] : -1;
++}
+diff --git a/include/core/GameManager.h b/include/core/GameManager.h
+index ab9baf7..e0ba562 100644
+--- a/include/core/GameManager.h
++++ b/include/core/GameManager.h
+@@ -27,8 +27,10 @@ public:
+     // Negative, so they never collide with a registry id.
+     static constexpr int TOWER_KING_ID = -2;
+     static constexpr int TOWER_PRINCESS_ID = -3;
+-    // Mirror's registered id; playCard special-cases it.
++    // Mirror's registered id, and its Evolution's (patch 0016); playCard
++    // special-cases both.
+     static constexpr int MIRROR_CARD_ID = 164;
++    static constexpr int EVO_MIRROR_CARD_ID = 180;
+     // Spirit Empress's registered id; see SpiritEmpressForms.h.
+     static constexpr int SPIRIT_EMPRESS_CARD_ID = 165;
+ 
+@@ -551,9 +553,11 @@ public:
+         if (!cardDef) return false;
+ 
+         // Mirror: legality, spawn and cost come from this team's last play (+1
+-        // elixir), reusing that card's own rules. Fails if nothing has been
+-        // played.
+-        bool isMirror = (targetCardId == MIRROR_CARD_ID);
++        // elixir), reusing that card's own rules, and the copy is one level
++        // above the team's (wiki Mirror). Fails if nothing has been played.
++        // Evolved Mirror (180) plays as Mirror until its evolved play, which
++        // copies the last card as its Evolution where it has one.
++        bool isMirror = (targetCardId == MIRROR_CARD_ID || targetCardId == EVO_MIRROR_CARD_ID);
+         // Spirit Empress: the form and cost follow the current elixir at play
+         // time (an approximation; see SpiritEmpressForms.h). Both forms share a
+         // footprint, so legality needs no substitution.
+@@ -581,11 +585,27 @@ public:
+             if (isSpiritEmpress) {
+                 bool flying = (costOverride >= 6.0f);
+                 CardFactories::spawn(flying ? spiritEmpressFlyingStats() : spiritEmpressGroundStats(), x, y, team, board);
++            } else if (isMirror && result.useEvolvedForm) {
++                // Evolved Mirror: the last card's Evolution, else its base.
++                const CardDefinition* evo = CardRegistry::getInstance().getCard(evolutionIdOf(player.lastPlayedCardId));
++                if (evo && evo->spawnEvolvedEntity) evo->spawnEvolvedEntity(x, y, team, board);
++                else effectiveDef->spawnEntity(x, y, team, board);
+             } else if (result.useEvolvedForm && effectiveDef->spawnEvolvedEntity) {
+                 effectiveDef->spawnEvolvedEntity(x, y, team, board);
+             } else {
+                 effectiveDef->spawnEntity(x, y, team, board);
+             }
++            if (isMirror) {
++                // +1 level on the bodies the copy spawns now. Bodies they spawn
++                // later (death spawns, a spawner's units) take the team level.
++                const int level = std::min(board.cardLevel[team] + 1, CardLevels::MAX_LEVEL);
++                for (size_t i = pendingBefore; i < board.pendingEntityCount(); ++i) {
++                    Entity& e = *board.getPendingEntity(i);
++                    if (e.levelApplied || e.team != team) continue;
++                    e.levelApplied = true;
++                    e.scaleToLevel(level);
++                }
++            }
+             float reportedCost = (costOverride >= 0.0f) ? costOverride : cardDef->cost;
+             board.statsEvents.notifyCardPlayed({ team, result.cardId, reportedCost, x, y, currentTick });
+             observedEvents[team].push_back({ currentTick, 0, result.cardId, reportedCost,
+diff --git a/perception/mapping/card_map.json b/perception/mapping/card_map.json
+index 7839127..bd76859 100644
+--- a/perception/mapping/card_map.json
++++ b/perception/mapping/card_map.json
+@@ -1333,7 +1333,7 @@
+     "mirror": {
+       "real_name": "Mirror",
+       "sim_id": 164,
+-      "sim_evo_id": null,
++      "sim_evo_id": 180,
+       "cost": 3.0,
+       "is_spell": true,
+       "is_building": false,
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index a2939af..ddb061f 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -130,6 +130,7 @@ TEST_CASE("Every currently-defined card resolves with id/name/cost/isSpell", "[c
+         {177, "Giant", 5.0f, false}, // Evolution of id 2 (patch 0015)
+         {178, "Elite Barbarians", 6.0f, false}, // Evolution of id 17 (patch 0015)
+         {179, "Electro Giant", 7.0f, false}, // Evolution of id 84 (patch 0015)
++        {180, "Mirror", 3.0f, true}, // Evolution of id 164 (patch 0016)
+         {156, "Lumberjack", 4.0f, false}, // Evolution of id 21
+         {157, "Executioner", 5.0f, false}, // Evolution of id 36
+         {158, "Giant Snowball", 2.0f, true}, // Evolution of id 100
+diff --git a/tests/core/test_mirror.cpp b/tests/core/test_mirror.cpp
+index f31c3ec..6753456 100644
+--- a/tests/core/test_mirror.cpp
++++ b/tests/core/test_mirror.cpp
+@@ -2,6 +2,9 @@
+ #include "GameManager.h"
+ #include "CardRegistry.h"
+ #include "CombatEntity.h"
++#include "CardLevels.h"
++#include "Tower.h"
++#include <set>
+ 
+ TEST_CASE("Mirror fails to play when nothing has been played yet", "[game_manager][mirror]") {
+     GameManager game({ 164, 1, 2, 3, 4, 5, 6, 7 }, { 0,1,2,3,4,5,6,7 });
+@@ -201,3 +204,103 @@ TEST_CASE("Mirror plays the base (non-evolved) form when mirroring an Evolution,
+     }
+     REQUIRE(runnerCount == 0); // neither play was evolved -- no Runners at all
+ }
++
++// --- Mirror level and Evolved Mirror (patch 0016) ---
++
++namespace {
++int hpOfNewest(GameManager& game, const std::string& name) {
++    int hp = -1, newest = -1;
++    for (const auto& e : game.getBoard().getEntities())
++        if (e->name == name && e->id > newest) { newest = e->id; hp = e->hp; }
++    return hp;
++}
++}  // namespace
++
++TEST_CASE("Mirror's copy is one level above the team's", "[game_manager][mirror][patch0016]") {
++    GameManager game({ 0, 164, 2, 3, 4, 5, 6, 7 }, { 0,1,2,3,4,5,6,7 });
++    game.playerAI.hand = { 0, 164, 2, 3 };
++    game.playerAI.deckQueue = { 4, 5, 6, 7 };
++    game.playerAI.elixir = 10.0f;
++    REQUIRE(game.playCard(0, 0, 5.0f, 10.0f));
++    game.step();
++    const int original = hpOfNewest(game, "Knight");
++    REQUIRE(game.playCard(0, 164, 12.0f, 10.0f));
++    game.step();
++    REQUIRE(original == CardLevels::scale(1766, CardLevels::TOURNAMENT_LEVEL));
++    REQUIRE(hpOfNewest(game, "Knight") == CardLevels::scale(1766, CardLevels::TOURNAMENT_LEVEL + 1));
++}
++
++TEST_CASE("Evolved Mirror is an Evolution of Mirror with 2 cycles", "[card_registry][mirror][patch0016]") {
++    const CardDefinition* def = CardRegistry::getInstance().getCard(180);
++    REQUIRE(def != nullptr);
++    REQUIRE(def->isEvolution);
++    REQUIRE(def->name == "Mirror");
++    REQUIRE(def->isSpell);
++    REQUIRE(def->evolutionCycleThreshold == 2);
++    REQUIRE(faceCardIdOf(180) == 164);
++    REQUIRE(evolutionIdOf(180) == 180);
++    REQUIRE(evolutionIdOf(2) == 177);    // Giant -> Evolved Giant
++    REQUIRE(evolutionIdOf(123) == 123);
++    REQUIRE(evolutionIdOf(0) == 135);    // Knight -> Evolved Knight
++    REQUIRE(evolutionIdOf(176) == -1);   // Minion Giant has no Evolution
++    REQUIRE(evolutionIdOf(166) == -1);   // a Hero has none
++}
++
++namespace {
++// Plays `copied`, then Evolved Mirror (deck slot 0), until Evolved Mirror's
++// evolved play, and returns that play's entities (shared_ptrs: they outlive
++// the match).
++std::vector<std::shared_ptr<Entity>> evolvedMirrorCopy(int copied, int& evolvedPlays) {
++    GameManager game({ 180, copied, 2, 3, 4, 5, 6, 7 }, { 0,1,2,3,4,5,6,7 });
++    for (const auto& e : game.getBoard().getEntities())
++        if (auto t = std::dynamic_pointer_cast<Tower>(e)) t->sleep();
++    std::vector<std::shared_ptr<Entity>> out;
++    for (int round = 0; round < 4; ++round) {
++        game.playerAI.hand = { 180, copied, 2, 3 };
++        game.playerAI.handCooldownTicks = { 0, 0, 0, 0 };
++        game.playerAI.deckQueue = { 4, 5, 6, 7 };
++        game.playerAI.elixir = 100.0f;
++        REQUIRE(game.playCard(0, copied, 9.0f, 8.0f));
++        game.step();
++        std::set<int> before;
++        for (const auto& e : game.getBoard().getEntities()) before.insert(e->id);
++        const auto it = game.playerAI.evolutionState.find(180);
++        REQUIRE(it != game.playerAI.evolutionState.end());
++        const bool evolvedNext = (it->second.cyclesUntilEvolved <= 0);
++        game.playerAI.handCooldownTicks = { 0, 0, 0, 0 };
++        REQUIRE(game.playCard(0, 180, 9.0f, 8.0f));
++        game.step();
++        if (evolvedNext) {
++            ++evolvedPlays;
++            for (const auto& e : game.getBoard().getEntities())
++                if (!before.count(e->id)) out.push_back(e);
++            return out;
++        }
++    }
++    return out;
++}
++}  // namespace
++
++TEST_CASE("Evolved Mirror's evolved play copies the last card as its Evolution",
++        "[game_manager][mirror][evolution][patch0016]") {
++    int evolvedPlays = 0;
++    // Electro Giant (84) has an Evolution (179): the copy carries Level Damper.
++    auto copy = evolvedMirrorCopy(84, evolvedPlays);
++    REQUIRE(evolvedPlays == 1);
++    REQUIRE(copy.size() == 1);
++    auto eg = std::dynamic_pointer_cast<CombatEntity>(copy[0]);
++    REQUIRE(eg != nullptr);
++    REQUIRE(eg->name == "Electro Giant");
++    REQUIRE(eg->selfPeriodicEffect != nullptr);
++    REQUIRE(eg->currentLevel == CardLevels::TOURNAMENT_LEVEL + 1);
++}
++
++TEST_CASE("Evolved Mirror's evolved play copies a card with no Evolution as its base, one level up",
++        "[game_manager][mirror][evolution][patch0016]") {
++    int evolvedPlays = 0;
++    auto copy = evolvedMirrorCopy(176, evolvedPlays);   // Minion Giant: no Evolution
++    REQUIRE(evolvedPlays == 1);
++    REQUIRE(copy.size() == 1);
++    REQUIRE(copy[0]->name == "Minion Giant");
++    REQUIRE(copy[0]->hp == CardLevels::scale(1817, CardLevels::TOURNAMENT_LEVEL + 1));
++}

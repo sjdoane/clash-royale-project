@@ -1,0 +1,113 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 0180760..30be3ce 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1265,6 +1265,52 @@ knockback, is moved by a PushbackAll and hits on time),
+ `tests/entities/test_combat_entity.cpp` (the two knockback-charge sections now
+ wait the hit speed for the plain hit).
+ 
++## 2026-11-22: Evolved Elite Barbarians' Rage lasts 2 s (patch 0055)
++
++**GAMEPLAY-AFFECTING.** One number, from an official note.
++
++The official 8 September 2026 balance note reads "Elite Barbarians Evolution:
++Spear Range: 3.5-5 -> 3-4.5 tiles (-10%), Rage Duration: 2.5s -> 2s (-20%)".
++The registry already had the new band and the 26 August spear damage (220),
++but the Rage still lasted the August 2.5 s (25 ticks). It is 20 ticks now.
++
++Why this card was looked at: in the replay forensics the Elite Barbarians are
++the top source of the first excess damage against the Hog 2.6 side, and 257
++of 258 such events are the Evolution's deck slot (card 178), which in the
++"any" sample over-performs by +0.116 in win rate.
++
++What the traces of the standard answers showed (scratch `eb.py`), and what is
++NOT changed here because no published value decides it:
++
++- The published scalars of `AngryBarbarian` all match: Speed 90 (Fast, 2.0
++  tiles/s measured), hit speed 1.4 s, first hit 0.5 s after reaching range
++  (LoadTime 900), sight 6.0, range 1.2, deploy 1.0 s, 1341 hp, 384 damage.
++- The published table of release 15.535.13 has no record of the evolved form
++  (`AngryBarbarians_EV1` is `NotInUse`), so the spear is known only from the
++  three official notes (26 Aug, 8 Sep, 6 Oct 2026) and descriptions. The
++  engine's spear is an instant 220 on the nearest enemy ground troop 3-4.5
++  tiles away, checked every tick, with no wind-up and no flight. An Ice Spirit
++  (215 hp) is therefore always dead before it can jump (range 2.5), and each
++  Skeleton in the band is one spear. Whether the real spear has a wind-up or
++  flight long enough for the spirit to jump first, whether it is thrown at the
++  barbarian's own target only, and whether buildings and Crown Towers are
++  valid targets are all unpublished; the 6 Oct note ("Spear Attack Sight
++  Range: 4.5 -> 6 tiles ... will no longer ignore troops outside of their base
++  sight range while throwing their spears") suggests it is an attack of his
++  with its own sight, not a free periodic effect.
++- The pair deploys abreast (offsets +-0.5; published SummonRadius 700) but
++  walks in a column 0.8-1.0 tiles apart once it has crossed a bridge (166 of
++  234 pairs in the events), because `Board::getNextWaypoint` funnels every
++  crosser through the bridge's centre point, although the bridge is two tiles
++  wide. The second barbarian reaches a tower 0.8 s after the first.
++- No deploy stagger: the published `SummonDeployDelay` (100 ms per unit for
++  most multi-unit cards) is not modelled.
++- Collision radius 0.4 against the published 0.5.
++
++Test: `tests/core/test_cards_0015.cpp` `[patch0055]` (the registered evolved
++pair throws one spear each at a troop in the band and is enraged for exactly
++20 updates).
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index b4aac86..2e6041c 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -1768,8 +1768,9 @@ private:
+         // nearest enemy ground troop 3-4.5 tiles away, 220 damage (284 -> 220
+         // on 26 Aug), recharging every 5 s, and enrages himself and allies
+         // within 1.5 tiles (assumed; the path toward the target is not
+-        // modelled) for 2.5 s (3.5 -> 2.5 s on 26 Aug). 1 cycle (guides; the
+-        // wiki gives none). The 6 Oct sight change (4.5 -> 6) is not separate
++        // modelled) for 2 s (3.5 -> 2.5 s on 26 Aug, 2.5 -> 2 s on 8 Sep 2026,
++        // the note that also set the 3-4.5 band; patch 0055). 1 cycle (guides;
++        // the wiki gives none). The 6 Oct sight change (4.5 -> 6) is not separate
+         // here: he walks to his targets and throws once one is in the band.
+         addEvolution(178,
+             troop(17, "Elite Barbarians", 6.0f, Archetype::MeleeSquad, 1341, SPEED_FAST, 1.2f, 384, 14, 'e')
+@@ -1778,7 +1779,7 @@ private:
+             troop(17, "Elite Barbarians", 6.0f, Archetype::MeleeSquad, 1341, SPEED_FAST, 1.2f, 384, 14, 'e')
+             .withSightRange(6.0f)   /* published AngryBarbarian SightRange 6000 (patch 0045) */
+                 .withOffsets({ {-0.5f, 0.0f}, {0.5f, 0.0f} })
+-                .withSelfPeriodicEffect(1, 50, std::make_shared<EvoEliteBarbarianSpearEffect>(3.0f, 4.5f, 220, 1.35f, 25, 1.5f)),
++                .withSelfPeriodicEffect(1, 50, std::make_shared<EvoEliteBarbarianSpearEffect>(3.0f, 4.5f, 220, 1.35f, 20, 1.5f)),
+             1, 1);
+ 
+         // Electro Giant ("Level Damper", released 5 Oct 2026; wiki Electro
+diff --git a/tests/core/test_cards_0015.cpp b/tests/core/test_cards_0015.cpp
+index f27b823..9cb79ad 100644
+--- a/tests/core/test_cards_0015.cpp
++++ b/tests/core/test_cards_0015.cpp
+@@ -190,6 +190,26 @@ TEST_CASE("Evolved Elite Barbarians throw a 220 spear at a ground troop 3-4.5 ti
+     REQUIRE(close->buffTicksRemaining == 0);
+ }
+ 
++// Patch 0055. The official 8 September 2026 note: "Elite Barbarians Evolution:
++// Spear Range 3.5-5 -> 3-4.5 tiles, Rage Duration 2.5s -> 2s". The band was
++// already the new one; the Rage still lasted the August 2.5 s.
++TEST_CASE("the registered Evolved Elite Barbarians are enraged for 2 s by a spear, the 8 Sep 2026 value",
++        "[evolution][evo_elite_barbarians][patch0055]") {
++    Match m;
++    auto barbs = m.spawnCard(EVO_ELITE_BARBARIANS, 9.0f, 8.0f, 0, true);
++    REQUIRE(barbs.size() == 2);
++    // One ground troop in the 3-4.5 band of both, too tough to die, harmless.
++    auto foe = m.dummy(9.0f, 12.0f, 1, 100000);
++    int enragedUpdates = 0, hpAfterThrow = -1;
++    for (int t = 1; t <= 45; ++t) {
++        m.step();
++        if (hpAfterThrow < 0 && foe->hp < 100000) hpAfterThrow = foe->hp;
++        if (barbs[0]->buffTicksRemaining > 0) enragedUpdates++;
++    }
++    REQUIRE(hpAfterThrow == 100000 - 2 * 220);      // one spear each, on the same update; the next is 5 s away
++    REQUIRE(enragedUpdates == 20);
++}
++
+ TEST_CASE("an evolved Elite Barbarian recharges the spear every 5 s", "[evolution][evo_elite_barbarians][patch0015]") {
+     Match m;
+     auto barbs = m.spawnCard(EVO_ELITE_BARBARIANS, 9.0f, 8.0f, 0, true);

@@ -1,0 +1,70 @@
+diff --git a/include/core/ClashEnv.h b/include/core/ClashEnv.h
+index 2fc47a6..362a6dc 100644
+--- a/include/core/ClashEnv.h
++++ b/include/core/ClashEnv.h
+@@ -1105,6 +1105,12 @@ public:
+         return game.getStatistics().damageDealtByCard(cardId, team);
+     }
+     float getElixirSpent(int team) const { return game.getStatistics().elixirSpent(team); }
++    // Champion / Hero abilities `team` actually activated this match, and the
++    // elixir they cost (not part of getElixirSpent, which is cards only). The
++    // engine's own count: a raised flag is not an activation when the slot was
++    // not ready or the tick's card play left too little elixir.
++    int getAbilityActivations(int team) const { return game.getStatistics().championAbilityActivations(team); }
++    float getAbilityElixirSpent(int team) const { return game.getStatistics().championAbilityElixirSpent(team); }
+ };
+ 
+ // Every registered playable card id. Child units (Golemite, Ram Rider's
+diff --git a/python_ai/tests/test_ability_activation_counts.py b/python_ai/tests/test_ability_activation_counts.py
+new file mode 100644
+index 0000000..d685794
+--- /dev/null
++++ b/python_ai/tests/test_ability_activation_counts.py
+@@ -0,0 +1,30 @@
++"""The engine's own count of ability activations, per team (patch 0081).
++
++`get_elixir_spent` counts cards only and a raised ability flag is not an
++activation (not ready, too little elixir, still deploying), so a measurement of
++"presses per match" needs the engine's count. No gameplay change: the two
++readers expose `MatchStatistics::championAbilityActivations` and
++`championAbilityElixirSpent`, which the engine already kept.
++"""
++import pytest
++
++from test_ability_charges_and_deploy import H, _game, _play, _wait_ready
++
++
++def test_the_engine_counts_activations_and_their_elixir_per_team():
++    env, deck = _game(168)                               # Hero Musketeer, 3 elixir
++    assert env.get_ability_activations(0) == 0
++    _play(env, deck, 168)
++    env.step_self_play(H, 0.0, 0.0, H, 0.0, 0.0, 1, True)   # flag raised while deploying
++    assert env.get_ability_activations(0) == 0
++    assert _wait_ready(env) is not None
++    spent = env.get_elixir_spent(0)
++    env.set_elixir_for_team(0, 10.0)
++    env.step_self_play(H, 0.0, 0.0, H, 0.0, 0.0, 1, True)
++    assert env.get_ability_activations(0) == 1
++    assert env.get_ability_activations(1) == 0
++    assert env.get_ability_elixir_spent(0) == pytest.approx(3.0)
++    assert env.get_elixir_spent(0) == pytest.approx(spent)   # cards only
++    env.set_elixir_for_team(0, 10.0)
++    env.step_self_play(H, 0.0, 0.0, H, 0.0, 0.0, 1, True)   # the charge is spent
++    assert env.get_ability_activations(0) == 1
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index 9a2b130..75b336d 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -513,6 +513,12 @@ PYBIND11_MODULE(clash_royale_env, m) {
+         // (ClashEnv::seed).
+         .def("seed", &ClashEnv::seed, py::arg("seed"))
+         .def("get_elixir_spent", &ClashEnv::getElixirSpent, py::arg("team"))
++        .def("get_ability_activations", &ClashEnv::getAbilityActivations, py::arg("team"),
++             "Champion / Hero abilities `team` has activated this match (the "
++             "engine's count, not the flags raised).")
++        .def("get_ability_elixir_spent", &ClashEnv::getAbilityElixirSpent, py::arg("team"),
++             "Elixir `team` has spent on abilities this match; get_elixir_spent "
++             "counts cards only.")
+         // Surviving towers (King and Princesses) for one team; see
+         // ClashEnv::getTowersAlive.
+         .def("get_towers_alive", &ClashEnv::getTowersAlive, py::arg("team"))

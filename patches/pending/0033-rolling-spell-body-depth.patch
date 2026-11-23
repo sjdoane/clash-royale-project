@@ -1,0 +1,273 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index f5ae916..b876180 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -490,6 +490,34 @@ Ram) stays, and a dash past its point of immunity (Bandit) is not stopped.
+ none is in `DEFAULT_DECK`, but The Log and Fireball are, and they are now
+ worth more against those cards. Checkpoints still load.
+ 
++## 2026-11-21: a roller is a body, not a live corridor (patch 0033)
++
++`AreaSpell::updateRoll` hit every unit anywhere in the corridor BEHIND the
++leading edge for the whole 3 s roll, so anything that arrived after the Log had
++gone by was still rolled over. With the real Goblin Barrel flight of patch 0030
++that made every early Log work: one cast on the same tick as the throw killed
++Goblins that landed 2 s after it had passed. The real Log is a projectile 1.2
++tiles long (published `projectile_radius_y` 600 each way, the same for the
++Barbarian Barrel).
++
++- `AreaSpell::rollBodyDepth` / `CardStats::spellRollBodyDepth`
++  (`.withRollBodyDepth(1.2f)` on The Log 33, Barbarian Barrel 101, Hero
++  Barbarian Barrel 174); a unit is skipped once it is wholly behind the
++  trailing edge. 0, the default, keeps the old whole-corridor rule, so a
++  roller built by hand in a test behaves as before.
++- `position` is still the LEADING edge and the 10.1 / 4.5 reach is unchanged.
++  Whether the published range is to the body's centre (reach 0.6 longer) is
++  not known and not changed.
++- Exposed as `get_card_stats(id)["base"]["roll_body_depth"]`.
++- Tests: `tests/entities/test_area_spell.cpp` (`[roll][body]`),
++  `python_ai/tests/test_log_rolls_past.py`.
++
++**GAMEPLAY-AFFECTING, and The Log is in `DEFAULT_DECK`.** A Log now has to
++arrive while its target is there. Against a Goblin Barrel on a Princess Tower
++the cast window has a start as well as an end (see the sweep in the patch-0030
++report); against troops already walking in the lane nothing changes.
++Checkpoints still load.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index f97c920..d573878 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -283,6 +283,7 @@ inline void spawnSpell(const CardStats& stats, float x, float y, int team, Board
+     if (stats.spellRollRange > 0.0f) {
+         spell->configureRoll(stats.spellRollRange, stats.spellRollWidth,
+                              stats.spellRollSpeed, stats.spellRollKnockback);
++        spell->rollBodyDepth = stats.spellRollBodyDepth;
+     }
+     board.addEntity(spell);
+ }
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index 8651b15..c8d49e9 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -735,9 +735,13 @@ private:
+         // tile/s (3.33). Knockback 0.7 tiles is the published pushback (700; 0.7
+         // tiles since the 7/2/2023 balance update), on the scale that gives
+         // Fireball its 1.0. It was an unsourced 0.8.
++        // The body is 1.2 tiles long (published projectile_radius_y 600, each
++        // way): what lands in the corridor after it has rolled by is not hit,
++        // so a Log cast as a Goblin Barrel is thrown rolls past under it.
+         add(spell(33, "The Log", 2.0f, 3.9f, 269, 8, 'o')
+             .withGroundOnly()
+             .withRollingSweep(10.1f, 3.9f, 0.34f, 0.7f)
++            .withRollBodyDepth(1.2f)
+             .withCrownTowerDamage(35)); // audit 0003: wiki The Log, level 11 (13% since 1/6/2026)
+ 
+         // --- the 2026 roster expansion (ids 46+) ---
+@@ -1054,6 +1058,7 @@ private:
+             .withGroundOnly()
+             .withOwnSideOnly()
+             .withRollingSweep(4.5f, 2.6f, 0.5f, 0.0f)
++            .withRollBodyDepth(1.2f) // published projectile_radius_y 600, as The Log
+             .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(barbarianBarrelBarbarianStats())) /* audit 0003: wiki Barbarian Barrel, level 11 */);
+         // Goblin Curse: only the damage over time is modelled, not the
+         // damage-taken amplification or the Goblin on cursed death.
+@@ -1866,6 +1871,7 @@ private:
+                 .withGroundOnly()
+                 .withOwnSideOnly()
+                 .withRollingSweep(4.5f, 2.6f, 0.5f, 0.0f)
++                .withRollBodyDepth(1.2f) // published projectile_radius_y 600, as The Log
+                 .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(heroBarbarianBarrelBarbarianStats())).withCrownTowerDamage(108) /* wiki Barbarian Barrel/Hero gives 232 / CT 116, before the 6 Oct 2026 nerf to 215; CT kept at half (patch 0014) */;
+             heroBarbarianBarrelSpellStats.isHero = true;
+             add(heroBarbarianBarrelSpellStats);
+diff --git a/include/core/CardStats.h b/include/core/CardStats.h
+index 070adbf..f8ae85f 100644
+--- a/include/core/CardStats.h
++++ b/include/core/CardStats.h
+@@ -133,6 +133,9 @@ struct CardStats {
+     float spellRollWidth = 0.0f;
+     float spellRollSpeed = 0.0f;
+     float spellRollKnockback = 0.0f;
++    // Length of the rolling body behind its leading edge (AreaSpell::
++    // rollBodyDepth); 0 = the whole swept corridor stays live.
++    float spellRollBodyDepth = 0.0f;
+ 
+     // Spell-spawns-troops (Goblin Barrel, Royal Delivery, Graveyard); see
+     // AreaSpell::spawnOnDetonate.
+@@ -567,6 +570,12 @@ struct CardStats {
+         spellRollKnockback = knockback;
+         return *this;
+     }
++    // The roller is a body `depth` tiles long, not a corridor that stays live
++    // behind it (published projectile_radius_y, doubled).
++    CardStats& withRollBodyDepth(float depth) {
++        spellRollBodyDepth = depth;
++        return *this;
++    }
+     CardStats& withSpellSpawn(std::shared_ptr<IPeriodicEffect> effect) {
+         spellSpawnEffect = std::move(effect);
+         return *this;
+diff --git a/include/entities/AreaSpell.h b/include/entities/AreaSpell.h
+index b120c76..3df47ab 100644
+--- a/include/entities/AreaSpell.h
++++ b/include/entities/AreaSpell.h
+@@ -139,6 +139,11 @@ public:
+     float rollWidth = 0.0f;   // FULL width, not a radius
+     float rollSpeed = 0.0f;   // tiles per tick
+     float rollKnockback = 0.0f;
++    // Length of the rolling body along the roll, behind its leading edge. The
++    // body is what hits: a unit that arrives in the corridor after the body
++    // has passed (Goblins landing from a Barrel behind an early Log) is not
++    // touched. 0 keeps the whole swept corridor live for the whole roll.
++    float rollBodyDepth = 0.0f;
+     float rollTravelled = 0.0f;
+     int rollDirY = 0;         // +1 for team 0, -1 for team 1
+     Vector2D rollOrigin{0.0f, 0.0f};
+@@ -316,6 +321,8 @@ private:
+             // edge (9.00 away) but never its centre (10.50); pinned in
+             // tests/entities/test_area_spell.cpp.
+             if (dy - r > rollTravelled) continue;
++            // Already behind the body's trailing edge: the roll has gone by.
++            if (rollBodyDepth > 0.0f && dy + r < rollTravelled - rollBodyDepth) continue;
+ 
+             sweptIds.push_back(entity->id);
+ 
+diff --git a/python_ai/tests/test_log_rolls_past.py b/python_ai/tests/test_log_rolls_past.py
+new file mode 100644
+index 0000000..b61afd2
+--- /dev/null
++++ b/python_ai/tests/test_log_rolls_past.py
+@@ -0,0 +1,69 @@
++"""The Log is a rolling body, not a corridor that stays live behind it.
++
++A Goblin Barrel thrown at our Princess Tower lands 28 ticks after the cast. A
++Log cast on the tile in front of the tower as the Barrel is thrown has rolled
++by before the Goblins land and does not touch them; one cast two seconds later
++meets them. (Body 1.2 tiles long: published projectile_radius_y 600.)
++"""
++import pytest
++
++import python_ai  # noqa: F401
++import clash_royale_env as E
++
++ID = {E.get_card_info(c)["name"]: c for c in E.get_all_card_ids()}
++NOOP = 4
++OURS = [15, 6, 25, 40, 24, 72, 33, 7]
++BAIT = [ID["Goblin Barrel"], 4, 12, 112, 61, 20, 14, 2]
++LEFT_X = 3.0
++MIRROR_Y = E.ClashRoyaleEnv.BOARD_HEIGHT - 1
++
++
++def _tower_loss(log_delay, log_tile=(LEFT_X, 4.0)):
++    """HP our left Princess Tower loses to a Barrel answered by a Log cast
++    `log_delay` ticks after the Barrel (None: no Log)."""
++    env = E.ClashRoyaleEnv(list(OURS), list(BAIT), 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    hp = env.get_tower_hp(0, 1)
++    barrel, log = ID["Goblin Barrel"], ID["The Log"]
++    for team, card, deck in ((1, barrel, BAIT), (0, log, OURS)):
++        env.set_elixir_for_team(team, 10.0)
++        assert env.set_hand_for_team(team, [card] + [c for c in deck if c != card][:3])
++    target_y = E.arena_princess_y(0)
++    for tick in range(120):
++        a0 = (NOOP, 0.0, 0.0)
++        a1 = (NOOP, 0.0, 0.0)
++        if tick == 0:
++            a1 = (0, LEFT_X, MIRROR_Y - target_y)
++        if log_delay is not None and tick == log_delay:
++            a0 = (0, log_tile[0], log_tile[1])
++        spent = (env.get_elixir_spent(0), env.get_elixir_spent(1))
++        env.step_self_play(*a0, *a1, 1)
++        if tick == 0:
++            assert env.get_elixir_spent(1) > spent[1], "the Barrel was refused"
++        if log_delay is not None and tick == log_delay:
++            assert env.get_elixir_spent(0) > spent[0], "the Log was refused"
++    return hp - env.get_tower_hp(0, 1)
++
++
++def test_the_rollers_carry_their_body_depth():
++    for name in ("The Log", "Barbarian Barrel"):
++        assert E.get_card_stats(ID[name])["base"]["roll_body_depth"] == pytest.approx(1.2), name
++
++
++def test_an_unanswered_barrel_hurts_the_tower():
++    assert _tower_loss(None) > 0
++
++
++def test_a_log_cast_as_the_barrel_is_thrown_rolls_past_before_the_goblins_land():
++    assert _tower_loss(0) == _tower_loss(None)
++    assert _tower_loss(5) == _tower_loss(None)
++
++
++def test_a_log_cast_two_seconds_after_the_throw_saves_the_tower():
++    for delay in (16, 20, 24):
++        assert _tower_loss(delay) == 0, delay
++
++
++def test_a_log_cast_after_the_first_stab_is_too_late():
++    assert _tower_loss(40) > 0
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index 2f6d400..0538841 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -97,6 +97,7 @@ py::dict statsDict(const CardStats& s, int depth = 0) {
+     d["roll_width"] = s.spellRollWidth;
+     d["roll_speed"] = s.spellRollSpeed;
+     d["roll_knockback"] = s.spellRollKnockback;
++    d["roll_body_depth"] = s.spellRollBodyDepth;
+     // Deploy burst.
+     d["spawn_effect_radius"] = s.spawnEffectRadius;
+     d["spawn_effect_damage"] = s.spawnEffectDamage;
+diff --git a/tests/entities/test_area_spell.cpp b/tests/entities/test_area_spell.cpp
+index ab71fb7..8c71152 100644
+--- a/tests/entities/test_area_spell.cpp
++++ b/tests/entities/test_area_spell.cpp
+@@ -486,6 +486,44 @@ TEST_CASE("The Log rolls at the measured 0.34 tiles/tick and still reaches the t
+     REQUIRE_FALSE(log.isAlive());         // the 10.1 roll ends at ~30 ticks
+ }
+ 
++TEST_CASE("a rolling body hits what is under it, not what arrives after it has passed", "[area_spell][roll][body]") {
++    // The Log is a body 1.2 tiles long. Goblins that land from a Barrel in the
++    // corridor behind it are not rolled over; with no depth configured the
++    // whole swept corridor stays live, as every roller was before.
++    for (const float depth : { 1.2f, 0.0f }) {
++        Board board;
++        AreaSpell log = makeRoller(1, 9.0f, 10.0f, 0, 200, 10.0f, 3.9f, 1.0f, 0.0f);
++        log.rollBodyDepth = depth;
++        for (int i = 0; i < 5; ++i) log.update(board);     // leading edge at y 15, trailing at 13.8
++        REQUIRE(log.position.y == Catch::Approx(15.0f));
++
++        auto behind = std::make_shared<DummyEntity>(2, 9.0f, 12.0f, 1000, 1);
++        auto under = std::make_shared<DummyEntity>(3, 9.0f, 14.5f, 1000, 1);
++        auto ahead = std::make_shared<DummyEntity>(4, 9.0f, 18.0f, 1000, 1);
++        spawn(board, behind);
++        spawn(board, under);
++        spawn(board, ahead);
++        for (int i = 0; i < 5; ++i) log.update(board);
++
++        REQUIRE(under->hp == 800);
++        REQUIRE(ahead->hp == 800);
++        REQUIRE(behind->hp == (depth > 0.0f ? 1000 : 800));
++    }
++}
++
++TEST_CASE("The Log and the Barbarian Barrels roll as a 1.2-tile body", "[area_spell][roll][body][registry]") {
++    // Published projectile_radius_y 600 for both rolling projectiles.
++    for (int id : { 33, 101, 174 }) {
++        REQUIRE(CardRegistry::getInstance().getCard(id)->stats->spellRollBodyDepth == Catch::Approx(1.2f));
++    }
++    Board board;
++    CardFactories::spawnSpell(*CardRegistry::getInstance().getCard(33)->stats, 9.0f, 10.0f, 0, board);
++    REQUIRE(board.pendingEntityCount() == 1);
++    auto log = std::dynamic_pointer_cast<AreaSpell>(board.getPendingEntity(0));
++    REQUIRE(log);
++    REQUIRE(log->rollBodyDepth == Catch::Approx(1.2f));
++}
++
+ TEST_CASE("The Log throws edge-caught units SIDEWAYS and centred ones FORWARD", "[area_spell][roll][knockback]") {
+     // The card's tactical point: it splits a group rather than shunting it back
+     // as one block, which a radial pushAway cannot do.

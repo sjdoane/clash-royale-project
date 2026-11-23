@@ -1,0 +1,1062 @@
+diff --git a/perception/capture/adb.py b/perception/capture/adb.py
+new file mode 100644
+index 0000000..fca19cc
+--- /dev/null
++++ b/perception/capture/adb.py
+@@ -0,0 +1,80 @@
++"""Live frames from the device, via `adb exec-out screencap`.
++
++The non-Windows path: Windows.Graphics.Capture does not exist on macOS. The
++original measurement rejected adb at 1.4-4.9 s per frame on Windows BlueStacks;
++BlueStacks Air on Apple Silicon returns a 1080x1920 PNG in ~0.4 s, inside the
++1 Hz budget. A frame is resized to the 549x976 the live path's readers were
++built against, the same 9:16 as the device.
++"""
++from __future__ import annotations
++
++import subprocess
++import time
++from pathlib import Path
++from typing import Iterator
++
++import cv2
++import numpy as np
++
++from capture.source import Frame, FrameSource
++
++GAME_SIZE = (549, 976)
++
++
++class AdbSource(FrameSource):
++    """One screencap per read, so every frame is a new observation. The stamp is
++    taken before the capture: the board is at least that old when it arrives.
++    """
++
++    def __init__(self, adb: Path, serial: str | None = None):
++        self._cmd = [str(adb)] + (["-s", serial] if serial else [])
++        self._t0 = time.perf_counter()
++        self._index = 0
++        self._stamps: list[float] = []
++        self._size = self._grab()[1].shape[1::-1]
++
++    def _grab(self) -> tuple[float, np.ndarray]:
++        stamp = time.perf_counter()
++        done = subprocess.run(self._cmd + ["exec-out", "screencap", "-p"],
++                              capture_output=True, timeout=15)
++        if done.returncode != 0:
++            raise RuntimeError(f"adb screencap failed ({done.returncode}): "
++                               f"{done.stderr.decode(errors='replace').strip()}")
++        image = cv2.imdecode(np.frombuffer(done.stdout, np.uint8), cv2.IMREAD_COLOR)
++        if image is None:
++            raise RuntimeError(f"adb screencap returned {len(done.stdout)} "
++                               "undecodable bytes")
++        self._stamps = (self._stamps + [stamp])[-120:]
++        return stamp, cv2.resize(image, GAME_SIZE, interpolation=cv2.INTER_AREA)
++
++    @property
++    def fps(self) -> float:
++        """Achieved rate; every Frame carries its own capture time."""
++        if len(self._stamps) < 2:
++            return 0.0
++        return (len(self._stamps) - 1) / (self._stamps[-1] - self._stamps[0])
++
++    @property
++    def size(self) -> tuple[int, int]:
++        return self._size
++
++    @property
++    def frame_count(self) -> int:
++        return -1
++
++    def __iter__(self) -> Iterator[Frame]:
++        while True:
++            yield self.read()
++
++    def read(self) -> Frame:
++        stamp, image = self._grab()
++        frame = Frame(index=self._index,
++                      wall_time_ms=(stamp - self._t0) * 1000.0, image=image)
++        self._index += 1
++        return frame
++
++    def read_new(self, timeout_s: float = 1.0) -> Frame | None:
++        return self.read()
++
++    def close(self) -> None:
++        pass
+diff --git a/perception/capture/mirror.py b/perception/capture/mirror.py
+new file mode 100644
+index 0000000..3ce53b6
+--- /dev/null
++++ b/perception/capture/mirror.py
+@@ -0,0 +1,228 @@
++"""Live frames and taps through macOS iPhone Mirroring (macOS 15+, iOS 18+).
++
++The iPhone shows up as a window on the Mac. Frames are captures of that one
++window (CGWindowListCreateImage by window id, so other windows overlapping it
++do not matter), and taps are mouse clicks posted at the HID level, which
++iPhone Mirroring turns into touches. No Xcode and no signing are needed; the
++process running this needs two macOS permissions, in System Settings >
++Privacy & Security: Screen Recording (frames) and Accessibility (clicks).
++
++The click is move, down, a one-pixel drag, then up: the same sequence
++jev-royal (github.com/Amrit-Nigam/jev-royal) found registers in Clash Royale
++through Mirroring.
++
++The game frame inside the window is the same crop as on WDA
++(capture/wda.IosGeometry, from tools/calibrate_ios.py --mirror), with
++`scale` = window-capture pixels per screen point. Taps map through it and are
++offset by the window's on-screen origin, read fresh at every placement, so
++moving the window mid-match is harmless.
++"""
++from __future__ import annotations
++
++import time
++from typing import Iterator
++
++import numpy as np
++
++from capture.source import Frame, FrameSource
++from capture.wda import IosGeometry
++
++import os
++
++# Overridable only to test against another window; play uses the real app.
++OWNER = os.environ.get("CR_MIRROR_OWNER", "iPhone Mirroring")
++
++
++class MirrorError(RuntimeError):
++    pass
++
++
++def _quartz():
++    try:
++        import Quartz
++    except ImportError as exc:                              # pragma: no cover
++        raise MirrorError("pyobjc missing: uv pip install pyobjc-framework-Quartz") from exc
++    return Quartz
++
++
++class MirrorWindow:
++    """The iPhone Mirroring window: find it, capture it, click inside it."""
++
++    def __init__(self, owner: str | None = None):
++        self.Q = _quartz()
++        self.owner = owner or OWNER
++        self.wid, self.bounds = self._find()
++
++    def _find(self) -> tuple[int, tuple[float, float, float, float]]:
++        Q = self.Q
++        # All windows, not only on-screen ones: the window still captures while
++        # it sits on another Space (e.g. you switched to the terminal).
++        wins = Q.CGWindowListCopyWindowInfo(Q.kCGWindowListOptionAll,
++                                            Q.kCGNullWindowID) or []
++        best = None
++        for w in wins:
++            if w.get("kCGWindowOwnerName") != self.owner or w.get("kCGWindowLayer", 0):
++                continue
++            b = w["kCGWindowBounds"]
++            rect = (float(b["X"]), float(b["Y"]), float(b["Width"]), float(b["Height"]))
++            # The phone window is portrait; the app also owns small helper windows.
++            if rect[3] < 300 or rect[3] < 1.5 * rect[2]:
++                continue
++            key = (bool(w.get("kCGWindowIsOnscreen")), rect[2] * rect[3])
++            if best is None or key > best[0]:
++                best = (key, int(w["kCGWindowNumber"]), rect)
++        if best is not None:
++            best = best[1:]
++        if best is None:
++            raise MirrorError("no iPhone Mirroring window on screen. Open the iPhone "
++                              "Mirroring app, connect to the phone and leave the window "
++                              "visible (not minimised)")
++        return best
++
++    def refresh(self) -> tuple[float, float, float, float]:
++        self.wid, self.bounds = self._find()
++        return self.bounds
++
++    def capture(self) -> np.ndarray:
++        """BGR image of the window's content (Retina pixels)."""
++        Q = self.Q
++        img = None
++        for attempt in range(5):                             # transient None happens
++            img = Q.CGWindowListCreateImage(
++                Q.CGRectNull, Q.kCGWindowListOptionIncludingWindow, self.wid,
++                Q.kCGWindowImageBoundsIgnoreFraming)
++            if img is not None:
++                break
++            time.sleep(0.05 * (attempt + 1))
++            self.refresh()
++        if img is None:
++            raise MirrorError("window capture failed (window closed?)")
++        w, h = Q.CGImageGetWidth(img), Q.CGImageGetHeight(img)
++        stride = Q.CGImageGetBytesPerRow(img)
++        data = Q.CGDataProviderCopyData(Q.CGImageGetDataProvider(img))
++        arr = np.frombuffer(data, np.uint8).reshape(h, stride // 4, 4)[:, :w, :3]
++        return np.ascontiguousarray(arr)                     # BGRA -> BGR
++
++    def scale(self) -> float:
++        return self.capture().shape[1] / self.bounds[2]
++
++    @staticmethod
++    def permissions() -> dict[str, bool]:
++        Q = _quartz()
++        out = {"screen_recording": bool(Q.CGPreflightScreenCaptureAccess())}
++        try:
++            from ApplicationServices import AXIsProcessTrusted
++            out["accessibility"] = bool(AXIsProcessTrusted())
++        except ImportError:
++            out["accessibility"] = True                      # cannot tell; try anyway
++        return out
++
++    def activate(self) -> None:
++        try:
++            from AppKit import NSRunningApplication, NSWorkspace
++        except ImportError:
++            return
++        front = NSWorkspace.sharedWorkspace().frontmostApplication()
++        if front is not None and front.localizedName() == self.owner:
++            return
++        for app in NSWorkspace.sharedWorkspace().runningApplications():
++            if app.localizedName() == self.owner:
++                app.activateWithOptions_(1 << 1)             # ignoring other apps
++                time.sleep(0.25)                             # focus settles before input
++                return
++
++    def _click(self, x: float, y: float, hold_ms: int) -> None:
++        Q = self.Q
++        src = Q.CGEventSourceCreate(Q.kCGEventSourceStateHIDSystemState)
++        p, nudge = (x, y), (x + 1, y)
++        for kind, at, wait in ((Q.kCGEventMouseMoved, p, 0.02),
++                               (Q.kCGEventLeftMouseDown, p, hold_ms / 2000),
++                               (Q.kCGEventLeftMouseDragged, nudge, hold_ms / 2000),
++                               (Q.kCGEventLeftMouseUp, p, 0.0)):
++            ev = Q.CGEventCreateMouseEvent(src, kind, at, Q.kCGMouseButtonLeft)
++            Q.CGEventPost(Q.kCGHIDEventTap, ev)
++            if wait:
++                time.sleep(wait)
++
++
++class MirrorClient:
++    """WdaClient's tap interface over a MirrorWindow, for live/wda_actuator."""
++
++    backend = "iphone-mirroring"
++
++    def __init__(self, window: MirrorWindow):
++        self.window = window
++
++    @property
++    def session(self) -> str:
++        perms = MirrorWindow.permissions()
++        if not perms["accessibility"]:
++            raise MirrorError("this terminal lacks Accessibility permission, so clicks "
++                              "are dropped: System Settings > Privacy & Security > "
++                              "Accessibility, add the terminal app, then restart it")
++        self.window.activate()
++        return "mirror"
++
++    def tap_sequence(self, points: list[tuple[float, float]],
++                     hold_ms: int = 60, gap_ms: int = 80) -> None:
++        """Click each point (window-relative screen points) in order."""
++        self.window.activate()
++        ox, oy, _, _ = self.window.refresh()
++        for i, (x, y) in enumerate(points):
++            if i:
++                time.sleep(gap_ms / 1000)
++            self.window._click(ox + x, oy + y, hold_ms)
++
++
++class MirrorSource(FrameSource):
++    """One window capture per read, cropped to the game frame."""
++
++    def __init__(self, window: MirrorWindow, geometry: IosGeometry):
++        self._win = window
++        self._geo = geometry
++        self._t0 = time.perf_counter()
++        self._index = 0
++        self._stamps: list[float] = []
++        first = self._grab()[1]
++        if float(first.std()) < 2.0:
++            raise MirrorError("the captured frame is blank: grant this terminal Screen "
++                              "Recording permission (System Settings > Privacy & "
++                              "Security > Screen Recording), then restart it")
++        self._size = first.shape[1::-1]
++
++    def _grab(self) -> tuple[float, np.ndarray]:
++        stamp = time.perf_counter()
++        image = self._win.capture()
++        self._stamps = (self._stamps + [stamp])[-120:]
++        return stamp, self._geo.frame(image)
++
++    @property
++    def fps(self) -> float:
++        if len(self._stamps) < 2:
++            return 0.0
++        return (len(self._stamps) - 1) / (self._stamps[-1] - self._stamps[0])
++
++    @property
++    def size(self) -> tuple[int, int]:
++        return self._size
++
++    @property
++    def frame_count(self) -> int:
++        return -1
++
++    def __iter__(self) -> Iterator[Frame]:
++        while True:
++            yield self.read()
++
++    def read(self) -> Frame:
++        stamp, image = self._grab()
++        frame = Frame(index=self._index,
++                      wall_time_ms=(stamp - self._t0) * 1000.0, image=image)
++        self._index += 1
++        return frame
++
++    def read_new(self, timeout_s: float = 1.0) -> Frame | None:
++        return self.read()
++
++    def close(self) -> None:
++        pass
+diff --git a/perception/capture/wda.py b/perception/capture/wda.py
+new file mode 100644
+index 0000000..52ded0f
+--- /dev/null
++++ b/perception/capture/wda.py
+@@ -0,0 +1,237 @@
++"""Live frames from an iPhone, via WebDriverAgent (XCUITest) over USB.
++
++iOS has no adb. WebDriverAgent, the XCUITest server Appium uses, is built onto
++the phone with Xcode and serves screenshots and synthesised touches over HTTP;
++`iproxy 8100 8100` forwards it to localhost over the USB cable.
++
++An iPhone screen is not the 9:16 the live path's readers were built against
++(BlueStacks at 1080x1920), so a frame is a CROP of the screenshot: the
++rectangle that matches the 9:16 layout, resized to 549x976. The same rectangle
++maps taps back (live/wda_actuator.py), so capture and touch cannot disagree.
++The rectangle comes from tools/calibrate_ios.py and lives in a JSON file:
++
++    {"crop": [x, y, w, h],     # in screenshot pixels
++     "scale": 3.0,             # screenshot pixels per WDA point
++     "tray_dy": 0}             # optional, see below
++
++A tall screen can put extra space between the arena and the card tray. Then
++the tray (the frame's rows below SPLIT) sits `tray_dy` screenshot pixels lower
++than one 9:16 rectangle says; the frame is stitched from the two bands and taps
++in the tray are shifted by the same amount.
++"""
++from __future__ import annotations
++
++import base64
++import json
++import time
++import urllib.request
++from dataclasses import dataclass
++from pathlib import Path
++from typing import Iterator
++
++import cv2
++import numpy as np
++
++from capture.source import Frame, FrameSource
++
++GAME_SIZE = (549, 976)
++DEFAULT_URL = "http://127.0.0.1:8100"
++# Fraction of the frame's height where the card tray starts (row 790 of 976).
++SPLIT = 790 / 976
++
++
++class WdaError(RuntimeError):
++    pass
++
++
++class WdaClient:
++    """The few WebDriverAgent endpoints the live loop needs."""
++
++    def __init__(self, url: str = DEFAULT_URL, timeout: float = 15.0):
++        self.url = url.rstrip("/")
++        self.timeout = timeout
++        self._session: str | None = None
++
++    def _call(self, method: str, path: str, body: dict | None = None) -> dict:
++        data = None if body is None else json.dumps(body).encode()
++        req = urllib.request.Request(self.url + path, data=data, method=method,
++                                     headers={"Content-Type": "application/json"})
++        try:
++            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
++                return json.loads(resp.read() or b"{}")
++        except OSError as exc:
++            raise WdaError(f"WebDriverAgent at {self.url} not reachable ({exc}). "
++                           "Is WDA running on the phone and `iproxy 8100 8100` "
++                           "up?") from exc
++
++    def status(self) -> dict:
++        return self._call("GET", "/status").get("value", {})
++
++    @property
++    def session(self) -> str:
++        if self._session is None:
++            out = self._call("POST", "/session", {"capabilities": {}})
++            sid = out.get("sessionId") or out.get("value", {}).get("sessionId")
++            if not sid:
++                raise WdaError(f"WDA refused a session: {out}")
++            self._session = sid
++        return self._session
++
++    def screenshot_png(self) -> bytes:
++        value = self._call("GET", "/screenshot").get("value")
++        if not value:
++            raise WdaError("WDA returned an empty screenshot")
++        return base64.b64decode(value)
++
++    def window_size(self) -> tuple[float, float]:
++        v = self._call("GET", f"/session/{self.session}/window/size")["value"]
++        return float(v["width"]), float(v["height"])
++
++    def tap_sequence(self, points: list[tuple[float, float]],
++                     hold_ms: int = 60, gap_ms: int = 80) -> None:
++        """Tap each point in order (WDA points), in ONE W3C actions request, so
++        a placement's two taps cost one round trip and cannot interleave."""
++        actions = []
++        for i, (x, y) in enumerate(points):
++            if i:
++                actions.append({"type": "pause", "duration": gap_ms})
++            actions += [
++                {"type": "pointerMove", "duration": 0, "x": round(x), "y": round(y)},
++                {"type": "pointerDown", "button": 0},
++                {"type": "pause", "duration": hold_ms},
++                {"type": "pointerUp", "button": 0},
++            ]
++        self._call("POST", f"/session/{self.session}/actions", {"actions": [{
++            "type": "pointer", "id": "finger1",
++            "parameters": {"pointerType": "touch"}, "actions": actions}]})
++
++
++Band = tuple[float, float, float, float]   # (sx, sy, ox, oy)
++
++
++@dataclass(frozen=True)
++class IosGeometry:
++    """Where the 549x976 game frame's pixels sit in the phone's screenshot.
++
++    Two bands, each an axis-aligned affine map from a frame pixel (u, v) to a
++    screenshot pixel (ox + sx*u, oy + sy*v): the arena (frame rows above
++    SPLIT) and the card tray (rows below). A tall iPhone scales the arena
++    differently in x and y and moves the tray, so one rectangle cannot serve.
++    """
++    arena: Band
++    tray: Band
++    scale: float
++
++    @classmethod
++    def from_crop(cls, crop, scale: float, tray_dy: int = 0) -> "IosGeometry":
++        x, y, w, h = crop
++        sx, sy = w / GAME_SIZE[0], h / GAME_SIZE[1]
++        return cls((sx, sy, x, y), (sx, sy, x, y + tray_dy), scale)
++
++    @classmethod
++    def load(cls, path: Path) -> "IosGeometry":
++        blob = json.loads(Path(path).read_text())
++        if "arena" in blob:
++            return cls(tuple(blob["arena"]), tuple(blob["tray"]), float(blob["scale"]))
++        return cls.from_crop([int(v) for v in blob["crop"]], float(blob["scale"]),
++                             int(blob.get("tray_dy", 0)))
++
++    def to_json(self) -> dict:
++        return {"arena": list(self.arena), "tray": list(self.tray), "scale": self.scale}
++
++    @property
++    def crop(self) -> tuple[int, int, int, int]:
++        """Bounding box of the whole frame in the screenshot (for logs)."""
++        sx, sy, ox, oy = self.arena
++        tsx, tsy, tox, toy = self.tray
++        bottom = toy + tsy * GAME_SIZE[1]
++        return (int(ox), int(oy), int(sx * GAME_SIZE[0]), int(bottom - oy))
++
++    def _band(self, fy: float) -> Band:
++        return self.arena if fy < SPLIT else self.tray
++
++    def maps(self, shape: tuple[int, int]) -> tuple[np.ndarray, np.ndarray]:
++        cached = getattr(self, "_maps", None)
++        if cached is not None and cached[0] == shape:
++            return cached[1]
++        W, H = GAME_SIZE
++        u = np.arange(W, dtype=np.float32)
++        v = np.arange(H, dtype=np.float32)
++        cut = int(round(SPLIT * H))
++        mx = np.empty((H, W), np.float32)
++        my = np.empty((H, W), np.float32)
++        for rows, (sx, sy, ox, oy) in ((slice(0, cut), self.arena),
++                                       (slice(cut, H), self.tray)):
++            mx[rows] = ox + sx * u[None, :]
++            my[rows] = (oy + sy * v[rows])[:, None]
++        h, w = shape
++        inside = (mx >= -0.5) & (mx <= w - 0.5) & (my >= -0.5) & (my <= h - 0.5)
++        # Mostly off-screen means the geometry is for another screen size.
++        if inside.mean() < 0.85:
++            raise WdaError(f"geometry maps only {inside.mean():.0%} of the frame onto "
++                           f"the {w}x{h} screenshot; recalibrate")
++        object.__setattr__(self, "_maps", (shape, (mx, my)))
++        return mx, my
++
++    def frame(self, screenshot: np.ndarray) -> np.ndarray:
++        mx, my = self.maps(screenshot.shape[:2])
++        return cv2.remap(screenshot, mx, my, cv2.INTER_LINEAR,
++                         borderMode=cv2.BORDER_REPLICATE)
++
++    def to_points(self, fx: float, fy: float) -> tuple[float, float]:
++        """A position as fractions (0..1) of the game frame -> screen points."""
++        sx, sy, ox, oy = self._band(fy)
++        return ((ox + sx * fx * GAME_SIZE[0]) / self.scale,
++                (oy + sy * fy * GAME_SIZE[1]) / self.scale)
++
++
++class WdaSource(FrameSource):
++    """One WDA screenshot per read. The stamp is taken before the request."""
++
++    def __init__(self, client: WdaClient, geometry: IosGeometry):
++        self._client = client
++        self._geo = geometry
++        self._t0 = time.perf_counter()
++        self._index = 0
++        self._stamps: list[float] = []
++        self._size = self._grab()[1].shape[1::-1]
++
++    def _grab(self) -> tuple[float, np.ndarray]:
++        stamp = time.perf_counter()
++        png = self._client.screenshot_png()
++        image = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_COLOR)
++        if image is None:
++            raise WdaError(f"undecodable screenshot ({len(png)} bytes)")
++        self._stamps = (self._stamps + [stamp])[-120:]
++        return stamp, self._geo.frame(image)
++
++    @property
++    def fps(self) -> float:
++        if len(self._stamps) < 2:
++            return 0.0
++        return (len(self._stamps) - 1) / (self._stamps[-1] - self._stamps[0])
++
++    @property
++    def size(self) -> tuple[int, int]:
++        return self._size
++
++    @property
++    def frame_count(self) -> int:
++        return -1
++
++    def __iter__(self) -> Iterator[Frame]:
++        while True:
++            yield self.read()
++
++    def read(self) -> Frame:
++        stamp, image = self._grab()
++        frame = Frame(index=self._index,
++                      wall_time_ms=(stamp - self._t0) * 1000.0, image=image)
++        self._index += 1
++        return frame
++
++    def read_new(self, timeout_s: float = 1.0) -> Frame | None:
++        return self.read()
++
++    def close(self) -> None:
++        pass
+diff --git a/perception/live/actuator.py b/perception/live/actuator.py
+index 37b3c82..15494f3 100644
+--- a/perception/live/actuator.py
++++ b/perception/live/actuator.py
+@@ -38,6 +38,8 @@ from __future__ import annotations
+ 
+ import base64
+ import queue
++import re
++import shutil
+ import struct
+ import subprocess
+ import threading
+@@ -61,7 +63,7 @@ from clashroyalebuildabot.constants import (
+ 
+ from live.adapter import TILE_Y_OFFSET
+ 
+-ADB = Path(r"C:\Program Files\BlueStacks_nxt\HD-Adb.exe")
++ADB = Path(shutil.which("adb") or r"C:\Program Files\BlueStacks_nxt\HD-Adb.exe")
+ 
+ TOUCH_DEVICE = "/dev/input/event4"          # "BlueStacks Virtual Touch"
+ ABS_MT_POSITION_X, ABS_MT_POSITION_Y = 53, 54
+@@ -221,6 +223,7 @@ class AdbActuator:
+         self.errors = 0
+         self.last_error: BaseException | None = None
+         self.raw: RawTouch | None = None
++        self.panel = (DISPLAY_WIDTH, DISPLAY_HEIGHT)
+         self._proc: subprocess.Popen | None = None
+         if not dry_run and not self.adb.exists():
+             raise ActuationError(f"adb not found at {self.adb}")
+@@ -307,16 +310,29 @@ class AdbActuator:
+             cmd = [str(self.adb)]
+             if self.serial:
+                 cmd += ["-s", self.serial]
+-            out = subprocess.run(cmd + ["shell", f"wm size; ls {TOUCH_DEVICE}"],
++            out = subprocess.run(cmd + ["shell", "wm size; getevent -pl"],
+                                  capture_output=True, text=True,
+                                  timeout=15).stdout
+-            if TOUCH_DEVICE not in out:
++            size = re.search(r"(\d+)x(\d+)", out)
++            # The event number differs between emulators; the name does not.
++            device = re.search(r"add device \d+: (\S+)\s+name:\s+\"[^\"]*Touch\"",
++                               out)
++            if size is None:
+                 return None
+-            size = [w for w in out.replace("x", " ").split()
+-                    if w.isdigit()]
+-            if len(size) < 2:
++            self.panel = (int(size[1]), int(size[2]))
++            if device is None:
+                 return None
+-            return RawTouch(int(size[0]), int(size[1]))
++            raw = RawTouch(*self.panel, device=device[1])
++            # Writable is not enough: BlueStacks Air answers EINVAL to every
++            # write, and the persistent shell would hide that, so each tap
++            # would vanish while the loop reports it sent. A bare SYN_REPORT
++            # is harmless to the device and proves the write path.
++            probe = subprocess.run(
++                cmd + ["shell", raw._write(_input_event(EV_SYN, SYN_REPORT, 0))],
++                capture_output=True, text=True, timeout=15)
++            if probe.returncode != 0 or probe.stderr.strip():
++                return None
++            return raw
+         except Exception:                                   # noqa: BLE001
+             return None
+ 
+@@ -324,6 +340,11 @@ class AdbActuator:
+     def backend(self) -> str:
+         return "raw-evdev" if self.raw is not None else "input-tap"
+ 
++    def _panel_xy(self, tap: Tap) -> str:
++        """`input tap` wants panel pixels; a Tap is in the 720x1280 display."""
++        return (f"{round(tap.x * self.panel[0] / DISPLAY_WIDTH)} "
++                f"{round(tap.y * self.panel[1] / DISPLAY_HEIGHT)}")
++
+     def _adb(self, *args: str) -> list[str]:
+         cmd = [str(self.adb)]
+         if self.serial:
+@@ -390,9 +411,9 @@ class AdbActuator:
+                 if self.raw is not None:
+                     self._shell(self.raw.placement_script(card, target))
+                 else:
+-                    self._shell(f"input tap {card.x} {card.y}; "
++                    self._shell(f"input tap {self._panel_xy(card)}; "
+                                 f"sleep {TAP_GAP_S}; "
+-                                f"input tap {target.x} {target.y}")
++                                f"input tap {self._panel_xy(target)}")
+             except Exception as exc:                        # noqa: BLE001
+                 # A failed tap must not kill the worker, or the loop would look
+                 # like it was acting while nothing reached the game.
+diff --git a/perception/live/mvp_loop.py b/perception/live/mvp_loop.py
+index 1e5983f..2d8fe9c 100644
+--- a/perception/live/mvp_loop.py
++++ b/perception/live/mvp_loop.py
+@@ -40,6 +40,7 @@ if str(_ENGINE) not in sys.path:
+ if str(_ROOT.parent) not in sys.path:
+     sys.path.insert(0, str(_ROOT.parent))
+ 
++from capture.adb import AdbSource  # noqa: E402
+ from capture.window import WindowSource  # noqa: E402
+ from clashroyalebuildabot.constants import (  # noqa: E402
+     SCREENSHOT_HEIGHT,
+@@ -48,7 +49,7 @@ from clashroyalebuildabot.constants import (  # noqa: E402
+ from clashroyalebuildabot.detectors.detector import Detector  # noqa: E402
+ from clashroyalebuildabot.namespaces.cards import Cards  # noqa: E402
+ from live.action_gate import MAX_STALENESS_MS, ActionGate  # noqa: E402
+-from live.actuator import AdbActuator  # noqa: E402
++from live.actuator import ADB, AdbActuator  # noqa: E402
+ from live.adapter import build_game_state  # noqa: E402
+ from live.elixir_ledger import ElixirLedger  # noqa: E402
+ from live.hand_tracker import HandTracker  # noqa: E402
+@@ -57,31 +58,12 @@ from live.pipeline import PerceptionWorker, Stages  # noqa: E402
+ from live.placement_confirm import PlacementConfirmer  # noqa: E402
+ 
+ def _training_deck_ids() -> list[int]:
+-    """`gym_wrapper.DEFAULT_DECK`, parsed from source rather than imported.
+-
+-    Importing it would pull in gymnasium and torch, which perception's venv
+-    does not carry. Parsing keeps one source of truth without the dependency.
+-    Strict: a DEFAULT_DECK that is missing or not a plain list of int literals
+-    raises, since a guessed deck means playing cards the policy has never seen.
++    """`python_ai.deck.DEFAULT_DECK`, the deck the policy trains on. That module
++    is a leaf importing only the engine, so this pulls in no gymnasium or torch.
+     """
+-    import ast  # noqa: PLC0415
++    from python_ai.deck import DEFAULT_DECK  # noqa: PLC0415
+ 
+-    source_path = (Path(__file__).resolve().parent.parent.parent
+-                   / "python_ai" / "envs" / "gym_wrapper.py")
+-    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+-    for node in tree.body:
+-        if not isinstance(node, ast.Assign):
+-            continue
+-        if not any(isinstance(t, ast.Name) and t.id == "DEFAULT_DECK"
+-                   for t in node.targets):
+-            continue
+-        value = ast.literal_eval(node.value)
+-        if not isinstance(value, list) or not all(isinstance(v, int) for v in value):
+-            raise RuntimeError(
+-                f"DEFAULT_DECK in {source_path} is not a list of int literals; "
+-                "it can no longer be read without importing gym_wrapper.")
+-        return value
+-    raise RuntimeError(f"no DEFAULT_DECK assignment found in {source_path}")
++    return list(DEFAULT_DECK)
+ 
+ 
+ def _deck_from_training() -> list:
+@@ -558,6 +540,15 @@ def main() -> int:
+     ap.add_argument("--act", action="store_true",
+                     help="actually tap. Without it the loop only watches.")
+     ap.add_argument("--window", default="BlueStacks App Player")
++    ap.add_argument("--capture", choices=("window", "adb", "wda", "mirror"),
++                    default="window" if sys.platform == "win32" else "adb",
++                    help="live frame source; window capture is Windows-only, "
++                         "wda is an iPhone through WebDriverAgent, mirror is an "
++                         "iPhone through macOS iPhone Mirroring")
++    ap.add_argument("--wda-url", default="http://127.0.0.1:8100",
++                    help="WebDriverAgent endpoint (iproxy 8100 8100)")
++    ap.add_argument("--ios-geometry", type=Path, default=None,
++                    help="crop JSON from tools/calibrate_ios.py (--capture wda/mirror)")
+     ap.add_argument("--serial", action="store_true",
+                     help="run perception inline instead of on its own thread. "
+                          "The original design, kept for comparison: it pins "
+@@ -634,6 +625,28 @@ def main() -> int:
+             from capture.frames import RecordingSource  # noqa: PLC0415
+             source = RecordingSource(args.frames)
+             print(f"replaying {source.frame_count} frames from {args.frames}")
++    elif args.capture == "adb":
++        source = AdbSource(ADB)
++    elif args.capture == "wda":
++        if args.ios_geometry is None:
++            raise SystemExit("--capture wda needs --ios-geometry "
++                             "(run tools/calibrate_ios.py first)")
++        from capture.wda import IosGeometry, WdaClient, WdaSource  # noqa: PLC0415
++        wda = WdaClient(args.wda_url)
++        ios_geo = IosGeometry.load(args.ios_geometry)
++        source = WdaSource(wda, ios_geo)
++        print(f"capture: iPhone via WDA {args.wda_url}, crop {ios_geo.crop}")
++    elif args.capture == "mirror":
++        if args.ios_geometry is None:
++            raise SystemExit("--capture mirror needs --ios-geometry "
++                             "(run tools/calibrate_ios.py --mirror first)")
++        from capture.mirror import MirrorClient, MirrorSource, MirrorWindow  # noqa: PLC0415
++        from capture.wda import IosGeometry  # noqa: PLC0415
++        mirror = MirrorWindow()
++        wda = MirrorClient(mirror)
++        ios_geo = IosGeometry.load(args.ios_geometry)
++        source = MirrorSource(mirror, ios_geo)
++        print(f"capture: iPhone Mirroring window {mirror.bounds}, crop {ios_geo.crop}")
+     else:
+         source = WindowSource(args.window)
+     detector = Detector(DECK)
+@@ -676,7 +689,11 @@ def main() -> int:
+         from match_nav import ensure_in_match  # noqa: PLC0415
+         ensure_in_match(detector)
+ 
+-    actuator = AdbActuator(dry_run=not args.act)
++    if args.capture in ("wda", "mirror") and not args.frames:
++        from live.wda_actuator import WdaActuator  # noqa: PLC0415
++        actuator = WdaActuator(wda, ios_geo, dry_run=not args.act)
++    else:
++        actuator = AdbActuator(dry_run=not args.act)
+     if args.act:
+         print(f"actuator backend: {actuator.backend}")
+     if args.policy == "neural":
+@@ -699,7 +716,7 @@ def main() -> int:
+     print(f"deck costs: {', '.join(f'{c:.0f}' for c in costs)}")
+     # Printed in full: the loop is consistent whatever deck it holds, so this
+     # line is what makes "live matches training" auditable.
+-    print("deck (derived from gym_wrapper.DEFAULT_DECK): "
++    print("deck (derived from python_ai.deck.DEFAULT_DECK): "
+           + ", ".join(c.name for c in DECK))
+     ledger = ElixirLedger(costs=costs)
+ 
+diff --git a/perception/live/wda_actuator.py b/perception/live/wda_actuator.py
+new file mode 100644
+index 0000000..201da06
+--- /dev/null
++++ b/perception/live/wda_actuator.py
+@@ -0,0 +1,102 @@
++"""Taps on an iPhone through WebDriverAgent, with AdbActuator's interface.
++
++Also drives iPhone Mirroring: capture/mirror.MirrorClient has the same
++`session` / `tap_sequence` surface, in window-relative screen points.
++
++Taps are computed exactly as for Android (card_centre / engine_tile_centre, in
++CRBAB's 720x1280 display space), then mapped through the same crop rectangle
++the frame source uses (capture/wda.IosGeometry), so a tap lands on the pixel
++the detector saw. Off the caller's thread, depth-one queue, drop-not-block:
++the same policy as AdbActuator, for the same reasons.
++"""
++from __future__ import annotations
++
++import queue
++import threading
++
++from clashroyalebuildabot.constants import DISPLAY_HEIGHT, DISPLAY_WIDTH
++
++from capture.wda import IosGeometry, WdaClient
++from live.actuator import (
++    TAP_GAP_S,
++    TOUCH_HOLD_S,
++    Tap,
++    card_centre,
++    engine_tile_centre,
++    tile_centre,
++)
++
++
++class WdaActuator:
++    def __init__(self, client: WdaClient, geometry: IosGeometry,
++                 dry_run: bool = True):
++        self.dry_run = dry_run
++        self.client = client
++        self.backend = getattr(client, "backend", "wda-xcuitest")
++        self.geo = geometry
++        self.taps: list[Tap] = []
++        self.dropped = 0
++        self.errors = 0
++        self.last_error: BaseException | None = None
++        self._q: queue.Queue = queue.Queue(maxsize=1)
++        self._stop = threading.Event()
++        self._worker: threading.Thread | None = None
++        if not dry_run:
++            self.client.session  # fail now, not on the first placement
++            self._worker = threading.Thread(target=self._run, name="actuator",
++                                            daemon=True)
++            self._worker.start()
++
++    backend = "wda-xcuitest"
++
++    def points(self, tap: Tap) -> tuple[float, float]:
++        return self.geo.to_points(tap.x / DISPLAY_WIDTH, tap.y / DISPLAY_HEIGHT)
++
++    def _enqueue(self, card: Tap, target: Tap) -> tuple[Tap, Tap]:
++        self.taps.extend((card, target))
++        if not self.dry_run:
++            try:
++                self._q.put_nowait((card, target))
++            except queue.Full:
++                self.dropped += 1
++        return card, target
++
++    def play(self, slot: int, tile_x: int, tile_y: int, *,
++             engine_frame: bool = True) -> tuple[Tap, Tap]:
++        target = (engine_tile_centre(tile_x, tile_y) if engine_frame
++                  else tile_centre(tile_x, tile_y))
++        return self._enqueue(card_centre(slot), target)
++
++    def play_pixel(self, slot: int, px: int, py: int) -> tuple[Tap, Tap]:
++        return self._enqueue(card_centre(slot), Tap(int(px), int(py)))
++
++    def flush(self) -> None:
++        if self._worker is not None:
++            self._q.join()
++
++    def close(self, timeout: float = 5.0) -> None:
++        if self._worker is None:
++            return
++        self._q.join()
++        self._stop.set()
++        self._worker.join(timeout=timeout)
++
++    @property
++    def pending(self) -> int:
++        return self._q.qsize()
++
++    def _run(self) -> None:
++        while not self._stop.is_set():
++            try:
++                card, target = self._q.get(timeout=0.2)
++            except queue.Empty:
++                continue
++            try:
++                self.client.tap_sequence(
++                    [self.points(card), self.points(target)],
++                    hold_ms=int(TOUCH_HOLD_S * 1000), gap_ms=int(TAP_GAP_S * 1000))
++            except Exception as exc:                        # noqa: BLE001
++                self.errors += 1
++                self.last_error = exc
++            finally:
++                self._q.task_done()
+diff --git a/perception/tools/calibrate_ios.py b/perception/tools/calibrate_ios.py
+new file mode 100644
+index 0000000..e503f47
+--- /dev/null
++++ b/perception/tools/calibrate_ios.py
+@@ -0,0 +1,171 @@
++"""Fit the crop that turns an iPhone screenshot into the live path's 9:16 frame.
++
++    python tools/calibrate_ios.py --mirror --out ../../ios/geometry.json   # iPhone Mirroring
++    python tools/calibrate_ios.py --out ../../ios/geometry.json            # live, via WDA
++    python tools/calibrate_ios.py --png shot.png --scale 3 --out geo.json  # from a file
++
++Take it during a battle (Training Camp is fine), towers standing, hand
++visible. The reference is a BlueStacks 549x976 battle frame
++(tests/assets/tower_numerals_2030_549x976.jpg). Its arena band and its card
++tray band are each matched separately against the screenshot over a sweep of
++scales, on gradient magnitude, so the arena skin and the cards in hand matter
++less than the layout.
++
++Each band gets its own x and y scale and origin: a tall phone stretches the
++arena more vertically than the 9:16 reference and puts the tray elsewhere.
++capture/wda.IosGeometry rebuilds the 9:16 frame from the two, taps included.
++
++Writes both bands, the scale (screenshot pixels per WDA point) and an overlay PNG
++next to the JSON, to check by eye.
++"""
++from __future__ import annotations
++
++import argparse
++import json
++import sys
++from pathlib import Path
++
++import cv2
++import numpy as np
++
++_ROOT = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(_ROOT))
++
++from capture.wda import GAME_SIZE, SPLIT, IosGeometry, WdaClient  # noqa: E402
++
++REFERENCE = _ROOT / "tests" / "assets" / "tower_numerals_2030_549x976.jpg"
++# Rows of the 549x976 reference: the arena below the name/clock strip, and the
++# card tray. Generous margins are left out so units in play matter less.
++ARENA_ROWS = (70, 780)
++TRAY_ROWS = (800, 976)
++# The arena's outer columns (scenery) may run off a narrow screen; match the
++# middle, which holds the towers, bridges and lanes.
++ARENA_COLS = (60, 489)
++SPLIT_ROW = int(round(SPLIT * GAME_SIZE[1]))
++MIN_SCORE = 0.3
++
++
++def gradient(gray: np.ndarray) -> np.ndarray:
++    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
++    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
++    return cv2.GaussianBlur(cv2.magnitude(gx, gy), (5, 5), 0)
++
++
++def best_fit(shot_g: np.ndarray, ref_g: np.ndarray, rows: tuple[int, int],
++             cols: tuple[int, int], sxs, sys_) -> tuple[float, float, float, float, float]:
++    """(score, sx, sy, ox, oy): the best placement of the reference patch
++    rows x cols, as a frame-to-screenshot affine (x = ox + sx*u, y = oy + sy*v)."""
++    patch = ref_g[rows[0]:rows[1], cols[0]:cols[1]]
++    best = (-1.0, 0.0, 0.0, 0.0, 0.0)
++    for sx in sxs:
++        for sy in sys_:
++            tw = int(round((cols[1] - cols[0]) * sx))
++            th = int(round((rows[1] - rows[0]) * sy))
++            if th > shot_g.shape[0] or tw > shot_g.shape[1] or tw < 8 or th < 8:
++                continue
++            templ = cv2.resize(patch, (tw, th), interpolation=cv2.INTER_AREA)
++            res = cv2.matchTemplate(shot_g, templ, cv2.TM_CCOEFF_NORMED)
++            _, score, _, (x, y) = cv2.minMaxLoc(res)
++            if score > best[0]:
++                best = (float(score), float(sx), float(sy),
++                        x - cols[0] * sx, y - rows[0] * sy)
++    return best
++
++
++def fit_band(shot_g, ref_g, rows, cols, lo, hi) -> tuple[float, float, float, float, float]:
++    """Coarse search at half resolution, then a fine one at full."""
++    half = cv2.resize(shot_g, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
++    grid = np.arange(lo, hi, 0.04)
++    _, sx, sy, _, _ = best_fit(half, ref_g, rows, cols, grid / 2, grid / 2)
++    sx, sy = 2 * sx, 2 * sy
++    return best_fit(shot_g, ref_g, rows, cols,
++                    np.arange(sx - 0.04, sx + 0.041, 0.008),
++                    np.arange(sy - 0.04, sy + 0.041, 0.008))
++
++
++def main() -> int:
++    ap = argparse.ArgumentParser(description=__doc__,
++                                 formatter_class=argparse.RawDescriptionHelpFormatter)
++    ap.add_argument("--png", type=Path, help="screenshot file instead of WDA")
++    ap.add_argument("--scale", type=float, default=None,
++                    help="screenshot pixels per point (iPhone: 3, some: 2); "
++                         "read from WDA when grabbing live")
++    ap.add_argument("--mirror", action="store_true",
++                    help="capture the macOS iPhone Mirroring window instead of WDA")
++    ap.add_argument("--wda-url", default="http://127.0.0.1:8100")
++    ap.add_argument("--out", type=Path, required=True)
++    args = ap.parse_args()
++
++    if args.png:
++        shot = cv2.imread(str(args.png))
++        if shot is None:
++            raise SystemExit(f"cannot read {args.png}")
++        if args.scale is None:
++            raise SystemExit("--scale is required with --png")
++        scale = args.scale
++    elif args.mirror:
++        from capture.mirror import MirrorWindow
++        win = MirrorWindow()
++        shot = win.capture()
++        if float(shot.std()) < 2.0:
++            raise SystemExit("blank capture: grant this terminal Screen Recording "
++                             "permission and restart it")
++        scale = args.scale or shot.shape[1] / win.bounds[2]
++        args.out.parent.mkdir(parents=True, exist_ok=True)
++        cv2.imwrite(str(args.out.with_suffix(".screenshot.png")), shot)
++    else:
++        client = WdaClient(args.wda_url)
++        png = client.screenshot_png()
++        shot = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_COLOR)
++        win_w, _ = client.window_size()
++        scale = args.scale or shot.shape[1] / win_w
++        args.out.parent.mkdir(parents=True, exist_ok=True)
++        cv2.imwrite(str(args.out.with_suffix(".screenshot.png")), shot)
++
++    H, W = shot.shape[:2]
++    print(f"screenshot {W}x{H}, {scale:g} px/pt")
++    ref = cv2.imread(str(REFERENCE), cv2.IMREAD_GRAYSCALE)
++    shot_g = gradient(cv2.cvtColor(shot, cv2.COLOR_BGR2GRAY))
++    ref_g = gradient(ref)
++
++    # Frame px -> screenshot px per band. The scale range allows a frame from
++    # 0.6x to 1.6x the screenshot width, x and y independently (tall phones
++    # stretch the arena more vertically than the 9:16 reference).
++    lo, hi = 0.6 * W / GAME_SIZE[0], 1.6 * W / GAME_SIZE[0]
++    arena = fit_band(shot_g, ref_g, ARENA_ROWS, ARENA_COLS, lo, hi)
++    tray = fit_band(shot_g, ref_g, TRAY_ROWS, (0, GAME_SIZE[0]), lo, hi)
++    for name, (score, sx, sy, ox, oy) in (("arena", arena), ("tray", tray)):
++        print(f"{name:5s} band: score {score:.3f}, scale x {sx:.3f} y {sy:.3f}, "
++              f"origin ({ox:.0f}, {oy:.0f})")
++
++    geo = IosGeometry(arena[1:], tray[1:], scale)
++    overlay = shot.copy()
++    for (score, sx, sy, ox, oy), rows, colour in ((arena, (0, SPLIT_ROW), (0, 0, 255)),
++                                                 (tray, (SPLIT_ROW, GAME_SIZE[1]), (255, 0, 0))):
++        cv2.rectangle(overlay, (int(ox), int(oy + rows[0] * sy)),
++                      (int(ox + GAME_SIZE[0] * sx), int(oy + rows[1] * sy)), colour, 4)
++    args.out.parent.mkdir(parents=True, exist_ok=True)
++    ov_path = args.out.with_suffix(".overlay.png")
++    cv2.imwrite(str(ov_path), overlay)
++    print(f"overlay: {ov_path}  (red = arena, blue = tray)")
++
++    if arena[0] < MIN_SCORE or tray[0] < MIN_SCORE:
++        print(f"match is weak (arena {arena[0]:.2f}, tray {tray[0]:.2f}); take the "
++              "screenshot mid-battle with all towers standing and the hand visible")
++        return 1
++    if tray[4] + SPLIT_ROW * tray[2] < arena[4] + SPLIT_ROW * arena[2] - 20:
++        print("the tray fit lies above the arena; send the overlay")
++        return 1
++    try:
++        frame = geo.frame(shot)
++    except Exception as exc:                                # noqa: BLE001
++        print(f"fitted frame does not fit the screen: {exc}")
++        return 1
++    cv2.imwrite(str(args.out.with_suffix(".frame.png")), frame)
++    args.out.write_text(json.dumps({**geo.to_json(), "screenshot": [W, H]}, indent=2) + "\n")
++    print(f"wrote {args.out}; check {args.out.with_suffix('.frame.png')} "
++          "looks like a normal battle")
++    return 0
++
++if __name__ == "__main__":
++    sys.exit(main())

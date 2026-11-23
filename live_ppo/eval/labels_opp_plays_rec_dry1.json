@@ -1,0 +1,260 @@
+{
+ "src": "rec_dry1",
+ "fps": 4,
+ "protocol": "Opponent plays on runs/live/rec_dry1 (4 fps recording, frame = 4 Hz index; ladder vs a level-14 opponent). Cards: the by-eye list in live_ppo/eval/labels_plays.json (rec). Time/tile: the first sighting / centre of the red deploy stopwatch (opp_watch.watches over every frame 547-956), each paired to its by-eye play (all 9 within 2 frames); the other 9 watch events were checked on crops: bridge-ornament static spots and debris (no play). The window starts at FIGHT! (elapsed 4 s) and the opponent cast no spell (labels_plays.json), so it is complete: every play named, usable for exact opponent elixir truth.",
+ "windows": [
+  {
+   "match": 0,
+   "a": 547,
+   "b": 956,
+   "complete": true,
+   "tier": "gold",
+   "spells_labelled": true
+  }
+ ],
+ "plays": [
+  {
+   "id": "0.0",
+   "match": 0,
+   "frame": 571,
+   "t": 10.0,
+   "card": "Hog Rider",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    78,
+    384
+   ],
+   "tile_yolo": [
+    1.01,
+    16.88
+   ],
+   "tile_engine": [
+    1.01,
+    17.88
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "card from labels_plays.json rec (first on board f572)",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "0.1",
+   "match": 0,
+   "frame": 580,
+   "t": 12.25,
+   "card": "Ice Spirit",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    313,
+    196
+   ],
+   "tile_yolo": [
+    9.99,
+    25.91
+   ],
+   "tile_engine": [
+    9.99,
+    27.91
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "card from labels_plays.json rec (first on board f580)",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "0.2",
+   "match": 0,
+   "frame": 629,
+   "t": 24.5,
+   "card": "Archer Queen",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    288,
+    89
+   ],
+   "tile_yolo": [
+    9.03,
+    31.01
+   ],
+   "tile_engine": [
+    9.03,
+    33.01
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "card from labels_plays.json rec (first on board f632)",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "0.3",
+   "match": 0,
+   "frame": 652,
+   "t": 30.25,
+   "card": "Elite Barbarians",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    105,
+    277
+   ],
+   "tile_yolo": [
+    2.04,
+    22.02
+   ],
+   "tile_engine": [
+    2.04,
+    24.02
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "card from labels_plays.json rec (first on board f652)",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "0.4",
+   "match": 0,
+   "frame": 697,
+   "t": 41.5,
+   "card": "Goblin Gang",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    392,
+    382
+   ],
+   "tile_yolo": [
+    12.98,
+    17.0
+   ],
+   "tile_engine": [
+    12.98,
+    18.0
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "card from labels_plays.json rec (first on board f700)",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "0.5",
+   "match": 0,
+   "frame": 756,
+   "t": 56.25,
+   "card": "Hog Rider",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    470,
+    382
+   ],
+   "tile_yolo": [
+    15.98,
+    17.0
+   ],
+   "tile_engine": [
+    15.98,
+    18.0
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "card from labels_plays.json rec (first on board f756)",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "0.6",
+   "match": 0,
+   "frame": 831,
+   "t": 75.0,
+   "card": "Tesla",
+   "form": "base",
+   "cat": "building",
+   "ref": [
+    196,
+    310
+   ],
+   "tile_yolo": [
+    5.54,
+    20.46
+   ],
+   "tile_engine": [
+    5.54,
+    22.46
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "card from labels_plays.json rec (first on board f832)",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "0.7",
+   "match": 0,
+   "frame": 863,
+   "t": 83.0,
+   "card": "Archer Queen",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    286,
+    90
+   ],
+   "tile_yolo": [
+    8.95,
+    30.96
+   ],
+   "tile_engine": [
+    8.95,
+    32.96
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "card from labels_plays.json rec (first on board f864)",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "0.8",
+   "match": 0,
+   "frame": 922,
+   "t": 97.75,
+   "card": "Elite Barbarians",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    132,
+    383
+   ],
+   "tile_yolo": [
+    3.07,
+    16.95
+   ],
+   "tile_engine": [
+    3.07,
+    17.95
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "card from labels_plays.json rec (first on board f924)",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch"
+  }
+ ]
+}

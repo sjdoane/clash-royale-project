@@ -1,0 +1,1886 @@
+diff --git a/include/core/ClashEnv.h b/include/core/ClashEnv.h
+index ce25b78..d3f05b4 100644
+--- a/include/core/ClashEnv.h
++++ b/include/core/ClashEnv.h
+@@ -10,11 +10,14 @@
+ #include "Troop.h"
+ #include "CombatEntity.h"
+ #include "GameLogger.h"
++#include "OpponentStateEstimator.h"
+ #include <vector>
+ #include <random>
+ #include <tuple>
+ #include <unordered_set>
+ #include <cmath>
++#include <algorithm>
++#include <array>
+ 
+ struct StepResult {
+     std::vector<float> observation;
+@@ -144,6 +147,69 @@ public:
+              / static_cast<float>(CardLevels::MAX_LEVEL - CardLevels::TOURNAMENT_LEVEL);
+     }
+ 
++    // --- opponent state (perception/UPSTREAM_REQUESTS.md item 46) ---
++    // After the level section, at OPP_STATE_START, from the observer's side:
++    //
++    //   +OPP_ELIXIR_OFFSET   4   opponent elixir estimate/10, lower/10, upper/10,
++    //                            confidence -- OpponentStateEstimator, fed by a
++    //                            simulated detector, never the true bar
++    //   +OWN_EVO_OFFSET      8   per own hand slot: is an Evolution, evo charge
++    //                            (1.0 = its next deployment is evolved)
++    //   +OWN_ABILITY_OFFSET  8   per own Champion/Hero deck slot 1, 2: slot holds
++    //                            one, deployed, ability ready, cooldown left / max
++    //   +OPP_ABILITY_OFFSET  8   per opponent Champion/Hero, by first sighting:
++    //                            seen, estimated cooldown left / max, ability
++    //                            cost/10, recency of the last seen activation
++    //   +OPP_EVO_OFFSET    370   known[c] then charge[c] per Evolution id c
++    //
++    // Not cheating: elixir, evo charge and cooldowns follow from what is on
++    // screen and the published rules, and the estimate carries the errors a
++    // live detector makes (DetectionNoise), so training and play match.
++    static constexpr int NUM_ABILITY_SLOTS = 2;
++    static constexpr int ABILITY_FEATURES = OpponentStateEstimator::ABILITY_FEATURES;
++    static constexpr int NUM_OPP_ABILITY_CARDS = OpponentStateEstimator::MAX_TRACKED_ABILITY_CARDS;
++    static constexpr int OPP_ELIXIR_OFFSET = 0;
++    static constexpr int OWN_EVO_OFFSET = OPP_ELIXIR_OFFSET + OpponentStateEstimator::ELIXIR_FEATURES;
++    static constexpr int OWN_ABILITY_OFFSET = OWN_EVO_OFFSET + 2 * HAND_SIZE;
++    static constexpr int OPP_ABILITY_OFFSET = OWN_ABILITY_OFFSET + NUM_ABILITY_SLOTS * ABILITY_FEATURES;
++    static constexpr int OPP_EVO_OFFSET = OPP_ABILITY_OFFSET + NUM_OPP_ABILITY_CARDS * ABILITY_FEATURES;
++    static constexpr int OPP_STATE_SIZE = OPP_EVO_OFFSET + 2 * NUM_CARD_IDS;
++    static constexpr int OPP_STATE_START = LEVEL_START + NUM_LEVEL_SCALARS;
++
++    // The simulated detector between the engine's events and the estimator.
++    // Defaults are the live rates measured 2026-11-18
++    // (runs/live/PERCEPTION_FILL_2026-11-18.md, runs/sim_fidelity/OPP_STATE_REPORT.md):
++    // troop births 9/9 and emitted 1.5 s after birth (-0.75..+0.5 s birth
++    // error, an Archer Queen ~3.5 s later still), spells 50/51 at 0.25-1.25 s,
++    // 2 false casts in 52. Disabled = every event reported exactly, on time.
++    struct DetectionNoise {
++        bool enabled = true;
++        float missTroop = 0.03f;
++        float missSpell = 0.04f;
++        float unknownCard = 0.02f;
++        float falsePlay = 0.02f;
++        int troopEmitTicks = 15;
++        int birthErrMinTicks = -7;
++        int birthErrMaxTicks = 5;
++        float lateTroop = 0.05f;
++        int lateExtraTicks = 35;
++        int spellSightMaxTicks = 3;
++        int spellEmitMinTicks = 2;
++        int spellEmitMaxTicks = 12;
++        float evoRecognised = 0.9f;
++        float abilityDetected = 0.0f;   // live has no ability detector (no YOLO class)
++        int abilityEmitTicks = 5;
++    };
++
++    // One delivered report, for measuring the estimator against the truth.
++    struct DeliveredReport {
++        int trueTick;
++        int emitTick;
++        OpponentStateEstimator::Report report;
++        int trueCardId;
++        bool trueEvolved;
++    };
++
+     // A Crown Tower's hp over its OWN maximum (its level's), in [0, 1]. The
+     // building channel and the six tower scalars both use it, so a full
+     // level-15 King reads 1.0 rather than 1.45 (UPSTREAM item 44). Live
+@@ -168,6 +234,24 @@ private:
+     HeuristicOpponent heuristicOpponent;
+     GameLogger logger;
+ 
++    // observers[t]: what team t has been able to work out about team 1 - t.
++    struct ObserverFeed {
++        OpponentStateEstimator est;
++        size_t consumed = 0;   // into game.getObservedEvents(1 - t)
++        struct Pending { int emitTick; long order; DeliveredReport d; };
++        std::vector<Pending> pending;
++        std::vector<DeliveredReport> delivered;
++        // Each observer's detector draws from its own stream: the draws then
++        // depend only on its own event order, never on when the other side's
++        // observation was read (stepSelfPlayFast reads neither).
++        std::mt19937 rng;
++    };
++    std::array<ObserverFeed, 2> observers;
++    // The detectors' streams are their own, so they never shift
++    // HeuristicOpponent's rolls.
++    DetectionNoise detectionNoise;
++    long pendingOrder = 0;
++
+     // Distinguishes the snapshot constructor from the ordinary (shallow) copy
+     // constructor, which pybind11 relies on.
+     struct SnapshotTag {};
+@@ -180,7 +264,10 @@ private:
+           maxTicks(other.maxTicks),
+           currentTick(other.currentTick),
+           rng(other.rng),
+-          heuristicOpponent(other.heuristicOpponent) {}
++          heuristicOpponent(other.heuristicOpponent),
++          observers(other.observers),
++          detectionNoise(other.detectionNoise),
++          pendingOrder(other.pendingOrder) {}
+ 
+     // The observation from `team`'s own point of view: the network always sees
+     // itself as team 0 (near low y, channels 0-3), so it can drive either side.
+@@ -360,9 +447,163 @@ private:
+         obs.push_back(levelScalar(game.getTeamCardLevel(opponent)));
+         obs.push_back(levelScalar(game.getTeamTowerLevel(opponent)));
+ 
++        // --- opponent state (item 46), at OPP_STATE_START ---
++        writeOpponentState(team, obs);
++
+         return obs;
+     }
+ 
++    void resetObservers() {
++        OpponentStateEstimator::Config cfg;
++        // The estimator's prior on unseen plays is the detector's own miss
++        // rate: trained under the noise it is told about.
++        cfg.assumedMissRate = detectionNoise.enabled
++            ? 0.5f * (detectionNoise.missTroop + detectionNoise.missSpell) : 0.0f;
++        for (auto& f : observers) {
++            f.est.setConfig(cfg);
++            f.est.reset(game.getCurrentTick());
++            f.consumed = 0;
++            f.pending.clear();
++            f.delivered.clear();
++        }
++    }
++
++    static int uniformInt(std::mt19937& g, int lo, int hi) {
++        if (hi <= lo) return lo;
++        return std::uniform_int_distribution<int>(lo, hi)(g);
++    }
++    static bool chance(std::mt19937& g, float p) {
++        if (p <= 0.0f) return false;
++        if (p >= 1.0f) return true;
++        return std::uniform_real_distribution<float>(0.0f, 1.0f)(g) < p;
++    }
++
++    // One engine event through the simulated detector: dropped, delayed,
++    // back-dated, mis-identified, as live perception would report it.
++    void enqueueObserved(ObserverFeed& f, const GameManager::ObservedEvent& ev) {
++        const DetectionNoise& n = detectionNoise;
++        OpponentStateEstimator::Report r;
++        r.tick = ev.tick;
++        r.kind = ev.kind;
++        int emit = ev.tick;
++        auto push = [&](const OpponentStateEstimator::Report& rep, int emitTick) {
++            f.pending.push_back({ emitTick, pendingOrder++, { ev.tick, emitTick, rep, ev.cardId, ev.evolved } });
++        };
++        if (ev.kind == OpponentStateEstimator::KIND_ABILITY) {
++            if (n.enabled && !chance(f.rng, n.abilityDetected)) return;
++            r.cardId = ev.cardId;
++            r.cost = ev.cost;
++            if (n.enabled) emit += n.abilityEmitTicks;
++            push(r, emit);
++            return;
++        }
++        // What the screen shows: the base card, unless the evolved form is
++        // recognised. A Hero is its own card.
++        const int base = OpponentStateEstimator::baseIdOf(ev.cardId);
++        bool seenEvolved = ev.evolved;
++        // An identified card's cost is the one paid: the screen shows Spirit
++        // Empress's form, and Mirror is its mirrored card plus one.
++        r.cost = ev.cost;
++        if (!n.enabled) {
++            r.cardId = seenEvolved ? ev.cardId : base;
++            r.evolved = seenEvolved ? 1 : 0;
++            push(r, emit);
++            return;
++        }
++        if (chance(f.rng, ev.isSpell ? n.missSpell : n.missTroop)) return;
++        if (ev.isSpell) {
++            r.tick = ev.tick + uniformInt(f.rng, 0, n.spellSightMaxTicks);
++            emit = r.tick + uniformInt(f.rng, n.spellEmitMinTicks, n.spellEmitMaxTicks);
++        } else {
++            r.tick = std::max(0, ev.tick + uniformInt(f.rng, n.birthErrMinTicks, n.birthErrMaxTicks));
++            if (chance(f.rng, n.lateTroop)) r.tick += n.lateExtraTicks;
++            emit = std::max(r.tick, ev.tick) + n.troopEmitTicks;
++        }
++        if (chance(f.rng, n.unknownCard)) {
++            r.cardId = -1;
++            r.cost = -1.0f;
++            r.evolved = -1;
++        } else {
++            seenEvolved = ev.evolved && chance(f.rng, n.evoRecognised);
++            r.cardId = seenEvolved ? ev.cardId : base;
++            r.evolved = seenEvolved ? 1 : 0;
++        }
++        push(r, emit);
++        if (chance(f.rng, n.falsePlay)) {
++            OpponentStateEstimator::Report fp;
++            fp.kind = OpponentStateEstimator::KIND_PLAY;
++            fp.tick = ev.tick + uniformInt(f.rng, 0, 40);
++            fp.cardId = -1;
++            fp.cost = static_cast<float>(uniformInt(f.rng, 2, 4));
++            f.pending.push_back({ fp.tick + n.spellEmitMinTicks, pendingOrder++, { -1, fp.tick + n.spellEmitMinTicks, fp, -1, false } });
++        }
++    }
++
++    // Brings observers[team] up to the current tick: new engine events into
++    // the detector, due reports into the estimator, regen to now.
++    void syncObserver(int team) {
++        ObserverFeed& f = observers[team];
++        const int now = game.getCurrentTick();
++        // set_current_tick() can rewind the clock; the estimator never runs
++        // backwards.
++        if (now < f.est.tick()) return;
++        const auto& evs = game.getObservedEvents(1 - team);
++        for (; f.consumed < evs.size(); ++f.consumed) enqueueObserved(f, evs[f.consumed]);
++        std::sort(f.pending.begin(), f.pending.end(), [](const ObserverFeed::Pending& a, const ObserverFeed::Pending& b) {
++            return a.emitTick < b.emitTick || (a.emitTick == b.emitTick && a.order < b.order);
++        });
++        size_t i = 0;
++        for (; i < f.pending.size() && f.pending[i].emitTick <= now; ++i) {
++            f.est.advanceWithSchedule(f.pending[i].emitTick);
++            f.est.report(f.pending[i].d.report);
++            f.delivered.push_back(f.pending[i].d);
++        }
++        f.pending.erase(f.pending.begin(), f.pending.begin() + static_cast<long>(i));
++        f.est.advanceWithSchedule(now);
++    }
++
++    void writeOpponentState(int team, std::vector<float>& obs) {
++        syncObserver(team);
++        const size_t base = obs.size();
++        obs.resize(base + OPP_STATE_SIZE, 0.0f);
++        float* o = obs.data() + base;
++        const OpponentStateEstimator& est = observers[team].est;
++
++        const auto ef = est.elixirFeatures();
++        std::copy(ef.begin(), ef.end(), o + OPP_ELIXIR_OFFSET);
++
++        // Own hand: the engine's own count (PlayerState::playCard's rule).
++        const PlayerState& me = (team == 0) ? game.playerAI : game.playerOpponent;
++        const auto& hand = game.getHand(team);
++        const auto& registry = CardRegistry::getInstance();
++        for (int i = 0; i < HAND_SIZE && i < static_cast<int>(hand.size()); ++i) {
++            const CardDefinition* def = registry.getCard(hand[i]);
++            if (!def || !def->isEvolution) continue;
++            o[OWN_EVO_OFFSET + 2 * i] = 1.0f;
++            auto it = me.evolutionState.find(hand[i]);
++            o[OWN_EVO_OFFSET + 2 * i + 1] = (it == me.evolutionState.end()) ? 0.0f
++                : OpponentStateEstimator::evoCharge(it->second.cyclesUntilEvolved, def->evolutionCycleThreshold);
++        }
++
++        // Own Champion/Hero slots.
++        const auto& deck = game.getDeckConfig(team);
++        for (int k = 0; k < NUM_ABILITY_SLOTS; ++k) {
++            const int slot = k + 1;
++            if (me.championSlots.find(slot) == me.championSlots.end()) continue;
++            float* f = o + OWN_ABILITY_OFFSET + k * ABILITY_FEATURES;
++            f[0] = 1.0f;
++            f[1] = game.isChampionDeployed(team, slot) ? 1.0f : 0.0f;
++            f[2] = game.isChampionAbilityReady(team, slot) ? 1.0f : 0.0f;
++            const CardDefinition* def = (slot < static_cast<int>(deck.size())) ? registry.getCard(deck[slot]) : nullptr;
++            const int cdMax = (def && def->stats) ? def->stats->abilityCooldownTicks : 0;
++            f[3] = cdMax > 0 ? std::clamp(static_cast<float>(game.championCooldownRemaining(team, slot))
++                                          / static_cast<float>(cdMax), 0.0f, 1.0f) : 0.0f;
++        }
++
++        est.writeAbilityFeatures(o + OPP_ABILITY_OFFSET);
++        est.writeEvoBlocks(o + OPP_EVO_OFFSET, NUM_CARD_IDS);
++    }
++
+     std::vector<float> extractObservation() { return extractObservationForTeam(0); }
+ 
+     float calculateReward() {
+@@ -393,7 +634,11 @@ public:
+             TowerTroopType aiTowerTroop = TowerTroopType::None,
+             TowerTroopType oppTowerTroop = TowerTroopType::None)
+         : game(aiDeck, oppDeck, aiTowerTroop, oppTowerTroop), maxTicks(maxTicks), currentTick(0),
+-          rng(std::random_device{}()) { heuristicOpponent.reset(rng); }
++          rng(std::random_device{}()) {
++        for (auto& f : observers) f.rng.seed(std::random_device{}());
++        heuristicOpponent.reset(rng);
++        resetObservers();
++    }
+ 
+     // An independent copy for decision-time search (see GameManager::snapshot
+     // and Board::deepCopy underneath). The replay logger starts empty: copying
+@@ -404,7 +649,7 @@ public:
+     ClashEnv snapshot() const { return ClashEnv(*this, SnapshotTag{}); }
+ 
+     // Built from the named offsets, so size and offsets cannot disagree.
+-    int observationSize() const { return LEVEL_START + NUM_LEVEL_SCALARS; }
++    int observationSize() const { return OPP_STATE_START + OPP_STATE_SIZE; }
+ 
+     // How many of `team`'s towers stand (King and Princesses only). The reward
+     // puts a deliberately non-potential-based bonus on destroying a tower: the
+@@ -448,6 +693,7 @@ public:
+         heuristicOpponent.reset(rng);
+         logger.logTick(0, game);
+         currentTick = 0;
++        resetObservers();
+         return extractObservation();
+     }
+ 
+@@ -718,6 +964,7 @@ public:
+     // episode.
+     void seed(unsigned int s) {
+         rng.seed(s);
++        for (unsigned t = 0; t < observers.size(); ++t) observers[t].rng.seed(s ^ (0x85EBCA6Bu + t));
+         heuristicOpponent.reset(rng);
+         game.seed(s ^ 0x9E3779B9u);
+         reset();
+@@ -727,6 +974,23 @@ public:
+         game.setOpponentDeck(deck);
+     }
+ 
++    // The simulated detector feeding the opponent-state estimate (item 46).
++    // Takes effect from the next reset().
++    void setOppDetectionNoise(const DetectionNoise& n) { detectionNoise = n; }
++    const DetectionNoise& getOppDetectionNoise() const { return detectionNoise; }
++
++    // What `team` currently believes about its opponent, synced to now.
++    const OpponentStateEstimator& getOppStateEstimator(int team) {
++        const int t = (team == 1) ? 1 : 0;
++        syncObserver(t);
++        return observers[t].est;
++    }
++    const std::vector<DeliveredReport>& getOppReports(int team) {
++        const int t = (team == 1) ? 1 : 0;
++        syncObserver(t);
++        return observers[t].delivered;
++    }
++
+     void setOpponentElixirMultiplier(float multiplier) {
+         game.setOpponentElixirMultiplier(multiplier);
+     }
+diff --git a/include/core/GameManager.h b/include/core/GameManager.h
+index 0ec249f..85e2231 100644
+--- a/include/core/GameManager.h
++++ b/include/core/GameManager.h
+@@ -53,6 +53,22 @@ private:
+     // observation. A plain value, so snapshot() copies it and a rollout
+     // inherits the cycle.
+     CycleTable lastPlayedTick = neverPlayed();
++public:
++    // Every real play and ability activation, per team, in order: what an
++    // observer could have watched happen. Read by ClashEnv, which passes it
++    // through a simulated detector into OpponentStateEstimator (item 46).
++    // Written in playCard and activateChampionAbility, cleared by reset(); a
++    // plain value, so snapshot() copies it.
++    struct ObservedEvent {
++        int tick;
++        int kind;        // OpponentStateEstimator::KIND_PLAY / KIND_ABILITY
++        int cardId;      // what left the hand (an Evolution's own id even when played plain)
++        float cost;      // elixir actually paid (Mirror +1, Spirit Empress 3/6, ability cost)
++        bool evolved;    // the evolved form was spawned
++        bool isSpell;
++    };
++private:
++    std::array<std::vector<ObservedEvent>, 2> observedEvents;
+     // Curriculum hook: scales the opponent's regen. 1.0 is a normal opponent.
+     float oppElixirMultiplier = 1.0f;
+     // setTeamLevel; written into each fresh Board by reset().
+@@ -319,6 +335,13 @@ public:
+         lastPlayedTick[team][cardId] = currentTick;
+     }
+ 
++    const std::vector<ObservedEvent>& getObservedEvents(int team) const {
++        return observedEvents[(team == 1) ? 1 : 0];
++    }
++    const std::vector<int>& getDeckConfig(int team) const {
++        return (team == 0) ? aiDeckConfig : oppDeckConfig;
++    }
++
+     int getLastPlayedTick(int team, int cardId) const {
+         if (team != 0 && team != 1) return -1;
+         if (cardId < 0 || cardId >= CARD_ID_COUNT) return -1;
+@@ -338,7 +361,7 @@ public:
+     void setElixir(int team, float value) {
+         PlayerState& player = (team == 0) ? playerAI : playerOpponent;
+         // The same [0, 10] clamp step() enforces.
+-        player.elixir = std::max(0.0f, std::min(value, 10.0f));
++        player.elixir = std::max(0.0f, std::min(value, PlayerState::MAX_ELIXIR));
+     }
+ 
+     // Returns false and changes nothing unless `cards` is a valid hand for this
+@@ -562,6 +585,8 @@ public:
+             }
+             float reportedCost = (costOverride >= 0.0f) ? costOverride : cardDef->cost;
+             board.statsEvents.notifyCardPlayed({ team, result.cardId, reportedCost, x, y, currentTick });
++            observedEvents[team].push_back({ currentTick, 0, result.cardId, reportedCost,
++                                             result.useEvolvedForm, effectiveDef->isSpell });
+ 
+             // Card-cycle tracking (perception/UPSTREAM_REQUESTS.md item 24).
+             // Recorded here because every real play passes through this
+@@ -617,6 +642,19 @@ public:
+         }
+     }
+ 
++    // Whether `team`'s Champion/Hero in `slot` has a live body, and its
++    // ability cooldown left (the live body's, else the persisted one a redeploy
++    // resumes). For the observation's own-ability section (item 46).
++    bool isChampionDeployed(int team, int slot) const {
++        return findChampionInSlot(team, slot) != nullptr;
++    }
++    int championCooldownRemaining(int team, int slot) const {
++        if (auto champion = findChampionInSlot(team, slot)) return champion->abilityCooldownRemaining;
++        const PlayerState& player = (team == 0) ? playerAI : playerOpponent;
++        auto it = player.championSlots.find(slot);
++        return it == player.championSlots.end() ? 0 : it->second.persistedCooldownRemaining;
++    }
++
+     // Whether `team`'s Champion in `slot` (1 = Heroic, 2 = Wild Card) could
+     // activate now: deployed, off cooldown, uses left, affordable. The two
+     // slots are independent.
+@@ -652,6 +690,7 @@ public:
+             player.elixir -= champion->abilityElixirCost;
+             champion->activateAbility(board);
+             board.statsEvents.notifyChampionAbilityActivated({ team, champion->cardId, champion->abilityElixirCost, currentTick });
++            observedEvents[team].push_back({ currentTick, 1, getDeckConfig(team)[slot], champion->abilityElixirCost, false, false });
+             return true;
+         }
+ 
+@@ -668,6 +707,7 @@ public:
+         slotDef->postDeathAbilityEffect->apply(board, slotState.lastSquadWipePosition, team);
+         slotState.lastSquadWipeTick = -1; // consumed until the squad is redeployed and wiped again
+         board.statsEvents.notifyChampionAbilityActivated({ team, deckConfig[slot], slotDef->abilityElixirCost, currentTick });
++        observedEvents[team].push_back({ currentTick, 1, deckConfig[slot], slotDef->abilityElixirCost, false, false });
+         return true;
+     }
+ 
+@@ -686,6 +726,7 @@ public:
+         // Cleared per match, or the agent would see cards the opponent has not
+         // shown.
+         for (auto& perTeam : lastPlayedTick) perTeam.fill(-1);
++        for (auto& perTeam : observedEvents) perTeam.clear();
+ 
+         std::string aiErr = validateDeckSlots(aiDeckConfig);
+         if (!aiErr.empty()) throw std::invalid_argument("GameManager: invalid AI deck -- " + aiErr);
+@@ -720,9 +761,9 @@ public:
+         // players. oppElixirMultiplier multiplies on top: a 1.5x opponent in
+         // double elixir gets 3x, as intended.
+         const float elixirPhase = getElixirMultiplier();
+-        playerAI.elixir = std::min(playerAI.elixir + ELIXIR_REGEN_RATE * elixirPhase, 10.0f);
++        playerAI.elixir = std::min(playerAI.elixir + ELIXIR_REGEN_RATE * elixirPhase, PlayerState::MAX_ELIXIR);
+         playerOpponent.elixir = std::min(
+-            playerOpponent.elixir + ELIXIR_REGEN_RATE * elixirPhase * oppElixirMultiplier, 10.0f);
++            playerOpponent.elixir + ELIXIR_REGEN_RATE * elixirPhase * oppElixirMultiplier, PlayerState::MAX_ELIXIR);
+         playerAI.tick();
+         playerOpponent.tick();
+ 
+@@ -738,8 +779,8 @@ public:
+ 
+         // Elixir Collector: drain this tick's grants into the players, with the
+         // same cap.
+-        playerAI.elixir = std::min(playerAI.elixir + board.pendingElixirGrant[0], 10.0f);
+-        playerOpponent.elixir = std::min(playerOpponent.elixir + board.pendingElixirGrant[1], 10.0f);
++        playerAI.elixir = std::min(playerAI.elixir + board.pendingElixirGrant[0], PlayerState::MAX_ELIXIR);
++        playerOpponent.elixir = std::min(playerOpponent.elixir + board.pendingElixirGrant[1], PlayerState::MAX_ELIXIR);
+         board.pendingElixirGrant[0] = 0.0f;
+         board.pendingElixirGrant[1] = 0.0f;
+ 
+diff --git a/include/core/OpponentStateEstimator.h b/include/core/OpponentStateEstimator.h
+new file mode 100644
+index 0000000..43ba510
+--- /dev/null
++++ b/include/core/OpponentStateEstimator.h
+@@ -0,0 +1,551 @@
++#pragma once
++
++#include <algorithm>
++#include <array>
++#include <cmath>
++#include <deque>
++#include <string>
++#include <unordered_map>
++#include <vector>
++
++#include "CardRegistry.h"
++#include "GameManager.h"
++#include "PlayerState.h"
++
++// What one player can know about the OTHER player's hidden state from watching
++// the screen: elixir, Evolution charge and Champion/Hero ability cooldowns
++// (perception/UPSTREAM_REQUESTS.md item 46).
++//
++// ONE implementation for training and play. ClashEnv feeds it the engine's play
++// and ability events through a simulated detector (DetectionNoise, below);
++// live perception feeds it its own detections through the bindings
++// (clash_royale_env.OpponentStateEstimator). The policy therefore learns how
++// much to trust the estimate under the errors it will meet live, instead of
++// training on truth and playing on a noisy number.
++//
++// ELIXIR is a small filter around an upper bound, not a point:
++//
++//   hi    the bar if every report is right and nothing was missed. Missed plays
++//         only LOWER the truth, so hi stays an upper bound under misses.
++//   est   hi minus the expected unseen spend (bias): each reported play stands
++//         for p/(1-p) unreported ones (p = assumedMissRate) at the mean cost of
++//         this opponent's identified plays.
++//   sigma uncertainty of est, in elixir; [lower, upper] = est -/+ 2 sigma,
++//         upper capped by hi. confidence = exp(-sigma / 1.5), lowered for a
++//         while after a contradiction. There is no hard floor: a missed play
++//         can have spent anything (an earlier hard floor pinned est to hi and
++//         erased the miss prior: OPP_STATE_REPORT.md).
++//
++// Three things re-anchor it:
++//   - a play of cost c proves the bar was >= c: an est below c is raised to c
++//     and sigma shrunk to match (the unseen spend was smaller than assumed);
++//   - the cap: while hi sits at 10 the truth keeps regenerating underneath, so
++//     every discarded drop of hi absorbs a drop of bias and sigma;
++//   - a contradiction: a play costing more than hi proves the model short
++//     (a false or double report, a misread cost, unmodelled income). Instead of
++//     clamping at 0 the bar is re-anchored at the cost just paid and hi is
++//     widened by the size of the surprise.
++//
++// Reports may arrive late and back-dated (live emits a troop 1.5 s after its
++// birth, an Archer Queen ~4.5 s): a report older than the last advance is
++// inserted in tick order and the recent window is replayed, so a late report
++// gives the same answer as a timely one.
++//
++// EVOLUTIONS: an opponent's card is known to be an Evolution only once an
++// evolved deployment of it is seen (the real screen shows nothing before); from
++// then on the PlayerState rule (evolutionCycleThreshold un-evolved plays, then
++// evolvedUsesGranted evolved ones) predicts the next deployment. A play the
++// count says is evolved but was reported plain is taken as evolved (a missed
++// recognition), since a missed play makes the count lag, never lead.
++//
++// ABILITIES: a seen activation starts that card's registry cooldown and debits
++// its abilityElixirCost.
++class OpponentStateEstimator {
++public:
++    static constexpr int MAX_TRACKED_ABILITY_CARDS = 2;
++    static constexpr int ABILITY_FEATURES = 4;
++    static constexpr int ELIXIR_FEATURES = 4;
++    // Recency time constant of a seen activation, the cycle blocks' 200 ticks.
++    static constexpr float ABILITY_RECENCY_TAU_TICKS = 200.0f;
++    // How far back a late report may land and still be replayed exactly.
++    static constexpr int REPLAY_WINDOW_TICKS = 150;
++    // A cost this far above hi counts as a contradiction rather than rounding.
++    static constexpr float CONTRADICTION_TOLERANCE = 0.15f;
++    static constexpr float CONFIDENCE_SIGMA_SCALE = 1.5f;
++    static constexpr float CONTRADICTION_PENALTY = 0.5f;
++    static constexpr float CONTRADICTION_RECOVERY_TICKS = 300.0f;
++    static constexpr float INTERVAL_SIGMAS = 2.0f;
++
++    // Elixir rules, from the engine, never restated: PlayerState owns the cap
++    // and the opening bar, GameManager the regen and its schedule.
++    struct Config {
++        float regenPerTick = GameManager::ELIXIR_REGEN_RATE;
++        // Expected fraction of the opponent's plays the detector never reports.
++        float assumedMissRate = 0.04f;
++        // Mean cost of a missed play before any play is seen; after that the
++        // mean of the opponent's identified plays, shrunk toward this by
++        // missedCostPriorWeight plays.
++        float missedPlayMeanCost = 3.0f;
++        float missedCostPriorWeight = 4.0f;
++        // Cost range assumed for a play whose card could not be identified.
++        float unknownCostMin = 1.0f;
++        float unknownCostMean = 3.5f;
++        float unknownCostMax = 6.0f;
++    };
++
++    // One detector report. tick is when the play happened (back-dated where
++    // the detector knows the birth), not when it was emitted.
++    struct Report {
++        int tick = 0;
++        int kind = 0;          // KIND_PLAY or KIND_ABILITY
++        int cardId = -1;       // as recognised: an evolution id if seen evolved, else the base id; -1 unknown
++        float cost = -1.0f;    // < 0: unknown (taken from the card, or the unknown-cost prior)
++        int evolved = -1;      // 1 seen evolved, 0 seen plain, -1 not judged
++        long seq = 0;          // arrival order, tie-break inside a tick
++    };
++    static constexpr int KIND_PLAY = 0;
++    static constexpr int KIND_ABILITY = 1;
++
++    struct EvoState {
++        int evoId = -1;
++        int baseId = -1;
++        int threshold = 0;
++        int granted = 1;
++        int cyclesUntilEvolved = 0;
++        int evolvedUsesRemaining = 1;
++    };
++
++    struct AbilityState {
++        int cardId = -1;
++        int lastActivationTick = -1;
++        int cooldownTicks = 0;
++        float cost = 0.0f;
++    };
++
++    struct Core {
++        int tick = 0;
++        float hi = PlayerState::STARTING_ELIXIR;
++        float bias = 0.0f;
++        float knownCostSum = 0.0f;
++        int knownCostPlays = 0;
++        float sigma = 0.0f;
++        int contradictions = 0;
++        int lastContradictionTick = -1;
++        float lastSurprise = 0.0f;
++        int plays = 0;
++        int unknownPlays = 0;
++        std::vector<EvoState> evos;
++        std::array<AbilityState, MAX_TRACKED_ABILITY_CARDS> abilities{};
++    };
++
++    OpponentStateEstimator() { reset(); }
++    explicit OpponentStateEstimator(const Config& c) : cfg(c) { reset(); }
++
++    // A match starting now with the opening bar known (the usual case).
++    void reset(int tick = 0) {
++        cur = Core{};
++        cur.tick = tick;
++        checkpoint = cur;
++        segments.clear();
++        events.clear();
++        nextSeq = 0;
++    }
++
++    // Joined mid-match with the bar unknown: hi 10, est 5, wide sigma.
++    void resetUnknown(int tick) {
++        reset(tick);
++        cur.hi = PlayerState::MAX_ELIXIR;
++        cur.bias = PlayerState::MAX_ELIXIR - PlayerState::STARTING_ELIXIR;
++        cur.sigma = 3.0f;
++        checkpoint = cur;
++    }
++
++    // Seeds an Evolution the observer knows from the start (its OWN deck), at
++    // the opening count PlayerState::seedSlotState uses.
++    void declareEvolution(int evoId) {
++        const CardDefinition* def = CardRegistry::getInstance().getCard(evoId);
++        if (!def || !def->isEvolution) return;
++        if (findEvo(cur, evoId)) return;
++        cur.evos.push_back(makeEvo(*def));
++        // Part of the state from the start, so a replay keeps it.
++        if (!findEvo(checkpoint, evoId)) checkpoint.evos.push_back(makeEvo(*def));
++    }
++
++    // Regenerates to `tick` at one multiplier for the whole interval. The
++    // multiplier for the step INTO tick t is the schedule's value at t, as in
++    // GameManager::step; callers split at phase boundaries (ClashEnv does).
++    void advanceTo(int tick, float multiplier) {
++        if (tick <= cur.tick) return;
++        segments.push_back({ cur.tick, tick, multiplier });
++        regen(cur, tick - cur.tick, multiplier);
++        cur.tick = tick;
++        trim();
++    }
++
++    // advanceTo on the engine's own schedule (GameManager::elixirMultiplierAtTick),
++    // split at each phase boundary so a long gap is exact. ClashEnv and live
++    // perception both advance with this, from the match clock.
++    void advanceWithSchedule(int tick) {
++        while (cur.tick < tick) {
++            const int from = cur.tick;
++            int end = tick;
++            for (int b : { GameManager::DOUBLE_ELIXIR_TICK, GameManager::TRIPLE_ELIXIR_TICK }) {
++                if (from + 1 < b && b <= end) end = b - 1;
++            }
++            advanceTo(end, GameManager::elixirMultiplierAtTick(from + 1));
++        }
++    }
++
++    void report(Report r) {
++        r.seq = nextSeq++;
++        // From the future: regenerate to it first.
++        if (r.tick > cur.tick) advanceWithSchedule(r.tick);
++        if (r.tick < checkpoint.tick) r.tick = checkpoint.tick;   // older than the window: as old as it can be
++        const bool late = r.tick < cur.tick;
++        // Kept in (tick, seq) order.
++        auto it = std::upper_bound(events.begin(), events.end(), r,
++            [](const Report& a, const Report& b) { return a.tick < b.tick || (a.tick == b.tick && a.seq < b.seq); });
++        events.insert(it, r);
++        if (!late) {
++            apply(cur, r);
++        } else {
++            replay();
++        }
++    }
++
++    // Convenience wrappers for the bindings.
++    void reportPlay(int tick, int cardId, float cost = -1.0f, int evolved = -1) {
++        Report r; r.tick = tick; r.kind = KIND_PLAY; r.cardId = cardId; r.cost = cost; r.evolved = evolved;
++        report(r);
++    }
++    void reportAbility(int tick, int cardId, float cost = -1.0f) {
++        Report r; r.tick = tick; r.kind = KIND_ABILITY; r.cardId = cardId; r.cost = cost;
++        report(r);
++    }
++
++    // --- read-out ---
++    int tick() const { return cur.tick; }
++    float estimate() const { return std::clamp(cur.hi - cur.bias, 0.0f, cur.hi); }
++    // A band of INTERVAL_SIGMAS sigma around the estimate. The top is also
++    // capped by hi, the bar if every unreported play cost nothing: a hard
++    // bound unless a report was false or over-costed (a contradiction). There
++    // is no hard floor: a missed play can have spent anything.
++    float lower() const { return std::clamp(estimate() - INTERVAL_SIGMAS * cur.sigma, 0.0f, estimate()); }
++    float upper() const { return std::clamp(estimate() + INTERVAL_SIGMAS * cur.sigma, estimate(), cur.hi); }
++    float hardUpper() const { return cur.hi; }
++    float sigma() const { return cur.sigma; }
++    int contradictions() const { return cur.contradictions; }
++    int lastContradictionTick() const { return cur.lastContradictionTick; }
++    float lastSurprise() const { return cur.lastSurprise; }
++    int plays() const { return cur.plays; }
++    float confidence() const {
++        float c = std::exp(-cur.sigma / CONFIDENCE_SIGMA_SCALE);
++        if (cur.lastContradictionTick >= 0) {
++            const float age = static_cast<float>(std::max(0, cur.tick - cur.lastContradictionTick));
++            c *= 1.0f - CONTRADICTION_PENALTY * std::exp(-age / CONTRADICTION_RECOVERY_TICKS);
++        }
++        return std::clamp(c, 0.0f, 1.0f);
++    }
++
++    // est/10, lower/10, upper/10, confidence.
++    std::array<float, ELIXIR_FEATURES> elixirFeatures() const {
++        const float m = PlayerState::MAX_ELIXIR;
++        return { estimate() / m, lower() / m, upper() / m, confidence() };
++    }
++
++    // 1.0 when the card's next deployment is evolved, else
++    // 1 - cyclesUntilEvolved / threshold. The SAME encoding ClashEnv writes for
++    // the observer's own hand from PlayerState, so own and opponent read alike.
++    static float evoCharge(int cyclesUntilEvolved, int threshold) {
++        if (cyclesUntilEvolved <= 0) return 1.0f;
++        if (threshold <= 0) return 1.0f;
++        return std::clamp(1.0f - static_cast<float>(cyclesUntilEvolved) / static_cast<float>(threshold), 0.0f, 1.0f);
++    }
++
++    // -1 when the evolution is not known (no evolved deployment seen yet).
++    float evoChargeFor(int evoId) const {
++        const EvoState* e = findEvo(cur, evoId);
++        return e ? evoCharge(e->cyclesUntilEvolved, e->threshold) : -1.0f;
++    }
++    int cyclesUntilEvolvedFor(int evoId) const {
++        const EvoState* e = findEvo(cur, evoId);
++        return e ? e->cyclesUntilEvolved : -1;
++    }
++    std::vector<int> knownEvolutions() const {
++        std::vector<int> out;
++        for (const auto& e : cur.evos) out.push_back(e.evoId);
++        return out;
++    }
++
++    // Writes known[c] at out[c] and charge[c] at out[numIds + c] (2 * numIds floats).
++    void writeEvoBlocks(float* out, int numIds) const {
++        for (const auto& e : cur.evos) {
++            if (e.evoId < 0 || e.evoId >= numIds) continue;
++            out[e.evoId] = 1.0f;
++            out[numIds + e.evoId] = evoCharge(e.cyclesUntilEvolved, e.threshold);
++        }
++    }
++
++    // Per tracked card k: seen, cooldown remaining fraction, cost/10, recency.
++    void writeAbilityFeatures(float* out) const {
++        for (int k = 0; k < MAX_TRACKED_ABILITY_CARDS; ++k) {
++            const AbilityState& a = cur.abilities[k];
++            float* f = out + k * ABILITY_FEATURES;
++            if (a.cardId < 0) { f[0] = f[1] = f[2] = f[3] = 0.0f; continue; }
++            f[0] = 1.0f;
++            f[2] = a.cost / PlayerState::MAX_ELIXIR;
++            if (a.lastActivationTick < 0) { f[1] = 0.0f; f[3] = 0.0f; continue; }
++            const int age = std::max(0, cur.tick - a.lastActivationTick);
++            f[1] = a.cooldownTicks > 0
++                ? std::clamp(static_cast<float>(a.cooldownTicks - age) / static_cast<float>(a.cooldownTicks), 0.0f, 1.0f)
++                : 0.0f;
++            f[3] = std::exp(-static_cast<float>(age) / ABILITY_RECENCY_TAU_TICKS);
++        }
++    }
++    const std::array<AbilityState, MAX_TRACKED_ABILITY_CARDS>& abilityStates() const { return cur.abilities; }
++
++    const Config& config() const { return cfg; }
++    void setConfig(const Config& c) { cfg = c; }
++
++    // --- card identity helpers (registry-derived, shared with ClashEnv) ---
++    // Evolutions reuse the base card's name verbatim (CardRegistry::addEvolution).
++    static int baseIdOf(int cardId) {
++        const auto& t = tables();
++        auto it = t.evoToBase.find(cardId);
++        return it == t.evoToBase.end() ? cardId : it->second;
++    }
++    static int evolutionIdOf(int baseId) {
++        const auto& t = tables();
++        auto it = t.baseToEvo.find(baseId);
++        return it == t.baseToEvo.end() ? -1 : it->second;
++    }
++
++private:
++    struct Segment { int from; int to; float multiplier; };
++
++    Config cfg;
++    Core cur;
++    Core checkpoint;
++    std::deque<Segment> segments;
++    std::deque<Report> events;
++    long nextSeq = 0;
++
++    struct Tables {
++        std::unordered_map<int, int> evoToBase;
++        std::unordered_map<int, int> baseToEvo;
++    };
++    static const Tables& tables() {
++        static const Tables t = [] {
++            Tables out;
++            const auto& reg = CardRegistry::getInstance();
++            std::unordered_map<std::string, int> baseByName;
++            for (int id = 0; id < CARD_ID_COUNT; ++id) {
++                const CardDefinition* d = reg.getCard(id);
++                if (d && !d->isEvolution) baseByName.emplace(d->name, id);
++            }
++            for (int id = 0; id < CARD_ID_COUNT; ++id) {
++                const CardDefinition* d = reg.getCard(id);
++                if (!d || !d->isEvolution) continue;
++                auto it = baseByName.find(d->name);
++                if (it == baseByName.end()) continue;
++                out.evoToBase[id] = it->second;
++                out.baseToEvo.emplace(it->second, id);
++            }
++            return out;
++        }();
++        return t;
++    }
++
++    static EvoState makeEvo(const CardDefinition& def) {
++        EvoState e;
++        e.evoId = def.id;
++        e.baseId = baseIdOf(def.id);
++        e.threshold = def.evolutionCycleThreshold;
++        e.granted = std::max(1, def.evolvedUsesGranted);
++        e.cyclesUntilEvolved = def.evolutionCycleThreshold;
++        e.evolvedUsesRemaining = e.granted;
++        return e;
++    }
++    static EvoState* findEvo(Core& s, int evoId) {
++        for (auto& e : s.evos) if (e.evoId == evoId) return &e;
++        return nullptr;
++    }
++    static const EvoState* findEvo(const Core& s, int evoId) {
++        for (const auto& e : s.evos) if (e.evoId == evoId) return &e;
++        return nullptr;
++    }
++    static EvoState* findEvoByBase(Core& s, int baseId) {
++        for (auto& e : s.evos) if (e.baseId == baseId) return &e;
++        return nullptr;
++    }
++
++    // One tick at a time, as GameManager::step adds it: the float sum is then
++    // the engine's own, and independent of how callers chunk their advances.
++    void regen(Core& s, int dt, float multiplier) const {
++        const float g = cfg.regenPerTick * multiplier;
++        for (int i = 0; i < dt; ++i) {
++            const float raw = s.hi + g;
++            s.hi = std::min(raw, PlayerState::MAX_ELIXIR);
++            const float over = raw - s.hi;
++            if (over > 0.0f) {
++                // The truth sits below hi by the unseen spend and keeps filling
++                // while hi is pinned: the cap absorbs it.
++                s.bias = std::max(0.0f, s.bias - over);
++                s.sigma = std::max(0.0f, s.sigma - over);
++            }
++        }
++    }
++
++    // Debits a play whose cost lies in [cMin, cMax] (mean cMean); one number
++    // for an identified card. missPrior: a PLAY stands for the unreported plays
++    // around it; an ability activation does not.
++    void spend(Core& s, float cMin, float cMean, float cMax, int tick, bool missPrior = true) const {
++        if (cMin > s.hi + CONTRADICTION_TOLERANCE) {
++            // Impossible under the model: re-anchor on the play itself. The
++            // bar was at least cMin; the model was short by `surprise`, so allow
++            // that much more above it.
++            const float surprise = cMin - s.hi;
++            s.contradictions++;
++            s.lastContradictionTick = tick;
++            s.lastSurprise = surprise;
++            s.hi = std::min(PlayerState::MAX_ELIXIR, cMin + surprise);
++            s.bias = s.hi - cMin;
++            s.sigma = std::max(s.sigma, surprise);
++        } else {
++            const float est = s.hi - s.bias;
++            if (cMin > est) {
++                // Possible, but only if the unseen spend was smaller than assumed.
++                s.bias = std::max(0.0f, s.hi - cMin);
++                s.sigma = std::min(s.sigma, std::max(0.0f, s.hi - cMin));
++            }
++        }
++        s.hi = std::max(0.0f, s.hi - cMin);
++        // An unidentified card: its cost above the minimum is expected spend.
++        s.bias += (cMean - cMin);
++        const float spread = cMax - cMin;
++        float var = s.sigma * s.sigma + spread * spread / 12.0f;
++        // The plays this one stands for that were never reported.
++        const float p = missPrior ? std::clamp(cfg.assumedMissRate, 0.0f, 0.9f) : 0.0f;
++        const float perPlay = p / (1.0f - p);
++        const float w = cfg.missedCostPriorWeight;
++        const float missCost = (cfg.missedPlayMeanCost * w + s.knownCostSum) / (w + static_cast<float>(s.knownCostPlays));
++        s.bias += perPlay * missCost;
++        var += perPlay * missCost * missCost;
++        s.sigma = std::sqrt(var);
++        s.bias = std::clamp(s.bias, 0.0f, s.hi);
++        s.sigma = std::min(s.sigma, PlayerState::MAX_ELIXIR);
++    }
++
++    void apply(Core& s, const Report& r) const {
++        const CardDefinition* def = (r.cardId >= 0) ? CardRegistry::getInstance().getCard(r.cardId) : nullptr;
++        if (r.kind == KIND_ABILITY) {
++            float cost = r.cost >= 0.0f ? r.cost : (def ? def->abilityElixirCost : 0.0f);
++            AbilityState* a = abilitySlot(s, r.cardId, def);
++            if (a) {
++                a->lastActivationTick = r.tick;
++                if (cost <= 0.0f) cost = a->cost;
++            }
++            if (cost > 0.0f) spend(s, cost, cost, cost, r.tick, /*missPrior=*/false);
++            return;
++        }
++
++        s.plays++;
++        const float known = r.cost >= 0.0f ? r.cost : (def ? def->cost : -1.0f);
++        if (known >= 0.0f) {
++            s.knownCostSum += known;
++            s.knownCostPlays++;
++            spend(s, known, known, known, r.tick);
++        } else {
++            s.unknownPlays++;
++            spend(s, cfg.unknownCostMin, cfg.unknownCostMean, cfg.unknownCostMax, r.tick);
++        }
++        if (!def) return;
++
++        if (def->isChampion || def->isHero) abilitySlot(s, r.cardId, def);
++
++        // Evolution bookkeeping.
++        if (def->isEvolution && r.evolved != 0) {
++            EvoState* e = findEvo(s, def->id);
++            if (!e) { s.evos.push_back(makeEvo(*def)); e = &s.evos.back(); }
++            consumeEvolved(*e);
++            return;
++        }
++        const int base = baseIdOf(r.cardId);
++        EvoState* e = findEvoByBase(s, base);
++        if (!e) return;
++        if (r.evolved == 1 || e->cyclesUntilEvolved <= 0) consumeEvolved(*e);
++        else e->cyclesUntilEvolved--;
++    }
++
++    static void consumeEvolved(EvoState& e) {
++        e.evolvedUsesRemaining--;
++        if (e.evolvedUsesRemaining <= 0) {
++            e.cyclesUntilEvolved = e.threshold;
++            e.evolvedUsesRemaining = e.granted;
++        }
++    }
++
++    static AbilityState* abilitySlot(Core& s, int cardId, const CardDefinition* def) {
++        if (cardId < 0) return nullptr;
++        for (auto& a : s.abilities) if (a.cardId == cardId) return &a;
++        if (!def || !(def->isChampion || def->isHero)) return nullptr;
++        for (auto& a : s.abilities) {
++            if (a.cardId >= 0) continue;
++            a.cardId = cardId;
++            a.cost = def->abilityElixirCost;
++            a.cooldownTicks = def->stats ? def->stats->abilityCooldownTicks : 0;
++            return &a;
++        }
++        return nullptr;
++    }
++
++    // Recomputes `cur` from the checkpoint, the stored segments and every
++    // stored report, in tick order.
++    void replay() {
++        Core s = checkpoint;
++        size_t ei = 0;
++        auto applyUpTo = [&](int t) {
++            while (ei < events.size() && events[ei].tick <= t) {
++                apply(s, events[ei]);
++                ++ei;
++            }
++        };
++        applyUpTo(s.tick);
++        for (const auto& seg : segments) {
++            int t = seg.from;
++            while (ei < events.size() && events[ei].tick <= seg.to) {
++                const int et = std::max(events[ei].tick, t);
++                regen(s, et - t, seg.multiplier);
++                t = et;
++                s.tick = t;
++                apply(s, events[ei]);
++                ++ei;
++            }
++            regen(s, seg.to - t, seg.multiplier);
++            s.tick = seg.to;
++        }
++        while (ei < events.size()) { apply(s, events[ei]); ++ei; }
++        s.tick = cur.tick;
++        cur = s;
++    }
++
++    // Folds segments (and their reports) older than the replay window into the
++    // checkpoint.
++    void trim() {
++        while (!segments.empty() && segments.front().to < cur.tick - REPLAY_WINDOW_TICKS) {
++            const Segment seg = segments.front();
++            int t = seg.from;
++            while (!events.empty() && events.front().tick <= seg.to) {
++                const int et = std::max(events.front().tick, t);
++                regen(checkpoint, et - t, seg.multiplier);
++                t = et;
++                checkpoint.tick = t;
++                apply(checkpoint, events.front());
++                events.pop_front();
++            }
++            regen(checkpoint, seg.to - t, seg.multiplier);
++            checkpoint.tick = seg.to;
++            segments.pop_front();
++        }
++    }
++};
+diff --git a/include/core/PlayerState.h b/include/core/PlayerState.h
+index 46fef09..642caa8 100644
+--- a/include/core/PlayerState.h
++++ b/include/core/PlayerState.h
+@@ -46,6 +46,11 @@ public:
+         Vector2D lastSquadWipePosition{ 0.0f, 0.0f };
+     };
+ 
++    // The bar's cap and the opening bar, named so GameManager and
++    // OpponentStateEstimator share them instead of restating 10 and 5.
++    static constexpr float MAX_ELIXIR = 10.0f;
++    static constexpr float STARTING_ELIXIR = 5.0f;
++
+     float elixir;
+     std::vector<int> hand;
+     // Ticks before a card that has just cycled into the hand can be played.
+@@ -86,7 +91,7 @@ public:
+     }
+ 
+     void initializeDeck(const std::vector<int>& deckList) {
+-        elixir = 5.0f;
++        elixir = STARTING_ELIXIR;
+         hand.clear();
+         deckQueue.clear();
+         evolutionState.clear();
+@@ -109,7 +114,7 @@ public:
+     // there is swapped with an eligible card from the queue. A legal deck holds
+     // each at most once, so a swap always exists.
+     void initializeDeck(const std::vector<int>& deckList, std::mt19937& rng) {
+-        elixir = 5.0f;
++        elixir = STARTING_ELIXIR;
+         hand.clear();
+         deckQueue.clear();
+         evolutionState.clear();
+diff --git a/perception/UPSTREAM_REQUESTS.md b/perception/UPSTREAM_REQUESTS.md
+index 732f11d..cf89bf4 100644
+--- a/perception/UPSTREAM_REQUESTS.md
++++ b/perception/UPSTREAM_REQUESTS.md
+@@ -2313,3 +2313,77 @@ Proposed 2026-11-18 by the gen-2 agent. Patch: `cr-robot/patches/pending/0011-se
+ - A given seed now plays a different (but fixed) match than before.
+ - Unseeded resets behave as before.
+ - Training runs that never pass a seed are unchanged in distribution.
++
++---
++
++## Item 46 — opponent elixir estimate, Evolution counters and Hero/Champion ability state in the observation
++
++Proposed 2026-11-18 by the opponent-state agent. Patch: `cr-robot/patches/pending/0012-opponent-state-observation.patch` (on top of 0004 → 0011).
++**OBS-AFFECTING:** `observation_size()` 13981 → 14379; a 398-float section appended after the level section. `ScalarEncoder` gains an `opp_state` branch (`SCALAR_FEATURE_DIM` 64 → 80), so gen-1 checkpoints do not load into a 0012 net.
++**Not GAMEPLAY-affecting:** no rule, stat or timing changes. `GameManager` only records an `ObservedEvent` per play and ability, and gets two read-only accessors. The 10.0f elixir cap literals became `PlayerState::MAX_ELIXIR` (same value).
++
++### Evidence
++- **What the policy saw before:**
++  - The obs had `opp_elixir_spent` and the opponent cycle blocks, but no opponent elixir estimate.
++  - It did not show which cards are Evolutions or when their next deployment is evolved, on either side. A Hero/Champion ability state was missing too, again on either side.
++  - The live tracker (`perception/track/opp_elixir.py`) clamps at 0 when proven wrong, has no miss prior, and never debits abilities.
++- **Harness:** `cr-robot/runs/sim_fidelity/opp_state_eval.py`.
++  - 16 seeded self-play matches, about 4,800 samples per row.
++  - Opponent decks are random, with Evolutions in slots 0 and 2. Both teams play random affordable cards and fire abilities when ready.
++  - Detector defaults apply except where a row varies them; opponent ability activations are never detected.
++  - Error is against `get_elixir_for_team(1)`.
++- **Results.** MAE is in elixir; "in band" is the share of samples with the truth inside [lower, upper].
++
++  | detector | new MAE | new bias | in band | old MAE | old bias |
++  |---|---|---|---|---|---|
++  | exact | 0.00 | +0.00 | 1.00 | 0.49 | +0.49 |
++  | miss 0 | 0.90 | +0.82 | 0.67 | 1.33 | +1.11 |
++  | miss .04 (default) | 1.31 | +0.96 | 0.77 | 1.72 | +1.59 |
++  | miss .10 | 2.42 | +2.07 | 0.68 | 3.01 | +2.91 |
++  | miss .20 | 2.65 | +2.21 | 0.70 | 3.68 | +3.57 |
++  | miss .30 | 2.66 | +2.30 | 0.73 | 4.29 | +4.25 |
++  | false plays .10 | 1.06 | +0.43 | 0.76 | 1.35 | +0.71 |
++  | unknown cards .10 | 1.29 | +0.96 | 0.75 | 2.09 | +1.99 |
++  | all troops 3.5 s late | 2.17 | +1.49 | 0.59 | 2.47 | +2.14 |
++
++  The miss-0 row still has error because detection timing remains. Roughly 0.4 of it is the 1.5 s troop emit latency, which is real information lag, and about 0.2–0.3 is undetected abilities.
++- **Estimator parity:** the bound class driven from Python with the delivered reports in emit order (as live drives it) equals the env's estimate to 0.0 in every row. In `live_ppo/eval/test_opp_state.py`, the live `OppState` section equals the env's opponent part exactly.
++- **Evolution counters:**
++  - When known, the counter is exact: charge equals the opponent's own value in 94–100% of samples at miss ≤ .10.
++  - Next-evolved precision is 1.0 in every row.
++  - Coverage is low (known on about 10% of evo-in-hand samples), because an opponent Evolution is only known after its first evolved sighting.
++- **Live recordings** (`cr-robot/live_ppo/eval/eval_opp_state.py`; vid_QD, vid_uVf1, vid_iVgm and rec_dry1, 6 match windows, 173 opponent plays):
++  - YOLO `-ev1` votes marked 5 plays evolved.
++  - Spot-checked frames: 1 confirmed (evolved Bats), 1 plausible (Royal Giant), and 1 false positive (`battle-ram-ev1` on the King Tower banner).
++  - No `-hero` play passed the vote threshold.
++  - Opponent ability activations have no YOLO class, so they are not detected.
++
++### Proposed change (exact)
++- **`include/core/OpponentStateEstimator.h` (new):**
++  - Elixir filter:
++    - `hi` is the hard upper bound under misses.
++    - `est = hi − bias`, where bias is the miss prior p/(1−p) × mean missed cost, and the mean cost adapts to the opponent's identified plays.
++    - `sigma` sets the spread; lower and upper are est ∓ 2σ, and upper is capped by `hi`. The cap absorbs bias and σ.
++    - When a cost exceeds `hi + 0.15`, the filter re-anchors (no clamp to 0) and confidence takes a penalty that recovers over 300 ticks.
++    - Back-dated reports are replayed within 150 ticks. Regen runs per tick, as `GameManager` does.
++  - Evolution counters follow `PlayerState`'s rule. An opponent Evolution becomes known on its first evolved report.
++  - Ability tracking covers the 2 opponent Champions/Heroes by first sighting, with estimated cooldown and recency.
++- **`ClashEnv`:**
++  - Section at `OPP_STATE_START = LEVEL_START + NUM_LEVEL_SCALARS`. All offsets are bound (see `cr-robot/runs/sim_fidelity/OPP_STATE_LAYOUT.md`).
++  - A per-observer simulated detector, `DetectionNoise`, feeds the estimator. Defaults are the live-measured rates: miss troop .03 and spell .04, unknown .02, false play .02, troop emit 1.5 s, late troop .05 (+3.5 s), evo recognised .9, `abilityDetected` 0.0.
++  - The detector has one RNG per observer, seeded by `seed()` and copied by `snapshot()`.
++- **Bindings:**
++  - `OpponentStateEstimator`, `OpponentStateConfig`, `OpponentReport`, `OpponentAbilityState`, `OppDetectionNoise` and `OppDeliveredReport`.
++  - `set_/get_opp_detection_noise`, `get_opp_state_estimate` and `get_opp_reports`.
++- **Python:**
++  - `models/net.py`: `ScalarEncoder` gets an `opp_state` branch (28 dense features plus a 2×185 → 8 evo embedding, out to 16).
++  - `models/perception_encoder.py`: `encode(..., opp_state=)`.
++- **Tests:**
++  - `tests/core/test_opponent_state_estimator.cpp` (7 cases), plus size updates in existing C++ and Python tests.
++  - The perception parity tests pass the engine's section into `encode`, because it is not a function of `GameState`.
++
++### Blast radius
++- The obs grows by 398 floats. BC data and checkpoints from 0011 are incompatible, so gen-2 must regenerate and train from scratch.
++- The opponent values are estimates in training too. That is intended: training sees the same estimator live does.
++- A model trained on 0012 run live without `--opp-state` sees a zero section it never trained on. `live_ppo/driver.py` warns when that happens.
++- Pre-existing failures are unchanged: 10 C++ (`card_registry` ×6, `deck_audit_item32`, `hero_abilities` ×3, `navigation_wedge`) and the flaky `test_rl_ppo_compaction`.
+diff --git a/perception/tests/test_encoder_matches_engine.py b/perception/tests/test_encoder_matches_engine.py
+index f6044dc..e8a069f 100644
+--- a/perception/tests/test_encoder_matches_engine.py
++++ b/perception/tests/test_encoder_matches_engine.py
+@@ -50,11 +50,19 @@ def _towers_only_state(env):
+     )
+ 
+ 
++def _opp_state(obs):
++    n = getattr(cre.ClashRoyaleEnv, "OPP_STATE_SIZE", 0)
++    return obs[cre.ClashRoyaleEnv.OPP_STATE_START:] if n else None
++
++
+ def test_encoder_reproduces_the_engine_observation_exactly():
+     env = cre.ClashRoyaleEnv(list(DECK), list(DECK))
+     env.reset()
+     sim = np.asarray(env.get_observation_for_team(0), dtype=np.float32)
+-    live = np.asarray(pe.encode(_towers_only_state(env)), dtype=np.float32)
++    # The opponent-state section (item 46) is not a function of the GameState:
++    # live_ppo/opp_state.py builds it from the bound estimator and hands it in.
++    live = np.asarray(pe.encode(_towers_only_state(env), opp_state=_opp_state(sim)),
++                      dtype=np.float32)
+ 
+     assert live.shape == sim.shape == (env.observation_size(),)
+ 
+diff --git a/perception/tests/test_perception_encoder.py b/perception/tests/test_perception_encoder.py
+index 561bd51..0e5318d 100644
+--- a/perception/tests/test_perception_encoder.py
++++ b/perception/tests/test_perception_encoder.py
+@@ -36,6 +36,28 @@ def enc(engine):
+     return perception_encoder
+ 
+ 
++def _opp_state(engine, truth):
++    """The engine's opponent-state section (item 46): not a function of the
++    GameState, so the caller passes it in (live: live_ppo/opp_state.py)."""
++    E = engine.ClashRoyaleEnv
++    return truth[E.OPP_STATE_START:] if getattr(E, "OPP_STATE_SIZE", 0) else None
++
++
++def test_opp_state_is_written_verbatim_and_checked(enc, engine):
++    E = engine.ClashRoyaleEnv
++    if not getattr(E, "OPP_STATE_SIZE", 0):
++        pytest.skip("engine without the opponent-state section")
++    env = _engine_with(engine, [])
++    sec = np.linspace(0.0, 1.0, E.OPP_STATE_SIZE, dtype=np.float32)
++    obs = enc.encode(_blank_state(env), opp_state=sec)
++    assert np.array_equal(obs[E.OPP_STATE_START:E.OPP_STATE_START + E.OPP_STATE_SIZE], sec)
++    # None leaves it zero ("nothing known"); that is NOT what the engine shows
++    # at kickoff, so a live caller on a 0012 model must pass the section
++    assert not enc.encode(_blank_state(env))[E.OPP_STATE_START:].any()
++    with pytest.raises(ValueError):
++        enc.encode(_blank_state(env), opp_state=sec[:-1])
++
++
+ def _blank_state(env, units=()):
+     return GameState(
+         units=tuple(units), my_elixir=env.get_elixir(),
+@@ -96,7 +118,7 @@ def test_empty_board_is_bit_exact(enc, engine):
+     """River and six towers, none of which perception reports as units."""
+     env = _engine_with(engine, [])
+     truth = np.asarray(env.get_observation_for_team(0), np.float32)
+-    assert np.array_equal(enc.encode(_blank_state(env)), truth)
++    assert np.array_equal(enc.encode(_blank_state(env), opp_state=_opp_state(engine, truth)), truth)
+ 
+ 
+ @pytest.mark.parametrize("tag,injects", [
+@@ -110,7 +132,7 @@ def test_round_trip_is_bit_exact(enc, engine, tag, injects):
+     env = _engine_with(engine, injects)
+     truth = np.asarray(env.get_observation_for_team(0), np.float32)
+     state = _state_from_board(enc, env, [c for c, _, _, _ in injects])
+-    assert np.array_equal(enc.encode(state), truth), tag
++    assert np.array_equal(enc.encode(state, opp_state=_opp_state(engine, truth)), truth), tag
+ 
+ 
+ def test_a_full_tower_reads_1_like_the_engine(enc, engine):
+diff --git a/python_ai/models/net.py b/python_ai/models/net.py
+index 2528f08..0346269 100644
+--- a/python_ai/models/net.py
++++ b/python_ai/models/net.py
+@@ -203,6 +203,16 @@ HAND_SLOT_EMBED_DIM = 5      # x hand_size (4) = 20
+ EXTRA_BRANCH_DIM = 12
+ CYCLE_BRANCH_DIM = 24
+ SCALAR_FEATURE_DIM = 64
++#: The opponent-state branch (UPSTREAM item 46: opponent elixir estimate, both
++#: sides' Evolution charge and Champion/Hero ability state). Present only on an
++#: engine with the section, and then the total is 80: a deliberate change of
++#: lstm_input_dim, since nothing below 64 can make room for it without starving
++#: another branch. Nets for that engine are trained from scratch (gen-2).
++OPP_STATE_BRANCH_DIM = 16
++SCALAR_FEATURE_DIM_WITH_OPP_STATE = SCALAR_FEATURE_DIM + OPP_STATE_BRANCH_DIM
++#: Card-identity width of the opponent-Evolution blocks (known[], charge[]),
++#: one projection shared by both, as in the cycle branch.
++OPP_EVO_EMBED_DIM = 8
+ 
+ #: Card-identity width inside the cycle branch. `seen` and `recency` share one
+ #: projection: they index the same card space, so both read the same notion of
+@@ -223,7 +233,8 @@ class ScalarEncoder(nn.Module):
+ 
+     def __init__(self, hand_size, num_card_ids, num_extra_scalars,
+                  cycle_block_size, extra_start, cycle_start,
+-                 num_level_scalars=0, level_start=None):
++                 num_level_scalars=0, level_start=None,
++                 opp_state_size=0, opp_state_start=None):
+         super().__init__()
+         self.hand_size = hand_size
+         self.num_card_ids = num_card_ids
+@@ -237,14 +248,21 @@ class ScalarEncoder(nn.Module):
+         self.num_level_scalars = num_level_scalars
+         self.level_start = level_start
+         self.onehot_start = 1 + hand_size
++        # The opponent-state section (item 46): its own branch, before the
++        # cycle so the cycle stays last. Sub-offsets are the engine's.
++        self.opp_state_size = opp_state_size
++        self.opp_state_start = opp_state_start
++        opp_dim = OPP_STATE_BRANCH_DIM if opp_state_size else 0
+ 
+         hand_dim = hand_size * HAND_SLOT_EMBED_DIM
+         self.out_dim = (ECON_BRANCH_DIM + hand_dim
+-                        + EXTRA_BRANCH_DIM + CYCLE_BRANCH_DIM)
+-        if self.out_dim != SCALAR_FEATURE_DIM:
++                        + EXTRA_BRANCH_DIM + opp_dim + CYCLE_BRANCH_DIM)
++        expected = (SCALAR_FEATURE_DIM_WITH_OPP_STATE if opp_state_size
++                    else SCALAR_FEATURE_DIM)
++        if self.out_dim != expected:
+             raise ValueError(
+                 f"scalar branches sum to {self.out_dim}, not "
+-                f"{SCALAR_FEATURE_DIM}; that changes lstm_input_dim and "
++                f"{expected}; that changes lstm_input_dim and "
+                 "discards the LSTM's 1.8M trained parameters. Retune the "
+                 "branch widths so they still sum to the total, or change the "
+                 "total deliberately and say so.")
+@@ -258,6 +276,12 @@ class ScalarEncoder(nn.Module):
+         self.extra = nn.Linear(num_extra_scalars + num_level_scalars, EXTRA_BRANCH_DIM)
+         self.cycle_card = nn.Linear(num_card_ids, CYCLE_EMBED_DIM, bias=False)
+         self.cycle_out = nn.Linear(2 * CYCLE_EMBED_DIM, CYCLE_BRANCH_DIM)
++        if opp_state_size:
++            E = clash_royale_env.ClashRoyaleEnv
++            self.opp_evo_offset = E.OPP_EVO_OFFSET
++            self.opp_evo_card = nn.Linear(num_card_ids, OPP_EVO_EMBED_DIM, bias=False)
++            self.opp_state_out = nn.Linear(E.OPP_EVO_OFFSET + 2 * OPP_EVO_EMBED_DIM,
++                                           OPP_STATE_BRANCH_DIM)
+ 
+         self.cycle_slice = (self.out_dim - CYCLE_BRANCH_DIM, self.out_dim)
+ 
+@@ -277,11 +301,24 @@ class ScalarEncoder(nn.Module):
+         h = F.relu(self.hand_slot(
+             onehots.reshape(-1, self.hand_size, self.num_card_ids))).flatten(1)
+         x = F.relu(self.extra(extra))
++        parts = [e, h, x]
++        if self.opp_state_size:
++            parts.append(self.opp_state_branch(
++                scalar[:, self.opp_state_start:self.opp_state_start + self.opp_state_size]))
+         # Detached: the actor and critic read the branch but cannot reshape it,
+         # which PPO otherwise did (turning it into a 1-D opponent-tempo
+         # readout). `cycle_id_head` is its only gradient. Downstream layers
+         # still learn to use these dims at full gradient.
+-        return torch.cat([e, h, x, self.cycle_branch(cycle).detach()], dim=1)
++        return torch.cat(parts + [self.cycle_branch(cycle).detach()], dim=1)
++
++    def opp_state_branch(self, opp):
++        """Elixir estimate, own evo/ability, opponent ability (the first
++        OPP_EVO_OFFSET values, read directly) and the two per-card Evolution
++        blocks through one shared card projection. (B, OPP_STATE_BRANCH_DIM)."""
++        head = opp[:, :self.opp_evo_offset]
++        evo = opp[:, self.opp_evo_offset:].reshape(-1, 2, self.num_card_ids)
++        evo = F.relu(self.opp_evo_card(evo)).flatten(1)
++        return F.relu(self.opp_state_out(torch.cat([head, evo], dim=1)))
+ 
+     def cycle_branch(self, cycle):
+         """The cycle branch with its gradient attached. (B, CYCLE_BRANCH_DIM).
+@@ -393,14 +430,18 @@ class MicroRoyaleNet(nn.Module):
+         # an engine without it has none, and the layout is then unchanged.
+         self.num_level_scalars = getattr(clash_royale_env.ClashRoyaleEnv,
+                                          "NUM_LEVEL_SCALARS", 0)
++        # The opponent-state section (item 46), appended after the levels.
++        self.opp_state_size = getattr(clash_royale_env.ClashRoyaleEnv,
++                                      "OPP_STATE_SIZE", 0)
+         self.scalar_size = (1 + hand_size + hand_size * num_card_ids
+                             + self.num_extra_scalars + self.cycle_block_size
+-                            + self.num_level_scalars)
++                            + self.num_level_scalars + self.opp_state_size)
+         self.extra_start = 1 + hand_size + hand_size * num_card_ids
+         # Forward offsets, never measured back from the end, which breaks on
+         # the next append.
+         self.cycle_start = self.extra_start + self.num_extra_scalars
+         self.level_start = self.cycle_start + self.cycle_block_size
++        self.opp_state_start = self.level_start + self.num_level_scalars
+ 
+         # 1. CNN over (Batch, NUM_CHANNELS, 34, 18). ceil_mode on both pools:
+         #    floor would drop a row (34 -> 17 -> 8). The pre-flatten map also
+@@ -434,7 +475,8 @@ class MicroRoyaleNet(nn.Module):
+             self.scalar_mlp = ScalarEncoder(
+                 hand_size, num_card_ids, self.num_extra_scalars,
+                 self.cycle_block_size, self.extra_start, self.cycle_start,
+-                self.num_level_scalars, self.level_start)
++                self.num_level_scalars, self.level_start,
++                self.opp_state_size, self.opp_state_start)
+             scalar_feature_dim = self.scalar_mlp.out_dim
+         else:
+             # The monolithic layer it replaced, kept so the A/B and the
+diff --git a/python_ai/models/perception_encoder.py b/python_ai/models/perception_encoder.py
+index 59c41f2..55c3a02 100644
+--- a/python_ai/models/perception_encoder.py
++++ b/python_ai/models/perception_encoder.py
+@@ -59,8 +59,10 @@ SPATIAL_SIZE = NUM_CHANNELS * PLANE
+ CYCLE_BLOCK_SIZE = _E.CYCLE_BLOCK_SIZE
+ # Then the level section (UPSTREAM item 44); 0 on an engine without one.
+ NUM_LEVEL_SCALARS = getattr(_E, "NUM_LEVEL_SCALARS", 0)
++# Then the opponent-state section (UPSTREAM item 46); 0 on an engine without one.
++OPP_STATE_SIZE = getattr(_E, "OPP_STATE_SIZE", 0)
+ SCALAR_SIZE = (1 + HAND_SIZE + HAND_SIZE * NUM_CARD_IDS + NUM_EXTRA_SCALARS
+-               + CYCLE_BLOCK_SIZE + NUM_LEVEL_SCALARS)
++               + CYCLE_BLOCK_SIZE + NUM_LEVEL_SCALARS + OPP_STATE_SIZE)
+ OBSERVATION_SIZE = SPATIAL_SIZE + SCALAR_SIZE
+ 
+ # See the module docstring.
+@@ -244,7 +246,7 @@ _BASE: np.ndarray | None = None
+ _TOWERS: dict[str, TowerCells] | None = None
+ 
+ 
+-def encode(state, *, card_table_=None, levels=None) -> np.ndarray:
++def encode(state, *, card_table_=None, levels=None, opp_state=None) -> np.ndarray:
+     """A GameState -> one observation vector, from our side (team 0).
+ 
+     Mirrors `ClashEnv::extractObservationForTeam(0)`: the HP channels assign,
+@@ -260,6 +262,11 @@ def encode(state, *, card_table_=None, levels=None) -> np.ndarray:
+     section (item 44); None means all TOURNAMENT_LEVEL, which reads zeros. The
+     real game shows each player's King level on the tower, which is the tower
+     level; perception passes it through.
++
++    `opp_state` is the OPP_STATE_SIZE-long opponent-state section (item 46),
++    written at OPP_STATE_START: live_ppo/opp_state.py builds it from the bound
++    OpponentStateEstimator. None leaves it zero, which reads "nothing known"
++    (est 0 with confidence 0), not "opponent at 0 elixir".
+     """
+     global _BASE, _TOWERS
+     table = card_table_ if card_table_ is not None else card_table()
+@@ -356,4 +363,8 @@ def encode(state, *, card_table_=None, levels=None) -> np.ndarray:
+         start = _E.LEVEL_START
+         for k, level in enumerate(lv[:NUM_LEVEL_SCALARS]):
+             obs[start + k] = engine.level_scalar(int(level))
++    if OPP_STATE_SIZE and opp_state is not None:
++        if len(opp_state) != OPP_STATE_SIZE:
++            raise ValueError(f"opp_state has {len(opp_state)} values, the section {OPP_STATE_SIZE}")
++        obs[_E.OPP_STATE_START:_E.OPP_STATE_START + OPP_STATE_SIZE] = opp_state
+     return obs
+diff --git a/python_ai/tests/test_net_dilated_context.py b/python_ai/tests/test_net_dilated_context.py
+index 3885120..dd19509 100644
+--- a/python_ai/tests/test_net_dilated_context.py
++++ b/python_ai/tests/test_net_dilated_context.py
+@@ -100,7 +100,7 @@ def test_trunk_output_shape_and_lstm_input_width_are_unchanged():
+     net = MicroRoyaleNet(num_ability_slots=0)
+     assert (net.pooled_h, net.pooled_w) == (9, 5)
+     assert net.cnn_out_dim == 1440
+-    assert net.lstm.input_size == net.cnn_out_dim + 64
++    assert net.lstm.input_size == net.cnn_out_dim + net.scalar_feature_dim == net.cnn_out_dim + 80
+     x = torch.randn(3, N_CHANNELS, BOARD_H, BOARD_W)
+     assert net.cnn_trunk(x).shape == (3, 32, 9, 5)
+ 
+diff --git a/python_ai/tests/test_net_trunk_receptive_field.py b/python_ai/tests/test_net_trunk_receptive_field.py
+index 6f4b0e1..6dc0e8d 100644
+--- a/python_ai/tests/test_net_trunk_receptive_field.py
++++ b/python_ai/tests/test_net_trunk_receptive_field.py
+@@ -137,4 +137,4 @@ def test_dilation_preserves_the_lstm_input_width():
+ 
+     net = MicroRoyaleNet(num_ability_slots=0)
+     assert net.cnn_out_dim == out_dim(1) == 1440
+-    assert net.lstm.input_size == net.cnn_out_dim + 64
++    assert net.lstm.input_size == net.cnn_out_dim + net.scalar_feature_dim == net.cnn_out_dim + 80
+diff --git a/python_ai/tests/test_opponent_cycle_observation.py b/python_ai/tests/test_opponent_cycle_observation.py
+index 6fba618..6a99031 100644
+--- a/python_ai/tests/test_opponent_cycle_observation.py
++++ b/python_ai/tests/test_opponent_cycle_observation.py
+@@ -44,7 +44,8 @@ def test_observation_size_grew_by_exactly_the_cycle_blocks(env):
+     expected = (_E.BOARD_WIDTH * _E.BOARD_HEIGHT * _E.NUM_CHANNELS
+                 + 1 + _E.HAND_SIZE + _E.HAND_SIZE * _E.NUM_CARD_IDS
+                 + _E.NUM_EXTRA_SCALARS + _E.CYCLE_BLOCK_SIZE
+-                + _E.NUM_LEVEL_SCALARS)          # item 44, appended after
++                + _E.NUM_LEVEL_SCALARS           # item 44, appended after
++                + _E.OPP_STATE_SIZE)             # item 46, appended after that
+     assert env.observation_size() == expected
+ 
+ 
+diff --git a/python_ai/tests/test_scalar_encoder_branches.py b/python_ai/tests/test_scalar_encoder_branches.py
+index 5f2c0a3..3ce5281 100644
+--- a/python_ai/tests/test_scalar_encoder_branches.py
++++ b/python_ai/tests/test_scalar_encoder_branches.py
+@@ -19,9 +19,10 @@ sum of the embeddings of cards shown, and the same weighted by recency. It is
+ separate from `card_id_embed`, so cycle gradients cannot disturb the working
+ placement path.
+ """
++import clash_royale_env
+ import torch
+ 
+-from python_ai.models.net import MicroRoyaleNet
++from python_ai.models.net import MicroRoyaleNet, SCALAR_FEATURE_DIM_WITH_OPP_STATE
+ 
+ 
+ def _obs_batch(net, n=8, seed=0):
+@@ -47,12 +48,16 @@ def _with_cycle(net, scalar, value, seed=1):
+ def test_scalar_encoder_output_width_is_unchanged_so_the_lstm_is_untouched():
+     """The branch widths may be retuned; their sum may not, without discarding the
+     LSTM.
++
++    The opponent-state section (item 46) raised it once, deliberately, 64 -> 80:
++    gen-2 nets are trained from scratch on that engine.
+     """
+     net = MicroRoyaleNet(num_ability_slots=0)
+     scalar = _scalar_part(net, _obs_batch(net))
+-    assert net.scalar_mlp(scalar).shape == (8, 64)
+-    assert net.lstm.input_size == net.cnn_out_dim + 64 == 1504
+-    assert sum(p.numel() for p in net.lstm.parameters()) == 1_804_288
++    assert SCALAR_FEATURE_DIM_WITH_OPP_STATE == 80
++    assert net.scalar_mlp(scalar).shape == (8, 80)
++    assert net.lstm.input_size == net.cnn_out_dim + 80 == 1520
++    assert sum(p.numel() for p in net.lstm.parameters()) == 4 * 256 * (1520 + 256 + 2)
+ 
+ 
+ def test_the_scalar_encoder_reads_its_blocks_from_the_engines_own_offsets():
+@@ -70,7 +75,11 @@ def test_the_scalar_encoder_reads_its_blocks_from_the_engines_own_offsets():
+     # The level section (card/tower level of each side) follows the cycle
+     # blocks and closes the vector.
+     assert enc.level_start == net.cycle_start + net.cycle_block_size
+-    assert enc.level_start + net.num_level_scalars == net.scalar_size
++    assert enc.level_start + net.num_level_scalars == enc.opp_state_start
++    # The opponent-state section (item 46) closes it.
++    assert enc.opp_state_start + enc.opp_state_size == net.scalar_size
++    E = clash_royale_env.ClashRoyaleEnv
++    assert net.spatial_size + enc.opp_state_start == E.OPP_STATE_START
+ 
+ 
+ def test_the_cycle_block_owns_a_dedicated_slice_of_the_scalar_features():
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index b6489ca..c1ab0f6 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -210,6 +210,112 @@ PYBIND11_MODULE(clash_royale_env, m) {
+         .value("DAGGER_DUCHESS", TowerTroopType::DaggerDuchess)
+         .value("ROYAL_CHEF", TowerTroopType::RoyalChef);
+ 
++    // --- opponent state (UPSTREAM item 46) ---
++    // The estimator ClashEnv runs inside training is the same class live
++    // perception drives (live_ppo/opp_state.py), so the two never drift.
++    using OSE = OpponentStateEstimator;
++    py::class_<OSE::Config>(m, "OpponentStateConfig")
++        .def(py::init<>())
++        .def_readwrite("regen_per_tick", &OSE::Config::regenPerTick)
++        .def_readwrite("assumed_miss_rate", &OSE::Config::assumedMissRate)
++        .def_readwrite("missed_play_mean_cost", &OSE::Config::missedPlayMeanCost)
++        .def_readwrite("unknown_cost_min", &OSE::Config::unknownCostMin)
++        .def_readwrite("unknown_cost_mean", &OSE::Config::unknownCostMean)
++        .def_readwrite("unknown_cost_max", &OSE::Config::unknownCostMax);
++    py::class_<OSE::Report>(m, "OpponentReport")
++        .def(py::init<>())
++        .def_readwrite("tick", &OSE::Report::tick)
++        .def_readwrite("kind", &OSE::Report::kind)
++        .def_readwrite("card_id", &OSE::Report::cardId)
++        .def_readwrite("cost", &OSE::Report::cost)
++        .def_readwrite("evolved", &OSE::Report::evolved)
++        .def_readwrite("seq", &OSE::Report::seq);
++    py::class_<OSE::AbilityState>(m, "OpponentAbilityState")
++        .def_readonly("card_id", &OSE::AbilityState::cardId)
++        .def_readonly("last_activation_tick", &OSE::AbilityState::lastActivationTick)
++        .def_readonly("cooldown_ticks", &OSE::AbilityState::cooldownTicks)
++        .def_readonly("cost", &OSE::AbilityState::cost);
++    py::class_<OSE>(m, "OpponentStateEstimator")
++        .def(py::init<>())
++        .def(py::init<const OSE::Config&>(), py::arg("config"))
++        .def("reset", &OSE::reset, py::arg("tick") = 0)
++        .def("reset_unknown", &OSE::resetUnknown, py::arg("tick"),
++             "Start mid-match with the bar unknown: [0, 10], low confidence.")
++        .def("declare_evolution", &OSE::declareEvolution, py::arg("evo_id"))
++        .def("advance_to", &OSE::advanceTo, py::arg("tick"), py::arg("multiplier"))
++        .def("advance_with_schedule", &OSE::advanceWithSchedule, py::arg("tick"),
++             "Regen to `tick` on the engine's double/triple schedule.")
++        .def("report", &OSE::report, py::arg("report"))
++        .def("report_play", &OSE::reportPlay, py::arg("tick"), py::arg("card_id"),
++             py::arg("cost") = -1.0f, py::arg("evolved") = -1)
++        .def("report_ability", &OSE::reportAbility, py::arg("tick"), py::arg("card_id"),
++             py::arg("cost") = -1.0f)
++        .def_property_readonly("tick", &OSE::tick)
++        .def("estimate", &OSE::estimate)
++        .def("lower", &OSE::lower)
++        .def("upper", &OSE::upper)
++        .def("hard_upper", &OSE::hardUpper, "The bar if every unreported play cost nothing.")
++        .def("sigma", &OSE::sigma)
++        .def("confidence", &OSE::confidence)
++        .def("contradictions", &OSE::contradictions)
++        .def("last_contradiction_tick", &OSE::lastContradictionTick)
++        .def("plays", &OSE::plays)
++        .def("elixir_features", &OSE::elixirFeatures)
++        .def("evo_charge_for", &OSE::evoChargeFor, py::arg("evo_id"))
++        .def("cycles_until_evolved_for", &OSE::cyclesUntilEvolvedFor, py::arg("evo_id"))
++        .def("known_evolutions", &OSE::knownEvolutions)
++        .def("ability_states", [](const OSE& e) {
++            const auto& a = e.abilityStates();
++            return std::vector<OSE::AbilityState>(a.begin(), a.end());
++        })
++        .def("evo_blocks", [](const OSE& e) {
++            std::vector<float> v(2 * ClashEnv::NUM_CARD_IDS, 0.0f);
++            e.writeEvoBlocks(v.data(), ClashEnv::NUM_CARD_IDS);
++            return v;
++        }, "known[c] then charge[c], as the observation's OPP_EVO block.")
++        .def("ability_features", [](const OSE& e) {
++            std::vector<float> v(OSE::MAX_TRACKED_ABILITY_CARDS * OSE::ABILITY_FEATURES, 0.0f);
++            e.writeAbilityFeatures(v.data());
++            return v;
++        }, "The observation's OPP_ABILITY block.")
++        .def_property("config", &OSE::config, &OSE::setConfig)
++        .def_static("evo_charge", &OSE::evoCharge, py::arg("cycles_until_evolved"), py::arg("threshold"))
++        .def_static("base_id_of", &OSE::baseIdOf, py::arg("card_id"))
++        .def_static("evolution_id_of", &OSE::evolutionIdOf, py::arg("base_id"))
++        .def_readonly_static("KIND_PLAY", &OSE::KIND_PLAY)
++        .def_readonly_static("KIND_ABILITY", &OSE::KIND_ABILITY)
++        .def_readonly_static("MAX_TRACKED_ABILITY_CARDS", &OSE::MAX_TRACKED_ABILITY_CARDS)
++        .def_readonly_static("ABILITY_FEATURES", &OSE::ABILITY_FEATURES)
++        .def_readonly_static("ELIXIR_FEATURES", &OSE::ELIXIR_FEATURES)
++        .def_readonly_static("ABILITY_RECENCY_TAU_TICKS", &OSE::ABILITY_RECENCY_TAU_TICKS)
++        .def_readonly_static("REPLAY_WINDOW_TICKS", &OSE::REPLAY_WINDOW_TICKS);
++
++    using DN = ClashEnv::DetectionNoise;
++    py::class_<DN>(m, "OppDetectionNoise")
++        .def(py::init<>())
++        .def_readwrite("enabled", &DN::enabled)
++        .def_readwrite("miss_troop", &DN::missTroop)
++        .def_readwrite("miss_spell", &DN::missSpell)
++        .def_readwrite("unknown_card", &DN::unknownCard)
++        .def_readwrite("false_play", &DN::falsePlay)
++        .def_readwrite("troop_emit_ticks", &DN::troopEmitTicks)
++        .def_readwrite("birth_err_min_ticks", &DN::birthErrMinTicks)
++        .def_readwrite("birth_err_max_ticks", &DN::birthErrMaxTicks)
++        .def_readwrite("late_troop", &DN::lateTroop)
++        .def_readwrite("late_extra_ticks", &DN::lateExtraTicks)
++        .def_readwrite("spell_sight_max_ticks", &DN::spellSightMaxTicks)
++        .def_readwrite("spell_emit_min_ticks", &DN::spellEmitMinTicks)
++        .def_readwrite("spell_emit_max_ticks", &DN::spellEmitMaxTicks)
++        .def_readwrite("evo_recognised", &DN::evoRecognised)
++        .def_readwrite("ability_detected", &DN::abilityDetected)
++        .def_readwrite("ability_emit_ticks", &DN::abilityEmitTicks);
++    py::class_<ClashEnv::DeliveredReport>(m, "OppDeliveredReport")
++        .def_readonly("true_tick", &ClashEnv::DeliveredReport::trueTick)
++        .def_readonly("emit_tick", &ClashEnv::DeliveredReport::emitTick)
++        .def_readonly("report", &ClashEnv::DeliveredReport::report)
++        .def_readonly("true_card_id", &ClashEnv::DeliveredReport::trueCardId)
++        .def_readonly("true_evolved", &ClashEnv::DeliveredReport::trueEvolved);
++
+     py::class_<ClashEnv>(m, "ClashRoyaleEnv")
+         .def(py::init<const std::vector<int>&, const std::vector<int>&, int, TowerTroopType, TowerTroopType>(),
+             py::arg("ai_deck"), py::arg("opp_deck"), py::arg("max_ticks") = 1800,
+@@ -242,6 +348,15 @@ PYBIND11_MODULE(clash_royale_env, m) {
+         .def("get_observation_for_team", &ClashEnv::getObservationForTeam, py::arg("team"))
+         .def("is_game_over", &ClashEnv::isGameOver)
+         .def("observation_size", &ClashEnv::observationSize)
++        .def("set_opp_detection_noise", &ClashEnv::setOppDetectionNoise, py::arg("noise"),
++             "The simulated detector feeding the opponent-state estimate; from the next reset().")
++        .def("get_opp_detection_noise", &ClashEnv::getOppDetectionNoise)
++        .def("get_opp_state_estimate", &ClashEnv::getOppStateEstimator, py::arg("team"),
++             py::return_value_policy::copy,
++             "A copy of what `team` believes about its opponent, synced to now.")
++        .def("get_opp_reports", &ClashEnv::getOppReports, py::arg("team"),
++             py::return_value_policy::copy,
++             "Every report delivered so far to `team`'s estimator, with the truth.")
+         .def("inject_enemy", &ClashEnv::injectEnemy, py::arg("card_id"), py::arg("x"), py::arg("y"))
+         // Defaults keep full health and a full deploy delay. Pass
+         // deploy_ticks=0 for a unit perception can already see, or every
+@@ -361,6 +476,17 @@ PYBIND11_MODULE(clash_royale_env, m) {
+         // The level section (UPSTREAM item 44), appended after the cycle blocks.
+         .def_readonly_static("LEVEL_START", &ClashEnv::LEVEL_START)
+         .def_readonly_static("NUM_LEVEL_SCALARS", &ClashEnv::NUM_LEVEL_SCALARS)
++        // The opponent-state section (UPSTREAM item 46), after the level section.
++        .def_readonly_static("OPP_STATE_START", &ClashEnv::OPP_STATE_START)
++        .def_readonly_static("OPP_STATE_SIZE", &ClashEnv::OPP_STATE_SIZE)
++        .def_readonly_static("OPP_ELIXIR_OFFSET", &ClashEnv::OPP_ELIXIR_OFFSET)
++        .def_readonly_static("OWN_EVO_OFFSET", &ClashEnv::OWN_EVO_OFFSET)
++        .def_readonly_static("OWN_ABILITY_OFFSET", &ClashEnv::OWN_ABILITY_OFFSET)
++        .def_readonly_static("OPP_ABILITY_OFFSET", &ClashEnv::OPP_ABILITY_OFFSET)
++        .def_readonly_static("OPP_EVO_OFFSET", &ClashEnv::OPP_EVO_OFFSET)
++        .def_readonly_static("NUM_ABILITY_SLOTS", &ClashEnv::NUM_ABILITY_SLOTS)
++        .def_readonly_static("NUM_OPP_ABILITY_CARDS", &ClashEnv::NUM_OPP_ABILITY_CARDS)
++        .def_readonly_static("ABILITY_FEATURES", &ClashEnv::ABILITY_FEATURES)
+         .def_readonly_static("NUM_EXTRA_SCALARS", &ClashEnv::NUM_EXTRA_SCALARS)
+         .def_readonly_static("MAX_MATCH_ELIXIR", &ClashEnv::MAX_MATCH_ELIXIR)
+         // Elixir phase boundaries in ticks, from GameManager.
+diff --git a/tests/core/test_card_cycle_observation.cpp b/tests/core/test_card_cycle_observation.cpp
+index 36fb9c0..eb8b490 100644
+--- a/tests/core/test_card_cycle_observation.cpp
++++ b/tests/core/test_card_cycle_observation.cpp
+@@ -65,7 +65,8 @@ TEST_CASE("the observation carries two card-cycle blocks after the extra scalars
+     // The blocks end where the level section (item 44) starts, which is last;
+     // this fails if anything is inserted rather than appended.
+     REQUIRE(cycleBase() + ClashEnv::CYCLE_BLOCK_SIZE == ClashEnv::LEVEL_START);
+-    REQUIRE(ClashEnv::LEVEL_START + ClashEnv::NUM_LEVEL_SCALARS == env.observationSize());
++    REQUIRE(ClashEnv::LEVEL_START + ClashEnv::NUM_LEVEL_SCALARS == ClashEnv::OPP_STATE_START);
++    REQUIRE(ClashEnv::OPP_STATE_START + ClashEnv::OPP_STATE_SIZE == env.observationSize());
+     REQUIRE(ClashEnv::CYCLE_BLOCK_SIZE
+             == ClashEnv::NUM_CYCLE_BLOCKS * ClashEnv::NUM_CARD_IDS);
+ }
+diff --git a/tests/core/test_clash_env.cpp b/tests/core/test_clash_env.cpp
+index c987411..051eac0 100644
+--- a/tests/core/test_clash_env.cpp
++++ b/tests/core/test_clash_env.cpp
+@@ -6,7 +6,7 @@
+ 
+ // The observation size, asserted both ways:
+ //
+-//   18*34*21 + 1 + 4 + 4*185 + 10 + 2*185 + 4 = 13981
++//   18*34*21 + 1 + 4 + 4*185 + 10 + 2*185 + 4 + 398 = 14379
+ //
+ //   * the formula catches observationSize() disagreeing with the constants it is built from, which would split the flat vector at the wrong offset and misread every scalar silently;
+ //   * the literal catches the size changing at all. A resize invalidates every checkpoint, so it must never happen by accident; when intended, updating the literal is the acknowledgement.
+@@ -25,11 +25,15 @@ TEST_CASE("ClashEnv::observationSize matches its declared layout", "[clash_env]"
+         + ClashEnv::HAND_SIZE * ClashEnv::NUM_CARD_IDS   // hand identity one-hots
+         + ClashEnv::NUM_EXTRA_SCALARS                    // time, elixir spent, tower HP
+         + ClashEnv::CYCLE_BLOCK_SIZE                     // opponent seen[] + recency[]
+-        + ClashEnv::NUM_LEVEL_SCALARS;                   // card/tower levels (item 44)
++        + ClashEnv::NUM_LEVEL_SCALARS                    // card/tower levels (item 44)
++        + ClashEnv::OPP_STATE_SIZE;                      // opponent state (item 46)
+ 
+     REQUIRE(env.observationSize() == expected);
+-    REQUIRE(env.observationSize() == 13981);
++    REQUIRE(env.observationSize() == 14379);
+     REQUIRE(ClashEnv::LEVEL_START == ClashEnv::CYCLE_START + ClashEnv::CYCLE_BLOCK_SIZE);
++    REQUIRE(ClashEnv::OPP_STATE_START == ClashEnv::LEVEL_START + ClashEnv::NUM_LEVEL_SCALARS);
++    REQUIRE(ClashEnv::OPP_STATE_START == 13981);
++    REQUIRE(ClashEnv::OPP_STATE_SIZE == 398);
+ 
+     // The CYCLE_START literal is a tripwire: +1 means a scalar was appended to
+     // the extra block; a larger jump means something was inserted earlier. The
+@@ -47,7 +51,7 @@ TEST_CASE("ClashEnv::observationSize matches its declared layout", "[clash_env]"
+     REQUIRE(env.observationSize() - spatial
+             == 1 + ClashEnv::HAND_SIZE + ClashEnv::HAND_SIZE * ClashEnv::NUM_CARD_IDS
+                + ClashEnv::NUM_EXTRA_SCALARS + ClashEnv::CYCLE_BLOCK_SIZE
+-               + ClashEnv::NUM_LEVEL_SCALARS);
++               + ClashEnv::NUM_LEVEL_SCALARS + ClashEnv::OPP_STATE_SIZE);
+     // ...and the spatial block ends exactly where EXTRA_SCALARS_START says.
+     REQUIRE(ClashEnv::EXTRA_SCALARS_START - spatial
+             == 1 + ClashEnv::HAND_SIZE + ClashEnv::HAND_SIZE * ClashEnv::NUM_CARD_IDS);
+diff --git a/tests/core/test_opponent_state_estimator.cpp b/tests/core/test_opponent_state_estimator.cpp
+new file mode 100644
+index 0000000..6f1af45
+--- /dev/null
++++ b/tests/core/test_opponent_state_estimator.cpp
+@@ -0,0 +1,191 @@
++#include <catch_amalgamated.hpp>
++#include "ClashEnv.h"
++#include "OpponentStateEstimator.h"
++#include <cmath>
++#include <random>
++#include <vector>
++
++// The opponent-state section (perception/UPSTREAM_REQUESTS.md item 46) and the
++// estimator behind it. These pin:
++//   - with the detector exact, the estimate IS the opponent's bar, a whole
++//     match long (any drift means the estimator's elixir rules differ from
++//     GameManager's);
++//   - a cost the model says is unaffordable re-anchors instead of clamping;
++//   - a late, back-dated report gives the same answer as a timely one;
++//   - the cap washes out the miss prior;
++//   - the evolution counter follows PlayerState's own rule;
++//   - the section sits at OPP_STATE_START and a snapshot keeps it.
++
++namespace {
++const std::vector<int> DECK = { 125, 168, 129, 15, 40, 72, 33, 7 };  // live_ppo TRAIN_DECK
++using OSE = OpponentStateEstimator;
++}
++
++TEST_CASE("Opponent-state estimate equals the true bar when the detector is exact",
++          "[opp_state]") {
++    ClashEnv env(DECK, DECK, 3000);
++    ClashEnv::DetectionNoise exact;
++    exact.enabled = false;
++    env.setOppDetectionNoise(exact);
++    env.seed(5);
++    env.reset();
++    std::mt19937 rng(9);
++    int plays = 0;
++    float worst = 0.0f;
++    for (int t = 0; t < 300; ++t) {
++        const int idx = (rng() % 3 == 0) ? static_cast<int>(rng() % 4) : -1;
++        auto r = env.step(idx, 3.0f + static_cast<float>(rng() % 12), 3.0f + static_cast<float>(rng() % 10),
++                          10, env.isChampionAbilityReady(0, 1), false);
++        const auto& est = env.getOppStateEstimator(0);
++        worst = std::max(worst, std::fabs(est.estimate() - env.getElixirForTeam(1)));
++        plays = est.plays();
++        if (r.done) break;
++    }
++    REQUIRE(plays > 10);
++    REQUIRE(worst < 1e-3f);
++}
++
++TEST_CASE("A play the model cannot afford re-anchors the estimate, then confidence recovers",
++          "[opp_state]") {
++    OSE est;
++    est.reportPlay(0, 26, 5.0f);          // spends the opening 5
++    REQUIRE(est.estimate() == Catch::Approx(0.0f).margin(1e-4));
++    est.advanceTo(10, 1.0f);              // +0.36
++    est.reportPlay(10, -1, 6.0f);         // 6 > hi: a missed income or a false report
++    REQUIRE(est.contradictions() == 1);
++    REQUIRE(est.estimate() >= 0.0f);
++    REQUIRE(est.upper() > 0.0f);          // hi widened by the surprise, not clamped to 0
++    const float c0 = est.confidence();
++    REQUIRE(c0 < 0.6f);
++    est.advanceTo(1500, 1.0f);            // long idle: the cap re-anchors
++    REQUIRE(est.estimate() == Catch::Approx(PlayerState::MAX_ELIXIR));
++    REQUIRE(est.confidence() > 0.95f);
++}
++
++TEST_CASE("A play costing more than the estimate raises it to the cost (a lower bound)",
++          "[opp_state]") {
++    OSE::Config cfg;
++    cfg.assumedMissRate = 0.3f;           // a heavy miss prior drags est below hi
++    OSE est(cfg);
++    for (int k = 0; k < 4; ++k) {
++        est.advanceTo(30 * (k + 1), 1.0f);
++        est.reportPlay(30 * (k + 1), 26, 1.0f);
++    }
++    REQUIRE(est.estimate() < est.hardUpper() - 0.5f);
++    const float before = est.estimate();
++    est.advanceTo(150, 1.0f);
++    const float bar = est.estimate();
++    const float cost = std::min(est.hardUpper(), bar + 1.0f);
++    est.reportPlay(150, -1, cost);
++    REQUIRE(est.contradictions() == 0);
++    // It had at least `cost`, so after paying it the bar is >= 0 and the
++    // unseen spend was smaller than assumed: est is above where the prior had
++    // it net of the cost.
++    REQUIRE(est.estimate() >= std::max(0.0f, bar - cost) - 1e-4f);
++    REQUIRE(before < bar + 1e-4f);
++}
++
++TEST_CASE("A back-dated report replays to the same state as a timely one", "[opp_state]") {
++    OSE a, b;
++    a.advanceWithSchedule(100);
++    a.reportPlay(100, 26, 3.0f);
++    a.advanceWithSchedule(160);
++    b.advanceWithSchedule(160);           // the detector emitted it 6 s late
++    b.reportPlay(100, 26, 3.0f);
++    REQUIRE(a.estimate() == Catch::Approx(b.estimate()).margin(1e-4));
++    REQUIRE(a.sigma() == Catch::Approx(b.sigma()).margin(1e-4));
++    // Back-dating matters near the cap: at 9.5 a play reported late but
++    // dated 30 ticks back still debits the regen it would have missed.
++    OSE c, d;
++    c.advanceWithSchedule(130); c.reportPlay(130, -1, 2.0f); c.advanceWithSchedule(200);
++    d.advanceWithSchedule(200); d.reportPlay(130, -1, 2.0f);
++    REQUIRE(c.estimate() == Catch::Approx(d.estimate()).margin(1e-4));
++}
++
++TEST_CASE("The Evolution counter follows PlayerState's rule once an evolved play is seen",
++          "[opp_state][evolution]") {
++    const CardDefinition* evo = CardRegistry::getInstance().getCard(125);
++    REQUIRE(evo);
++    REQUIRE(evo->isEvolution);
++    const int base = OSE::baseIdOf(125);
++    REQUIRE(base != 125);
++    REQUIRE(OSE::evolutionIdOf(base) == 125);
++
++    OSE est;
++    est.reportPlay(0, base, -1.0f, 0);    // plain, evolution not yet known
++    REQUIRE(est.evoChargeFor(125) == Catch::Approx(-1.0f));
++    est.advanceTo(100, 1.0f);
++    est.reportPlay(100, 125, -1.0f, 1);   // seen evolved: known from now on
++    REQUIRE(est.cyclesUntilEvolvedFor(125) == evo->evolutionCycleThreshold);
++    REQUIRE(est.evoChargeFor(125) == Catch::Approx(0.0f));
++    for (int k = 0; k < evo->evolutionCycleThreshold; ++k) {
++        est.advanceTo(200 + 100 * k, 1.0f);
++        est.reportPlay(200 + 100 * k, base, -1.0f, 0);
++    }
++    REQUIRE(est.evoChargeFor(125) == Catch::Approx(1.0f));  // next deployment evolved
++}
++
++TEST_CASE("The opponent's Evolution charge in the observation matches the opponent's own",
++          "[opp_state][evolution]") {
++    ClashEnv env(DECK, DECK, 3000);
++    ClashEnv::DetectionNoise exact;
++    exact.enabled = false;
++    env.setOppDetectionNoise(exact);
++    env.seed(2);
++    env.reset();
++    const int S = ClashEnv::OPP_STATE_START;
++    int checked = 0;
++    for (int t = 0; t < 600 && checked < 20; ++t) {
++        // Team 1 plays an Evolution whenever one is in hand (else cycles slot
++        // 0); team 0 idles.
++        int idx = 0;
++        const auto handNow = env.getHandForTeam(1);
++        for (int i = 0; i < ClashEnv::HAND_SIZE; ++i)
++            if (CardRegistry::getInstance().getCard(handNow[i])->isEvolution) { idx = i; break; }
++        env.setElixirForTeam(1, PlayerState::MAX_ELIXIR);
++        auto r = env.stepSelfPlay(-1, 0, 0, idx, 9.0f, 10.0f, 10, false, false, false, false);
++        const auto o0 = env.getObservationForTeam(0);
++        const auto o1 = env.getObservationForTeam(1);
++        const auto& hand1 = env.getHandForTeam(1);
++        for (int i = 0; i < ClashEnv::HAND_SIZE; ++i) {
++            if (o1[S + ClashEnv::OWN_EVO_OFFSET + 2 * i] != 1.0f) continue;
++            const int c = hand1[i];
++            if (o0[S + ClashEnv::OPP_EVO_OFFSET + c] != 1.0f) continue;   // not yet seen evolved
++            REQUIRE(o0[S + ClashEnv::OPP_EVO_OFFSET + ClashEnv::NUM_CARD_IDS + c]
++                    == Catch::Approx(o1[S + ClashEnv::OWN_EVO_OFFSET + 2 * i + 1]));
++            ++checked;
++        }
++        if (r.done) break;
++    }
++    REQUIRE(checked > 0);
++}
++
++TEST_CASE("The opponent-state section is appended last and a snapshot keeps it", "[opp_state]") {
++    ClashEnv env(DECK, DECK, 3000);
++    env.seed(4);
++    env.reset();
++    for (int t = 0; t < 60; ++t) env.stepSelfPlay(t % 4, 9.0f, 5.0f, t % 4, 9.0f, 5.0f, 10, false, false, false, false);
++    const auto obs = env.getObservationForTeam(0);
++    REQUIRE(static_cast<int>(obs.size()) == ClashEnv::OPP_STATE_START + ClashEnv::OPP_STATE_SIZE);
++    const int S = ClashEnv::OPP_STATE_START;
++    // own hand Evolution flags read the hand
++    const auto& hand = env.getHandForTeam(0);
++    for (int i = 0; i < ClashEnv::HAND_SIZE; ++i) {
++        const bool isEvo = CardRegistry::getInstance().getCard(hand[i])->isEvolution;
++        REQUIRE(obs[S + ClashEnv::OWN_EVO_OFFSET + 2 * i] == (isEvo ? 1.0f : 0.0f));
++    }
++    // Hero Musketeer is deck slot 1: the own-ability slot says so
++    REQUIRE(obs[S + ClashEnv::OWN_ABILITY_OFFSET] == 1.0f);
++    // the elixir estimate is a fraction of the cap with a confidence in [0, 1]
++    REQUIRE(obs[S + ClashEnv::OPP_ELIXIR_OFFSET] >= 0.0f);
++    REQUIRE(obs[S + ClashEnv::OPP_ELIXIR_OFFSET] <= 1.0f);
++    REQUIRE(obs[S + ClashEnv::OPP_ELIXIR_OFFSET + 3] >= 0.0f);
++    REQUIRE(obs[S + ClashEnv::OPP_ELIXIR_OFFSET + 3] <= 1.0f);
++
++    ClashEnv copy = env.snapshot();
++    REQUIRE(copy.getObservationForTeam(0) == obs);
++    // and the copy's detector continues identically
++    env.stepSelfPlay(0, 9.0f, 5.0f, 0, 9.0f, 5.0f, 10, false, false, false, false);
++    copy.stepSelfPlay(0, 9.0f, 5.0f, 0, 9.0f, 5.0f, 10, false, false, false, false);
++    REQUIRE(copy.getObservationForTeam(0) == env.getObservationForTeam(0));
++}

@@ -1,0 +1,20 @@
+# build and environments
+.venv/
+.venv-det/
+__pycache__/
+*.pyc
+*.so
+engine/build/
+
+# large or private files: fetched with scripts/fetch_assets.sh or rebuilt with scripts/build_data.sh
+checkpoints/
+data/
+runs/
+replays/
+*.pth
+*.pt
+
+# iPhone tooling (ios/SETUP.md)
+ios/WebDriverAgent/
+ios/geometry*
+.DS_Store

@@ -1,0 +1,36 @@
+{
+  "_about": "Proposed default gen-2 opponent pool for training/pool_env.py (PoolEnv). Keys starting with '_' are notes and are ignored by the loader. Checkpoint paths are relative to the repository root. The clone entry is a STAND-IN (the gen-1 Hog 2.6 clone): replace its path with the any-deck human-clone checkpoint when it exists.",
+
+  "weights": {"ghost": 0.35, "clone": 0.35, "teacher": 0.10, "self": 0.20},
+  "_why_weights": {
+    "ghost": "0.35. The only opponents that are real humans on real decks at real frequencies (478,250 training sides); they do not react to us, so they cannot be more than about a third without teaching the policy that opponents ignore it.",
+    "clone": "0.35. The only human-like opponent that REACTS to what we do, on the same deck distribution as the ghosts. Equal to the ghosts so that neither weakness (ghosts do not react, the clone is an imperfect human) dominates; move weight from ghost to clone once the any-deck clone's win rate against validation ghosts is near 0.5.",
+    "teacher": "0.10 (the owner's starting point). Not human-like, so a small share that keeps what only they do (constant pressure, punishing every over-commit at rung 10). Measured 2026-11-22 (evals/pool_smoke_gen1_league_20261122.json): the gen-1 league policy at temperature 1.0 with a 3/6/1 action delay wins 11 % against rungs 8-10 holding real decks, so these are the hardest opponents in this pool, not solved ones; gen 1 beats only the low rungs (96 / 96 / 79 % against rungs 0 / 2 / 4, evals/ghost_teacher_gen1_league_t1.0_20261121.json). Raising this weight is the owner's call.",
+    "self": "0.20. Our own snapshots on our own deck, as league play does today; keeps the policy from being exploitable by itself and is the only opponent that gets stronger with us. Low because the mirror match-up is 1.7 % of real matches."
+  },
+
+  "p_midmatch": 0.30,
+  "_why_p_midmatch": "30 % of ALL episodes start mid-match (the chance given a ghost or clone episode is 0.30 / 0.70 = 0.43). Gen 1 only ever saw states its own play produced; these put the policy in states a human Hog 2.6 player produced (defending a push it did not cause, double elixir, damaged towers) at the true frequency of those states, and they are about half as long (71-80 decisions against 152-167 from tick 0 at a 10-tick interval). Not more than about a third: the first minute of a match must stay well covered, and a mid-match state is a re-simulation held to the recorded towers by the guard. Measured in the smoke run: 585 of 2,000 episodes started mid-match; 5 of 590 requests fell back to tick 0 because the replayed match ended before the hand-over tick. Gen 1 wins 38 % from a human's mid-match seat against the ghost and 53 % from tick 0.",
+
+  "midmatch": {"start": [200, 2400], "kinds": ["ghost", "clone"], "guard": true},
+  "_why_midmatch": "Hand-over tick uniform in 20 s .. 240 s, capped 20 s before the recorded end, on the decision grid. Split between 'the ghost of that match goes on' and 'the clone takes that opponent's deck and goes on' by the ghost : clone weights (half each). guard = ghost.Guard during the prefix only (towers held to what the recording proves).",
+
+  "ghost": {"split": "train", "faced": "any"},
+  "_why_ghost": "Training split only (validation ghosts stay the evaluation set). faced = any: every recorded side, so decks follow real frequencies with no extra weight on any archetype (owner ruling 2026-11-20). Mid-match episodes necessarily use matches in which the other player held our exact deck (8,123 training sides).",
+
+  "clone": {"ckpts": [{"path": "remote_results/bc_hog26.pth", "name": "bc_hog26_standin"}],
+            "temp": 1.0, "decks": "ghost"},
+  "_why_clone": "decks = ghost: the clone's deck (with Evolution / Hero forms) is that of a recorded side drawn like a ghost. temp 1.0 = the clone as trained (the human distribution); lower temperatures make it stronger but less human.",
+
+  "teacher": {"rungs": {"8": 1.0, "9": 1.0, "10": 2.0}, "decks": "ghost"},
+  "_why_teacher": "Only the top three rungs (gen 1 already wins 79-96 % against rungs 0-4), half of them rung 10 (reactive, no random moves). Decks drawn like the ghosts'.",
+
+  "self": {"ckpts": [{"path": "remote_results/ppo_league26_ep138708.pth", "name": "gen1_league", "weight": 1.0}],
+           "temp": 1.0},
+  "_why_self": "Start: the gen-1 league policy. During training the trainer appends snapshots with set_pool (suggested: latest 50 %, uniform over older ones 50 %, as SnapshotPool does today).",
+
+  "opp_inference": "worker",
+  "_why_opp_inference": "The opponent network runs on the worker's own core. Measured with 4 workers on this machine (learner decisions/s, in-worker vs batched in the main process): mixed pool 764 vs 637 at a 10-tick interval and 754 vs 428 at 5 ticks, self only 813 vs 456, clone only 681 vs 627. The main-process batch is serial work that grows with the number of envs, and opponents on different decks do not share a batch behind today's adapter, so the gap widens at 16 workers (projected, not measured). 'main' remains available for a machine with a GPU.",
+
+  "priv": true
+}

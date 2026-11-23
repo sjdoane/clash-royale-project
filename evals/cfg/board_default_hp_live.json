@@ -1,0 +1,55 @@
+{
+ "scale": 1.0,
+ "scale_range": null,
+ "perception_hz": 4.0,
+ "hp_as_live": true,
+ "publish_clean": false,
+ "miss_isolated": 0.03,
+ "miss_deploy": 0.15,
+ "miss_overlap": 0.16,
+ "miss_spell": 0.13,
+ "miss_mean_frames": 3.0,
+ "deploy_seconds": 1.0,
+ "overlap_radius": 1.0,
+ "spell_seconds": 1.0,
+ "first_seen_delay_frames": [],
+ "ghost_death_prob": 1.0,
+ "ghost_hold_frames": [
+  1,
+  2
+ ],
+ "spurious_per_unit": 0.02,
+ "spurious_frames": [
+  1,
+  2,
+  3
+ ],
+ "spurious_near_unit": 0.7,
+ "spurious_near_radius": 1,
+ "wrong_side": 0.03,
+ "wrong_side_lifelong": 0.8,
+ "wrong_card_form": 0.0375,
+ "wrong_card_lookalike": 0.03,
+ "wrong_card_other": 0.0075,
+ "wrong_card_lifelong": 0.8,
+ "flip_mean_frames": 4.0,
+ "lookalike_pairs": [
+  [
+   "Barbarians",
+   "Elite Barbarians"
+  ],
+  [
+   "Minions",
+   "Mega Minion"
+  ],
+  [
+   "Goblins",
+   "Spear Goblins"
+  ]
+ ],
+ "other_neighbours": 6,
+ "pos_bias_sigma": 0.15,
+ "pos_jitter_sigma": 0.17,
+ "pos_tail_prob": 0.2,
+ "pos_tail_sigma": 0.45
+}

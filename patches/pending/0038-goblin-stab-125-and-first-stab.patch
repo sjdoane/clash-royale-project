@@ -1,0 +1,200 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index dc5cc45..609ae29 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -649,6 +649,49 @@ patches 0034-0036 and one before them. A Log cast from the tile below the tower
+ after, it has left the Goblin behind the tower before the barrel lands and one
+ stab gets through. Checkpoints still load.
+ 
++## 2026-11-21: the Goblin stabs for 125, first 0.4 s after deploying (patch 0038)
++
++Two numbers of the one Goblin character, both read off the 2026-11-20 recording
++(`runs/live/20261120-185026`, Goblin Barrels on a level-11 tower).
++
++- Damage 125 at level 11 everywhere. The Goblins card (4) already had it; the
++  Goblin Barrel's, Goblin Drill's, Goblin Gang's and Hero Goblins' Goblins
++  still stabbed for 120. The recording's tower loses 375 to three stabs.
++- Load time 0.7 s (`LoadTimes.h` rows Goblins, Goblin Gang, Hero Goblins; the
++  barrel's and drill's are named "Goblins"), so the first stab comes 0.4 s
++  after the deploy second. The current published file says 500 ms (first stab
++  0.6 s), the older one 700 ms. The barrel's Goblins first stab 1.43-1.53 s
++  after landing in the recording; the engine now gives 1.5 s, it gave 1.7 s.
++  `LoadTimes::Source::RECORDING` marks rows decided this way.
++- Tests: `tests/core/test_card_registry.cpp` (`[load_time]` table),
++  `python_ai/tests/test_thrown_spell_flight.py` (first stab 15 ticks after the
++  landing), `python_ai/tests/test_goblin_barrel_on_a_tower.py` (7 x 125).
++
++**GAMEPLAY-AFFECTING.** With patches 0034-0037 an unanswered Goblin Barrel on a
++Princess Tower now plays out as recorded: stabs 3 / 2 / 1 / 1 at 1.5, 2.6, 3.7
++and 4.8 s after landing (recorded 1.47, 2.57, 3.67, 4.77), arrows landing 1.1
++to 5.1 s after it 0.8 s apart (recorded 1.0 to 5.0), 875 HP (recorded 875 and
++about 1,000). Gen-2 before patch 0034: one stab, 120. A Log from the tile below
++the tower (3, 4) now saves it when cast 18 to 26 ticks after the throw; from
++(3, 2), 12 to 20 ticks. Checkpoints still load.
++
++**Replay parity got WORSE with patches 0034-0038**, measured with the outer
++repo's `training/parity.py` (1,000 recorded Hog 2.6 matches, both players
++replayed open-loop, default convention; the `--timing bc` numbers move the same
++way): winner agreement 52.9% -> 51.1%, the 2.6 side's simulated win rate 33.2%
++-> 24.6% (real 51.0%), the opponent's crowns 1.16 -> 1.69 (real 0.69),
++simulated matches over early 66.7% -> 74.6%. Agreement in the matches that do
++not end early is unchanged (62.5% -> 62.2%).
++
++- Most of it is patch 0034's first-hit rule, not the towers. With patches
++  0034-0038 but the old wind-up lengths (the load time itself) the 2.6 side
++  wins 33.8% and the crowns are 0.70 / 1.38: slower towers add damage on both
++  sides and leave the winner alone. The rule then takes the 2.6 side from
++  33.8% to 24.6%; putting only the Cannon and the Musketeer back gives 27.0%.
++- The replay over-damaged the 2.6 side's towers before these patches (1.16
++  crowns against a real 0.69). Why it does is NOT explained; these patches add
++  to it, they did not start it.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index db65268..6242a3b 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -225,7 +225,7 @@ private:
+             .withDeployTime(5);
+     }
+     static CardStats goblinDrillGoblinStats() {
+-        return troop(-18, "Goblins", 0.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 120, 11, 'g');
++        return troop(-18, "Goblins", 0.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 125, 11, 'g');
+     }
+     // Phoenix's one-time revive: a second Phoenix with no death effect of its
+     // own. The real card leaves a vulnerable egg for ~4 s; this revives
+@@ -244,7 +244,7 @@ private:
+     // other Princess Tower's reach. It was two beside and one on the river
+     // side (0.4 tiles), unmirrored, so the other tower shot at team 1's.
+     static CardStats goblinBarrelGoblinStats() {
+-        return troop(-20, "Goblins", 0.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 120, 11, 'g')
++        return troop(-20, "Goblins", 0.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 125, 11, 'g')
+             .withOffsets({ {0.0f, 0.5f}, {0.5f, -0.5f}, {-0.5f, -0.5f} });
+     }
+     static CardStats graveyardSkeletonStats() {
+@@ -337,7 +337,7 @@ private:
+     // Goblin Drill's death spawn: two Goblins (three before a 2021 balance
+     // patch).
+     static CardStats goblinDrillDeathGoblinStats() {
+-        return troop(-36, "Goblins", 0.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 120, 11, 'g')
++        return troop(-36, "Goblins", 0.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 125, 11, 'g')
+             .withOffsets({ {-0.4f, 0.0f}, {0.4f, 0.0f} });
+     }
+     // Goblin Demolisher's transformed form: a Very Fast, building-only kamikaze
+@@ -1124,7 +1124,7 @@ private:
+         // === Compound troops ===
+         // Goblin Gang and Rascals: both halves spawn via the primary unit plus
+         // secondaryUnit.
+-        add(troop(112, "Goblin Gang", 3.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 120, 11, 'g')
++        add(troop(112, "Goblin Gang", 3.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 125, 11, 'g')
+             .withOffsets({ {-0.5f, -0.5f}, {0.5f, -0.5f}, {0.0f, 0.5f} })
+             .withSecondaryUnit(
+                 troop(-27, "Spear Goblins", 0.0f, Archetype::RangedSquad, 133, SPEED_VERY_FAST, 5.0f, 81, 16, 'S')
+@@ -1803,10 +1803,10 @@ private:
+         // within 7 s of the last goblin dying): a fresh squad at the death
+         // position. withPostDeathAbility, since there is no alive-path ability.
+         // The new squad uses plain Goblins stats, so it cannot chain.
+-        add(troop(172, "Hero Goblins", 2.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 120, 11, 'g')
++        add(troop(172, "Hero Goblins", 2.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 125, 11, 'g')
+             .withOffsets({ {-0.5f, -0.5f}, {0.5f, -0.5f}, {-0.5f, 0.5f}, {0.5f, 0.5f} })
+             .withPostDeathAbility(1.0f, 70, std::make_shared<PeriodicSpawnEffect>(
+-                troop(-48, "Goblins", 0.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 120, 11, 'g')
++                troop(-48, "Goblins", 0.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 125, 11, 'g')
+                     .withOffsets({ {-0.5f, -0.5f}, {0.5f, -0.5f}, {-0.5f, 0.5f}, {0.5f, 0.5f} }))));
+ 
+         // Hero Knight (base: id 0). "Triumphant Taunt" (2 elixir, single use
+diff --git a/include/core/LoadTimes.h b/include/core/LoadTimes.h
+index 571fb7d..cc6bd19 100644
+--- a/include/core/LoadTimes.h
++++ b/include/core/LoadTimes.h
+@@ -34,10 +34,20 @@
+ //           "LoadTime" in ms. Preferred: it is the current release.
+ //   CRAPI - RoyaleAPI cr-api-data cards_stats.json "load_time" in ms, where
+ //           FLZ has no row. Older game files.
++//   RECORDING - the two published values disagree and a recording decides.
+ // Rounded to the nearest tick.
++//
++// The Goblin (Goblins, Goblin Gang, Hero Goblins, and the Goblin Barrel's and
++// Goblin Drill's, which are named "Goblins"): FLZ says 500 ms, the older
++// CRAPI file 700 ms. With hit speed 1.1 s that is a first stab 0.6 or 0.4 s
++// after deploying. A Goblin Barrel's Goblins in the recording of 2026-11-20
++// first stab 1.43-1.53 s after landing and their fourth stab
++// comes 0.23 s before the arrow that kills the last one; 700 ms gives 1.5 s
++// and that margin here, 500 ms gives 1.7 s and a fourth stab on the same tick
++// as the arrow. 700 ms it is (patch 0038).
+ namespace LoadTimes {
+ 
+-enum class Source { FLZ, CRAPI };
++enum class Source { FLZ, CRAPI, RECORDING };
+ 
+ struct Row {
+     const char* name;
+@@ -82,15 +92,15 @@ inline const Row* table(int& count) {
+         { "Giant", 10, Source::FLZ }, // Giant 1000 ms
+         { "Giant Skeleton", 10, Source::FLZ }, // GiantSkeleton 1000 ms
+         { "Goblin Drill", 2, Source::FLZ, 11 }, // GoblinDrill 200 ms, hit speed 1100 ms
+-        { "Goblin Gang", 5, Source::FLZ }, // GoblinGang 500 ms
++        { "Goblin Gang", 7, Source::RECORDING }, // Goblin: FLZ 500 ms, CRAPI 700 ms; see below
+         { "Goblin Giant", 7, Source::FLZ }, // GoblinGiant 700 ms
+-        { "Goblins", 5, Source::FLZ }, // Goblins 500 ms
++        { "Goblins", 7, Source::RECORDING }, // Goblin: FLZ 500 ms, CRAPI 700 ms; see below
+         { "Golden Knight", 7, Source::FLZ }, // GoldenKnight 700 ms
+         { "Golem", 15, Source::FLZ }, // Golem 1500 ms
+         { "Guards", 6, Source::CRAPI }, // SkeletonWarrior 600 ms
+         { "Heal Spirit", 1, Source::CRAPI, 3 }, // HealSpirit 100 ms, hit speed 300 ms
+         { "Hero Giant", 10, Source::FLZ }, // Giant 1000 ms
+-        { "Hero Goblins", 5, Source::FLZ }, // Goblins 500 ms
++        { "Hero Goblins", 7, Source::RECORDING }, // Goblin: FLZ 500 ms, CRAPI 700 ms; see below
+         { "Hero Ice Golem", 15, Source::CRAPI }, // IceGolemite 1500 ms
+         { "Hero Knight", 7, Source::FLZ }, // Knight 700 ms
+         { "Hero Magic Archer", 6, Source::CRAPI }, // EliteArcher 600 ms
+diff --git a/python_ai/tests/test_goblin_barrel_on_a_tower.py b/python_ai/tests/test_goblin_barrel_on_a_tower.py
+index 929097f..7fa50a1 100644
+--- a/python_ai/tests/test_goblin_barrel_on_a_tower.py
++++ b/python_ai/tests/test_goblin_barrel_on_a_tower.py
+@@ -47,8 +47,7 @@ def _barrel(caster, x):
+ def test_seven_stabs_reach_the_tower_and_only_that_tower():
+     left = _barrel(1, LEFT_X)
+     assert left[0] == 0 and left[2] == 0
+-    assert left[1] % 7 == 0
+-    assert 110 <= left[1] // 7 <= 130          # one Goblin stab at level 11
++    assert left[1] == 7 * 125                  # a level-11 Goblin stabs for 125
+     right = _barrel(1, RIGHT_X)
+     assert right == [0, 0, left[1]]
+ 
+diff --git a/python_ai/tests/test_thrown_spell_flight.py b/python_ai/tests/test_thrown_spell_flight.py
+index 5242877..62d3df4 100644
+--- a/python_ai/tests/test_thrown_spell_flight.py
++++ b/python_ai/tests/test_thrown_spell_flight.py
+@@ -113,13 +113,13 @@ def test_a_goblin_barrel_is_pending_until_it_lands_and_then_the_goblins_appear()
+     assert env.get_pending_spells() == []
+ 
+     # The Goblins deploy for a second and stab after their first-hit wind-up
+-    # (hit speed 1.1 s - load time 0.5 s, LoadTimes.h): the tower is first
+-    # hurt 1.7 s after the landing (1.43-1.53 s measured).
++    # (hit speed 1.1 s - load time 0.7 s, LoadTimes.h): the tower is first
++    # hurt 1.5 s after the landing (1.43-1.53 s measured).
+     for after_landing in range(1, 30):
+         _wait(env)
+         if env.get_tower_hp(0, 1) < hp:
+             break
+-    assert after_landing == 17
++    assert after_landing == 15
+ 
+ 
+ def test_a_fireball_hits_only_when_its_flight_is_over():
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index b01eb3e..c7d183a 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -1887,7 +1887,7 @@ TEST_CASE("The first-hit wind-up is hit speed minus load time", "[card_registry]
+         { 0, "Knight", 12, 7, 5 },
+         { 61, "Princess", 30, 27, 3 },
+         { 52, "Miner", 13, 8, 5 },
+-        { 4, "Goblins", 11, 5, 6 },
++        { 4, "Goblins", 11, 7, 4 },      // load time from the recording, patch 0038
+     };
+     auto& reg = CardRegistry::getInstance();
+     for (const Row& r : rows) {

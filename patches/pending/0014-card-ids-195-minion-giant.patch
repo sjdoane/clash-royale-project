@@ -1,0 +1,578 @@
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index 2ba6ba3..ea8ef74 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -4,6 +4,7 @@
+ #include <unordered_map>
+ #include <vector>
+ #include <memory>
++#include <cctype>
+ #include "Board.h"
+ #include "CardStats.h"
+ #include "CardFactories.h"
+@@ -102,10 +103,11 @@ struct CardDefinition {
+ };
+ 
+ // Exclusive upper bound on card ids: [0, CARD_ID_COUNT). Kept a few ids above
+-// the highest registered one (175). Defined here, next to the ids it bounds, so
++// the highest registered one (188, patch 0014), so a new card does not change
++// the observation size. Defined here, next to the ids it bounds, so
+ // ClashEnv (NUM_CARD_IDS, bound to Python) and GameManager share one
+ // definition.
+-inline constexpr int CARD_ID_COUNT = 185;
++inline constexpr int CARD_ID_COUNT = 195;
+ 
+ class CardRegistry {
+ private:
+@@ -248,12 +250,13 @@ private:
+     // Hero Barbarian Barrel makes the spawned Barbarian the Hero (the barrel
+     // spell has no persistent entity): barbarianBarrelBarbarianStats plus
+     // "Rowdy Reroll" -- a 3-tile reroll (May 2026) down the barrel's own 2.6
+-    // corridor, 232 like the barrel, healing half the damage it deals.
++    // corridor, as much as the barrel (215 since the 6 Oct 2026 nerf, which
++    // the notes apply to Hero forms too), healing half the damage it deals.
+     // withAbilitySlotCard(174): this body spawns ~17 ticks after the play, as
+     // a -47 helper, so the slot must be told whose ability it carries.
+     static CardStats heroBarbarianBarrelBarbarianStats() {
+         return troop(-47, "Hero Barbarian Barrel", 0.0f, Archetype::MeleeSquad, 716, SPEED_MEDIUM, 0.7f, 192, 14, 'B')
+-            .withHeroAbility(1.0f, 0, std::make_shared<HeroBarbarianBarrelRerollEffect>(3.0f, 1.3f, 232, 716), 1)
++            .withHeroAbility(1.0f, 0, std::make_shared<HeroBarbarianBarrelRerollEffect>(3.0f, 1.3f, 215, 716), 1)
+             .withAbilitySlotCard(174);
+     }
+     // Compound-card secondary units (Goblin Machine's turret, Ram Rider's
+@@ -624,6 +627,15 @@ private:
+ 
+         // === Ranged building targeter ===
+         add(troop(18, "Royal Giant", 6.0f, Archetype::RangedBuildingTargeter, 3164, SPEED_SLOW, 5.0f, 307, 18, 'Y').withSightRange(7.5f));
++        // Minion Giant (patch 0014; Rare, released 5 Sep 2026): a flying,
++        // building-targeting spitter. Wiki Minion Giant, level 11: 1817 hp,
++        // range 4, Medium speed, 1 s deploy; damage and hit speed from the
++        // official notes (Sep 2026 189 -> 168; 6 Oct hit speed 1.5 -> 1.7 s;
++        // 19 Oct 168 -> 153). Sight range 7.5 as Royal Giant (assumed, not
++        // published). The first-hit time is "Unknown" on the wiki, so it has
++        // no LoadTimes row.
++        add(troop(176, "Minion Giant", 4.0f, Archetype::RangedBuildingTargeter, 1817, SPEED_MEDIUM, 4.0f, 153, 17, '~')
++            .withFlying().withSightRange(7.5f));
+ 
+         // === Defensive structures ===
+         add(building(25, "Cannon", 3.0f, 824, 'C', 5.5f, 202, 10));
+@@ -1004,9 +1016,10 @@ private:
+         // Void: three damage tiers, once per wave. Official balance notes,
+         // 4 Aug 2026 rework: 5 elixir, 696 per hit on 1 target, 294 on 2-4,
+         // 153 on 5+; Crown Tower 97 / 51 / 35 (one value here: the 1-target
+-        // 97, the usual case of a Void on a tower); 26 Aug: one hit per 1 s.
++        // 97, the usual case of a Void on a tower); 26 Aug: one hit per 1 s;
++        // 19 Oct: 2-4 targets 294 -> 307.
+         add(spell(104, "Void", 5.0f, 2.5f, 0, 8, '&').withRepeats(3, 10)
+-            .withSpellTieredDamage(696, 294, 153).withCrownTowerDamage(97));
++            .withSpellTieredDamage(696, 307, 153).withCrownTowerDamage(97));
+         // Vines: only the 3 highest-HP enemies in radius. Pulling flyers to the
+         // ground is not modelled.
+         add(spell(105, "Vines", 3.0f, 2.5f, 153, 8, '+').withRepeats(2, 10) /* audit 0003: wiki Vines, level 11: 153 x2 over 2 s */
+@@ -1741,11 +1754,11 @@ private:
+         // on the spell. "Rowdy Reroll" (1 elixir, one use): see
+         // HeroBarbarianBarrelRerollEffect.
+         {
+-            CardStats heroBarbarianBarrelSpellStats = spell(174, "Hero Barbarian Barrel", 2.0f, 2.5f, 232, 8, '#')
++            CardStats heroBarbarianBarrelSpellStats = spell(174, "Hero Barbarian Barrel", 2.0f, 2.5f, 215, 8, '#')
+                 .withGroundOnly()
+                 .withOwnSideOnly()
+                 .withRollingSweep(4.5f, 2.6f, 0.5f, 0.0f)
+-                .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(heroBarbarianBarrelBarbarianStats())).withCrownTowerDamage(116) /* audit 0003: wiki Barbarian Barrel/Hero, level 11 */;
++                .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(heroBarbarianBarrelBarbarianStats())).withCrownTowerDamage(108) /* wiki Barbarian Barrel/Hero gives 232 / CT 116, before the 6 Oct 2026 nerf to 215; CT kept at half (patch 0014) */;
+             heroBarbarianBarrelSpellStats.isHero = true;
+             add(heroBarbarianBarrelSpellStats);
+         }
+@@ -1820,3 +1833,38 @@ inline std::string validateDeckSlots(const std::vector<int>& deck) {
+     }
+     return "";
+ }
++
++// The card the screen shows for a play (patch 0014). An Evolution shares its
++// base card's name and a Hero is named "Hero <base>"; both fold to the base
++// card, since the live client sees only the base card's art. Anything else,
++// and a form whose base is not registered, is itself. Training and live both
++// record this id in the opponent cycle block.
++inline int faceCardIdOf(int cardId) {
++    static const std::vector<int> table = [] {
++        auto norm = [](const std::string& n) {
++            std::string out;
++            for (char c : n) {
++                if (c == '.' || c == ' ' || c == '-' || c == '\'') continue;
++                out += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
++            }
++            return out;
++        };
++        const auto& all = CardRegistry::getInstance().getAllCards();
++        std::unordered_map<std::string, int> baseByName;
++        for (const auto& [id, def] : all) {
++            if (!def.isEvolution && !def.isHero) baseByName[norm(def.name)] = id;
++        }
++        std::vector<int> t(CARD_ID_COUNT);
++        for (int i = 0; i < CARD_ID_COUNT; ++i) t[i] = i;
++        for (const auto& [id, def] : all) {
++            if (id < 0 || id >= CARD_ID_COUNT) continue;
++            std::string key = norm(def.name);
++            if (def.isHero && key.rfind("hero", 0) == 0) key = key.substr(4);
++            else if (!def.isEvolution) continue;
++            auto it = baseByName.find(key);
++            if (it != baseByName.end()) t[id] = it->second;
++        }
++        return t;
++    }();
++    return (cardId >= 0 && cardId < CARD_ID_COUNT) ? table[cardId] : cardId;
++}
+diff --git a/include/core/ClashEnv.h b/include/core/ClashEnv.h
+index d3f05b4..03d9f49 100644
+--- a/include/core/ClashEnv.h
++++ b/include/core/ClashEnv.h
+@@ -422,7 +422,11 @@ private:
+         const int now = currentTick;
+         for (int block = 0; block < NUM_CYCLE_BLOCKS; ++block) {
+             for (int cardId = 0; cardId < NUM_CARD_IDS; ++cardId) {
+-                const int last = game.getLastPlayedTick(opponent, cardId);
++                // An Evolution or Hero id is never written (plays fold to the
++                // face card), so its slot stays 0; reading it through the
++                // folding getter would light the base card twice.
++                const int last = (faceCardIdOf(cardId) == cardId)
++                    ? game.getLastPlayedTick(opponent, cardId) : -1;
+                 if (last < 0) {
+                     // Never played: both blocks 0. seen=0 means "no
+                     // information"; seen=1 with recency ~0 means "they have it,
+@@ -1041,6 +1045,17 @@ inline std::vector<int> getAllCardIds() {
+     return ids;
+ }
+ 
++// The Evolution ids (patch 0014), so Python never keeps its own copy of the
++// id range. getAllCardIds leaves these out.
++inline std::vector<int> getEvolutionCardIds() {
++    std::vector<int> ids;
++    for (const auto& [id, def] : CardRegistry::getInstance().getAllCards()) {
++        if (def.isEvolution) ids.push_back(id);
++    }
++    std::sort(ids.begin(), ids.end());
++    return ids;
++}
++
+ // A random 8-card deck that is legal by construction: each slot draws only from
+ // the pools CardRegistry::validateDeckSlots allows there (slot 0: plain +
+ // Evolution; slot 1: plain + Champion/Hero; slot 2: all three; slots 3-7:
+diff --git a/include/core/GameManager.h b/include/core/GameManager.h
+index 85e2231..ab9baf7 100644
+--- a/include/core/GameManager.h
++++ b/include/core/GameManager.h
+@@ -329,10 +329,13 @@ public:
+     // ClashEnv::notePlayedCard for why this is separate from inject()).
+     // getLastPlayedTick returns the tick of `team`'s last play of `cardId`, or
+     // -1. Both ignore out-of-range ids: callers sweep the whole id range.
++    // Both fold the id to faceCardIdOf (patch 0014): an Evolution or Hero play
++    // is recorded under the base card the screen shows, which is all live
++    // perception can report, so training and live write the same index.
+     void notePlayedCard(int team, int cardId) {
+         if (team != 0 && team != 1) return;
+         if (cardId < 0 || cardId >= CARD_ID_COUNT) return;
+-        lastPlayedTick[team][cardId] = currentTick;
++        lastPlayedTick[team][faceCardIdOf(cardId)] = currentTick;
+     }
+ 
+     const std::vector<ObservedEvent>& getObservedEvents(int team) const {
+@@ -345,7 +348,7 @@ public:
+     int getLastPlayedTick(int team, int cardId) const {
+         if (team != 0 && team != 1) return -1;
+         if (cardId < 0 || cardId >= CARD_ID_COUNT) return -1;
+-        return lastPlayedTick[team][cardId];
++        return lastPlayedTick[team][faceCardIdOf(cardId)];
+     }
+ 
+     float getElixir(int team) const {
+@@ -593,9 +596,10 @@ public:
+             // function, whoever the caller.
+             //
+             // `result.cardId` is what left the hand: for a Mirror play, Mirror
+-            // itself (164), which is what has to cycle back round.
++            // itself (164), which is what has to cycle back round. Folded to
++            // the face card, as in notePlayedCard.
+             if (result.cardId >= 0 && result.cardId < CARD_ID_COUNT) {
+-                lastPlayedTick[team][result.cardId] = currentTick;
++                lastPlayedTick[team][faceCardIdOf(result.cardId)] = currentTick;
+             }
+             // A second Mirror replays what preceded the first, so Mirror never
+             // becomes lastPlayedCardId.
+diff --git a/perception/mapping/card_map.json b/perception/mapping/card_map.json
+index 55b3ee8..00966f1 100644
+--- a/perception/mapping/card_map.json
++++ b/perception/mapping/card_map.json
+@@ -1270,6 +1270,21 @@
+       "needs_review": false,
+       "notes": ""
+     },
++    "miniongiant": {
++      "real_name": "Minion Giant",
++      "sim_id": 176,
++      "sim_evo_id": null,
++      "cost": 4.0,
++      "is_spell": false,
++      "is_building": false,
++      "is_champion": false,
++      "is_hero": false,
++      "real_verified": false,
++      "real_only": false,
++      "aliases": [],
++      "needs_review": true,
++      "notes": "Added in patch 0014. In the official API card list (data/cards/api_cards_20261118.json), so it exists live; real_verified stays false until the detector has the label."
++    },
+     "minionhorde": {
+       "real_name": "Minion Horde",
+       "sim_id": 42,
+diff --git a/python_ai/advisors/data/hog26_placement_prior.npz b/python_ai/advisors/data/hog26_placement_prior.npz
+index 39ccce22a55160f88f122cecb28fb78229480fb2..f2edee417533218b7f51f51c4948419b7c908009 100644
+GIT binary patch
+delta 150
+zcmeBm>2uj|Lx$z1jiJfpJ2IM#nUgoj%1wSDuRPgZR+B}*O7ZaKV%arJjLef26wHBS
+zgn}uM>{GB4VAf?|VBi2^MFx=W%*l5Y^np@5iYkm{lMNLmfNU=yn{jf!q8O0frl=y`
+rDaXK2oLW?t8lRn7sh3w!8Q{&xq{}?{AW+?;$<GuO*`yVK1~LEudHE-1
+
+delta 168
+zcmeBk>2=v~Lx$zrTI0i$@5pE}W=!5FD>wP2yz*psSxx2utGk;^WY;h;GE7!fFb9&6
+z3Z_7^U%^g*L6?DnfdhyY89<sdCf`-i2TJiOsz{Z}GBD)D7vv-+r{<>Sl@#mc6;uXz
+zGcxHiO!ih(0V*m`6a$j&iYnqAatsW`sYPX}@!6@BNa_v&)lHoITv3rtN&#pG0{|Ma
+BFbe<x
+
+diff --git a/python_ai/deck.py b/python_ai/deck.py
+index 12d6507..79722fc 100644
+--- a/python_ai/deck.py
++++ b/python_ai/deck.py
+@@ -22,7 +22,6 @@ import clash_royale_env as E
+ SHIPPED_DECK = (15, 6, 25, 40, 24, 72, 33, 7)
+ 
+ DECK_SIZE = 8
+-_EVOLUTION_IDS = range(123, 164)
+ 
+ 
+ def _norm(name):
+@@ -35,7 +34,7 @@ def _lookup(token):
+         return int(token)
+     evo = token.lower().startswith("evo:")
+     want = _norm(token[4:] if evo else token)
+-    pool = _EVOLUTION_IDS if evo else E.get_all_card_ids()
++    pool = E.get_evolution_card_ids() if evo else E.get_all_card_ids()
+     for cid in pool:
+         try:
+             if _norm(E.get_card_info(cid)["name"]) == want:
+diff --git a/python_ai/tests/test_opponent_cycle_observation.py b/python_ai/tests/test_opponent_cycle_observation.py
+index 6a99031..fd6121e 100644
+--- a/python_ai/tests/test_opponent_cycle_observation.py
++++ b/python_ai/tests/test_opponent_cycle_observation.py
+@@ -130,3 +130,41 @@ def test_every_cycle_value_stays_in_the_unit_interval():
+     block = _obs(e)[EC.CYCLE_START:EC.CYCLE_START + _E.CYCLE_BLOCK_SIZE]
+     assert np.all(np.isfinite(block))
+     assert block.min() >= 0.0 and block.max() <= 1.0
++
++
++def test_an_evolution_or_hero_play_lights_the_card_live_perception_reports():
++    """Patch 0014: the cycle block is keyed by the card the screen shows. Live
++    `OppCycleMirror` notes the base id (all YOLO reports); a simulated
++    Evolution or Hero play must light the same index, or the policy reads a
++    slot in training that is never lit live.
++    """
++    face = clash_royale_env.face_card_id_of
++    evos = clash_royale_env.get_evolution_card_ids()
++    heroes = [c for c in clash_royale_env.get_all_card_ids()
++              if clash_royale_env.get_card_info(c)["is_hero"]]
++    for card in (evos[0], heroes[0]):
++        base = face(card)
++        assert base != card
++        assert clash_royale_env.get_card_info(base)["name"].replace(".", "").replace(" ", "").lower() \
++            in clash_royale_env.get_card_info(card)["name"].replace(".", "").replace(" ", "").lower()
++        e = CE(DECK, DECK, 3600)
++        e.reset()
++        e.note_played_card(1, card)
++        o = _obs(e, 0)
++        assert o[EC.CYCLE_START + base] == 1.0
++        assert o[EC.CYCLE_START + card] == 0.0
++        # The getter folds its query, so a poller keyed by deck ids still sees it.
++        assert e.get_last_played_tick(1, card) == e.get_last_played_tick(1, base) >= 0
++
++
++def test_evolution_ids_come_from_the_engine():
++    """No Python copy of the Evolution id range (it moved in 0014)."""
++    from python_ai import deck
++    evos = clash_royale_env.get_evolution_card_ids()
++    assert evos == sorted(evos)
++    assert all(clash_royale_env.get_card_info(c)["is_evolution"] for c in evos)
++    assert not any(clash_royale_env.get_card_info(c)["is_evolution"]
++                   for c in clash_royale_env.get_all_card_ids())
++    name = clash_royale_env.get_card_info(evos[-1])["name"]
++    assert deck._lookup("evo:" + name) == evos[-1]
++    assert not hasattr(deck, "_EVOLUTION_IDS")
+diff --git a/python_ai/tools/track_placement.py b/python_ai/tools/track_placement.py
+index 74a2a46..0fe6511 100644
+--- a/python_ai/tools/track_placement.py
++++ b/python_ai/tools/track_placement.py
+@@ -32,8 +32,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
+     os.path.abspath(__file__)))))
+ 
+ import python_ai  # noqa: E402
++import clash_royale_env as E  # noqa: E402
+ 
+-UNIFORM_NEXT_CARD_CE = float(np.log(185))   # ln(NUM_CARD_IDS)
++UNIFORM_NEXT_CARD_CE = float(np.log(E.ClashRoyaleEnv.NUM_CARD_IDS))
+ POOL_WINRATE_FLOOR = 0.20                   # opponents/deck_pool.py
+ 
+ 
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index c1ab0f6..86652db 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -501,6 +501,11 @@ PYBIND11_MODULE(clash_royale_env, m) {
+ 
+     m.def("get_all_card_ids", &getAllCardIds,
+         "All ids CardRegistry currently has registered (real, playable cards only).");
++    m.def("get_evolution_card_ids", &getEvolutionCardIds,
++        "The Evolution ids, ascending. get_all_card_ids leaves them out.");
++    m.def("face_card_id_of", &faceCardIdOf, py::arg("card_id"),
++        "The card the screen shows for a play: an Evolution or Hero folds to its "
++        "base card, anything else is itself. The cycle block records this id.");
+ 
+     // Per-card registry facts: whether a card is a spell (spells are exempt
+     // from the own-half rule), its cost (for the affordability mask), and
+@@ -520,10 +525,11 @@ PYBIND11_MODULE(clash_royale_env, m) {
+         info["deploy_anywhere"] = def->deployAnywhere;
+         info["is_champion"] = def->isChampion;
+         info["is_hero"] = def->isHero;
++        info["is_evolution"] = def->isEvolution;
+         return info;
+     }, py::arg("card_id"),
+         "Registry facts for one card id: name, cost, is_spell, is_building, "
+-        "placement_radius, deploy_anywhere, is_champion, is_hero.");
++        "placement_radius, deploy_anywhere, is_champion, is_hero, is_evolution.");
+ 
+     // Card-stats audit (patch 0003): the full CardStats behind a card id.
+     // {"base": stats, "evolved": stats | None, "evolution_cycle_threshold",
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index ac6b42f..62d0151 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -143,6 +143,7 @@ TEST_CASE("Every currently-defined card resolves with id/name/cost/isSpell", "[c
+         {171, "Hero Magic Archer", 4.0f, false}, {175, "Hero Ice Golem", 2.0f, false},
+         {174, "Hero Barbarian Barrel", 2.0f, true},
+         {172, "Hero Goblins", 2.0f, false},
++        {176, "Minion Giant", 4.0f, false},
+     };
+ 
+     const auto& registry = CardRegistry::getInstance();
+diff --git a/tests/core/test_cards_0014.cpp b/tests/core/test_cards_0014.cpp
+new file mode 100644
+index 0000000..9533197
+--- /dev/null
++++ b/tests/core/test_cards_0014.cpp
+@@ -0,0 +1,138 @@
++#include <catch_amalgamated.hpp>
++#include "test_helpers.h"
++#include "CardRegistry.h"
++#include "ClashEnv.h"
++#include <vector>
++#include <algorithm>
++#include "RangedBuildingTargeter.h"
++
++// Patch 0014: the id range grows to CARD_ID_COUNT = 195, Minion Giant (176),
++// and the opponent cycle block keyed by the card the screen shows.
++
++namespace {
++
++int idNamed(const std::string& name, bool evolution) {
++    for (const auto& [id, def] : CardRegistry::getInstance().getAllCards()) {
++        if (def.name == name && def.isEvolution == evolution) return id;
++    }
++    return -1;
++}
++
++constexpr int cycleBase() {
++    return ClashEnv::BOARD_WIDTH * ClashEnv::BOARD_HEIGHT * ClashEnv::NUM_CHANNELS
++         + 1 + ClashEnv::HAND_SIZE + ClashEnv::HAND_SIZE * ClashEnv::NUM_CARD_IDS
++         + ClashEnv::NUM_EXTRA_SCALARS;
++}
++
++// Plays deck slot 0 as team 1 through stepSelfPlay -> GameManager::playCard.
++void playSlot0AsOpponent(ClashEnv& env, const std::vector<int>& deck) {
++    REQUIRE(env.setHandForTeam(1, { deck[0], deck[3], deck[4], deck[5] }));
++    env.setElixirForTeam(1, 10.0f);
++    env.stepSelfPlay(4, 0.0f, 0.0f, 0, 9.0f, 8.0f, 1);
++}
++
++}  // namespace
++
++TEST_CASE("every registered id is inside [0, CARD_ID_COUNT)", "[card_registry][ids]") {
++    int highest = -1;
++    for (const auto& [id, def] : CardRegistry::getInstance().getAllCards()) {
++        REQUIRE(id >= 0);
++        REQUIRE(id < CARD_ID_COUNT);
++        highest = std::max(highest, id);
++    }
++    REQUIRE(CARD_ID_COUNT == 195);
++    REQUIRE(ClashEnv::NUM_CARD_IDS == CARD_ID_COUNT);
++    REQUIRE(highest < CARD_ID_COUNT);
++}
++
++TEST_CASE("Minion Giant (176): flying, building-targeting, ranged, current balance stats",
++        "[card_registry][minion_giant]") {
++    const CardDefinition* def = CardRegistry::getInstance().getCard(176);
++    REQUIRE(def != nullptr);
++    REQUIRE(def->name == "Minion Giant");
++    REQUIRE(def->cost == Catch::Approx(4.0f));
++    REQUIRE_FALSE(def->isEvolution);
++    REQUIRE_FALSE(def->isHero);
++
++    Board board;
++    def->spawnEntity(9.0f, 10.0f, 0, board);
++    board.commitPendingEntities();
++    auto mg = std::dynamic_pointer_cast<CombatEntity>(board.getEntities()[0]);
++    REQUIRE(mg != nullptr);
++    REQUIRE(mg->hp == 1817);
++    REQUIRE(def->stats->damage == 153);         // 19 Oct 2026: 168 -> 153
++    REQUIRE(mg->getAttackCooldown() == 17);   // 6 Oct 2026: 1.5 s -> 1.7 s
++    REQUIRE(mg->getAttackRange() == Catch::Approx(4.0f));
++    REQUIRE(mg->isFlying);
++    REQUIRE(std::dynamic_pointer_cast<RangedBuildingTargeter>(mg) != nullptr);
++}
++
++TEST_CASE("faceCardIdOf folds Evolutions and Heroes to their base card", "[card_registry][ids][cycle]") {
++    const int wallBreakers = idNamed("Wall Breakers", false);
++    REQUIRE(wallBreakers >= 0);
++    REQUIRE(faceCardIdOf(123) == wallBreakers);  // Evolution: same name as its base
++    REQUIRE(faceCardIdOf(166) == idNamed("Knight", false));  // "Hero Knight"
++    REQUIRE(faceCardIdOf(170) == 5);   // "Hero Mini P.E.K.K.A." -> "Mini PEKKA": dots ignored
++    REQUIRE(faceCardIdOf(174) == 101); // Hero Barbarian Barrel
++    REQUIRE(faceCardIdOf(15) == 15);   // a plain card is itself
++    REQUIRE(faceCardIdOf(164) == 164); // Mirror
++    REQUIRE(faceCardIdOf(117) == 117); // a Champion is itself
++    REQUIRE(faceCardIdOf(-3) == -3);   // out of range: unchanged
++    for (const auto& [id, def] : CardRegistry::getInstance().getAllCards()) {
++        INFO(def.name << " (" << id << ")");
++        const CardDefinition* face = CardRegistry::getInstance().getCard(faceCardIdOf(id));
++        REQUIRE(face != nullptr);
++        REQUIRE_FALSE(face->isEvolution);
++        if (def.isEvolution || def.isHero) REQUIRE(faceCardIdOf(id) != id);
++    }
++}
++
++TEST_CASE("an Evolution play lights its base card's cycle slot, as live perception does",
++        "[cycle][evolution]") {
++    const std::vector<int> deck = { 123, 6, 25, 40, 24, 72, 33, 7 };
++    const int base = faceCardIdOf(123);
++    ClashEnv env(deck, deck, 3600);
++    env.reset();
++    playSlot0AsOpponent(env, deck);
++
++    const std::vector<float> obs = env.getObservationForTeam(0);
++    REQUIRE(obs[cycleBase() + base] == 1.0f);
++    REQUIRE(obs[cycleBase() + 123] == 0.0f);
++    REQUIRE(obs[cycleBase() + ClashEnv::NUM_CARD_IDS + 123] == 0.0f);
++    // The folding getter answers for either id, so pollers keyed by deck ids work.
++    REQUIRE(env.getLastPlayedTick(1, 123) >= 0);
++    REQUIRE(env.getLastPlayedTick(1, 123) == env.getLastPlayedTick(1, base));
++}
++
++TEST_CASE("a Hero play lights its base card's cycle slot", "[cycle][hero]") {
++    const std::vector<int> deck = { 15, 166, 25, 40, 24, 72, 33, 7 };
++    const int knight = faceCardIdOf(166);
++    ClashEnv env(deck, deck, 3600);
++    env.reset();
++    REQUIRE(env.setHandForTeam(1, { 166, 25, 40, 24 }));
++    env.setElixirForTeam(1, 10.0f);
++    env.stepSelfPlay(4, 0.0f, 0.0f, 0, 9.0f, 8.0f, 1);
++
++    const std::vector<float> obs = env.getObservationForTeam(0);
++    REQUIRE(obs[cycleBase() + knight] == 1.0f);
++    REQUIRE(obs[cycleBase() + 166] == 0.0f);
++}
++
++TEST_CASE("notePlayedCard (the live path) folds the same way", "[cycle]") {
++    const std::vector<int> deck = { 15, 6, 25, 40, 24, 72, 33, 7 };
++    ClashEnv env(deck, deck, 3600);
++    env.reset();
++    env.notePlayedCard(1, 123);
++    const std::vector<float> obs = env.getObservationForTeam(0);
++    REQUIRE(obs[cycleBase() + faceCardIdOf(123)] == 1.0f);
++    REQUIRE(obs[cycleBase() + 123] == 0.0f);
++}
++
++TEST_CASE("getEvolutionCardIds lists exactly the Evolution ids, ascending", "[card_registry][ids]") {
++    const std::vector<int> evo = getEvolutionCardIds();
++    REQUIRE_FALSE(evo.empty());
++    REQUIRE(std::is_sorted(evo.begin(), evo.end()));
++    for (int id : evo) REQUIRE(CardRegistry::getInstance().getCard(id)->isEvolution);
++    const std::vector<int> all = getAllCardIds();
++    for (int id : evo) REQUIRE(std::find(all.begin(), all.end(), id) == all.end());
++}
+diff --git a/tests/core/test_clash_env.cpp b/tests/core/test_clash_env.cpp
+index 051eac0..4b95ab7 100644
+--- a/tests/core/test_clash_env.cpp
++++ b/tests/core/test_clash_env.cpp
+@@ -6,7 +6,7 @@
+ 
+ // The observation size, asserted both ways:
+ //
+-//   18*34*21 + 1 + 4 + 4*185 + 10 + 2*185 + 4 + 398 = 14379
++//   18*34*21 + 1 + 4 + 4*195 + 10 + 2*195 + 4 + 418 = 14459
+ //
+ //   * the formula catches observationSize() disagreeing with the constants it is built from, which would split the flat vector at the wrong offset and misread every scalar silently;
+ //   * the literal catches the size changing at all. A resize invalidates every checkpoint, so it must never happen by accident; when intended, updating the literal is the acknowledgement.
+@@ -29,16 +29,16 @@ TEST_CASE("ClashEnv::observationSize matches its declared layout", "[clash_env]"
+         + ClashEnv::OPP_STATE_SIZE;                      // opponent state (item 46)
+ 
+     REQUIRE(env.observationSize() == expected);
+-    REQUIRE(env.observationSize() == 14379);
++    REQUIRE(env.observationSize() == 14459);
+     REQUIRE(ClashEnv::LEVEL_START == ClashEnv::CYCLE_START + ClashEnv::CYCLE_BLOCK_SIZE);
+     REQUIRE(ClashEnv::OPP_STATE_START == ClashEnv::LEVEL_START + ClashEnv::NUM_LEVEL_SCALARS);
+-    REQUIRE(ClashEnv::OPP_STATE_START == 13981);
+-    REQUIRE(ClashEnv::OPP_STATE_SIZE == 398);
++    REQUIRE(ClashEnv::OPP_STATE_START == 14041);
++    REQUIRE(ClashEnv::OPP_STATE_SIZE == 418);
+ 
+     // The CYCLE_START literal is a tripwire: +1 means a scalar was appended to
+     // the extra block; a larger jump means something was inserted earlier. The
+     // relationship below is the invariant.
+-    REQUIRE(ClashEnv::CYCLE_START == 13607);
++    REQUIRE(ClashEnv::CYCLE_START == 13647);
+     REQUIRE(ClashEnv::EXTRA_SCALARS_START + ClashEnv::NUM_EXTRA_SCALARS
+             == ClashEnv::CYCLE_START);
+ 
+@@ -110,7 +110,7 @@ TEST_CASE("each hand slot's card-identity block is a true one-hot", "[clash_env]
+     const std::vector<float> obs = env.getObservationForTeam(0);
+     const std::vector<int> hand = env.getHand();
+ 
+-    constexpr int BOARD_W = 18, BOARD_H = 34, CHANNELS = 21, HAND = 4, CARD_IDS = 185;
++    constexpr int BOARD_W = 18, BOARD_H = 34, CHANNELS = 21, HAND = 4, CARD_IDS = 195;
+     const size_t oneHotBase = static_cast<size_t>(BOARD_W) * BOARD_H * CHANNELS + 1 + HAND;
+ 
+     REQUIRE(hand.size() == static_cast<size_t>(HAND));
+diff --git a/tests/core/test_sight_range.cpp b/tests/core/test_sight_range.cpp
+index 9560dea..0a3b2b1 100644
+--- a/tests/core/test_sight_range.cpp
++++ b/tests/core/test_sight_range.cpp
+@@ -333,6 +333,7 @@ const SightRow SIGHT_CATALOG[] = {
+         { 172, "Hero Goblins", 5.5f },
+         { 173, "Hero Mega Minion", 5.5f },
+         { 175, "Hero Ice Golem", 7.0f },
++        { 176, "Minion Giant", 7.5f },
+ };
+ } // namespace
+ 
+diff --git a/tools/figures/extract_figure_data.py b/tools/figures/extract_figure_data.py
+index 7f40098..3a406dc 100644
+--- a/tools/figures/extract_figure_data.py
++++ b/tools/figures/extract_figure_data.py
+@@ -90,9 +90,9 @@ def fig_observation(seeds=40, first=30, last=150):
+         ["Spatial channels (21 x 34 x 18)", 0, PLANE * C],
+         ["Own elixir", PLANE * C, 1],
+         ["Hand costs", PLANE * C + 1, E.HAND_SIZE],
+-        ["Hand identity (4 x 185)", PLANE * C + 1 + E.HAND_SIZE, E.HAND_SIZE * E.NUM_CARD_IDS],
++        [f"Hand identity ({E.HAND_SIZE} x {E.NUM_CARD_IDS})", PLANE * C + 1 + E.HAND_SIZE, E.HAND_SIZE * E.NUM_CARD_IDS],
+         ["Extra scalars", E.EXTRA_SCALARS_START, E.NUM_EXTRA_SCALARS],
+-        ["Opponent card cycle (2 x 185)", E.CYCLE_START, E.CYCLE_BLOCK_SIZE],
++        [f"Opponent card cycle (2 x {E.NUM_CARD_IDS})", E.CYCLE_START, E.CYCLE_BLOCK_SIZE],
+     ]
+     save("fig3_2_observation.json", {
+         "seed": seed, "tick": env.get_current_tick(), "units": best[0], "size": len(obs),

@@ -1,0 +1,1094 @@
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index 70ac33e..756b7ed 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -59,6 +59,7 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     entity->selfPeriodicEffect = stats.selfPeriodicEffect;
+     entity->selfPeriodicIntervalTicks = stats.selfPeriodicIntervalTicks;
+     entity->selfPeriodicTicksUntilNext = stats.selfPeriodicFirstTicks;
++    entity->crownTowerHitMultiplier = stats.crownTowerHitMultiplier;
+     entity->periodicSideOffset = stats.periodicSideOffset;
+     entity->auraRadius = stats.auraRadius;
+     entity->auraMaxTargets = stats.auraMaxTargets;
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index 9f63695..bdbe540 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -44,6 +44,7 @@
+ #include "HeroIceGolemSnowstormEffect.h"
+ #include "HeroBarbarianBarrelRerollEffect.h"
+ #include "EvolutionSelfEffects.h"
++#include "HeroAbilityEffects.h"
+ 
+ // A registered card. spawnEntity is one of the archetype factories in
+ // CardFactories.h bound to the card's CardStats.
+@@ -358,6 +359,36 @@ private:
+     // becomesStationary stays false: the archetype is already stationary, and
+     // that branch's freeze would silence the turret. hp and damage are not
+     // sourced.
++    // --- Hero ability bodies added in patch 0017 ---
++    // Hero Balloon's Skeletrooper (wiki Balloon/Hero, level 11): 473 hp, 204
++    // damage every 1.1 s, Very Fast, Melee: Short, ground only, -90% to Crown
++    // Towers.
++    static CardStats heroBalloonSkeletrooperStats() {
++        return troop(-49, "Skeletrooper", 0.0f, Archetype::MeleeSquad, 473, SPEED_VERY_FAST, 0.8f, 204, 11, 'r')
++            .withCrownTowerHitMultiplier(0.1f);
++    }
++    // Hero Dark Prince's Rhino (wiki Dark Prince/Hero, level 11): 1356 hp,
++    // 179 damage every 1.6 s, Melee: Short (0.8), Medium, buildings only; a
++    // charge after 2.5 tiles at Very Fast doubles the hit (358, the wiki's
++    // Rhino Charge Damage).
++    static CardStats heroDarkPrinceRhinoStats() {
++        return troop(-50, "Rhino", 0.0f, Archetype::MeleeBuildingTargeter, 1356, SPEED_MEDIUM, 0.8f, 179, 16, 'h')
++            .withCharge(2.5f, 2.0f).withChargeSpeed(2.0f);
++    }
++    // Hero Ice Wizard's Snowman: ~425 hp and a ~5 s life (community-measured,
++    // provisional); it does not attack. Enemies can hit it.
++    static CardStats heroIceWizardSnowmanStats() {
++        return building(-51, "Snowman", 0.0f, 425, '8', 0.0f, 0, 100).withLifetime(50);
++    }
++    // Hero Tombstone's Tomb Queen (wiki Tombstone/Hero; official 4 Aug 2026
++    // notes): 4224 hp, 422 damage, sight 7, a building-targeting win
++    // condition with no skeleton spawn (removed 6 Jul 2026). Hit speed, speed
++    // and range are not published: 1.5 s, Medium, melee 1.2 assumed.
++    static CardStats heroTombstoneQueenStats() {
++        return troop(-52, "Tomb Queen", 0.0f, Archetype::MeleeBuildingTargeter, 4224, SPEED_MEDIUM, 1.2f, 422, 15, 'q')
++            .withSightRange(7.0f);
++    }
++
+     static CardStats heroMusketeerTurretStats() {
+         // Card-stats audit (patch 0003), wiki Musketeer/Hero, level 11: 1536 hp
+         // (the table prints 721, a typo: 153.6 hp lost/s x 10 s), 140 damage
+@@ -1816,6 +1847,98 @@ private:
+             add(heroBarbarianBarrelSpellStats);
+         }
+ 
++        // --- Heroes added in patch 0017 (ids 181-188) ---
++        // Base stats are the base card's registration verbatim; the ability
++        // is single use (HeroAbilityEffects.h). Refunds the game gives when a
++        // Hero dies before its ability lands (Ice Wizard, Berserker) are not
++        // modelled.
++
++        // Hero Balloon (base: id 45). "Coffin Cadets" (2 elixir; wiki
++        // Balloon/Hero): a Skeletrooper drops on the nearest enemy ground unit
++        // within 6.5 tiles (else under the Balloon), 263 landing damage (27 to
++        // Crown Towers), then fights (heroBalloonSkeletrooperStats). Landing
++        // radius 1.5 and a 0.5 s fall are assumed.
++        add(troop(181, "Hero Balloon", 5.0f, Archetype::MeleeBuildingTargeter, 1676, SPEED_MEDIUM, 0.1f, 640, 20, 'a')
++            .withFlying()
++            .withDeathEffect(std::make_shared<AreaDamageOnDeath>(1.5f, 240)).withSightRange(7.7f)
++            .withHeroAbility(2.0f, 0, std::make_shared<HeroBalloonCadetEffect>(heroBalloonSkeletrooperStats(),
++                6.5f, 1.5f, 263, 27.0f / 263.0f, 5), 1));
++
++        // Hero Valkyrie (base: id 10). "Whirlwind" (3 elixir; wiki
++        // Valkyrie/Hero): for 3.5 s she spins instead of swinging, 97 damage
++        // in 2.5 tiles every 0.25 s (-50% to Crown Towers), takes 15% less
++        // damage, and dashes 5.5 tiles (x5.5/3.5 her speed).
++        add(troop(182, "Hero Valkyrie", 4.0f, Archetype::MeleeSquad, 1907, SPEED_MEDIUM, 1.2f, 266, 15, 'V')
++            .withSplash(2.0f)
++            .withHeroAbility(3.0f, 0, std::make_shared<HeroWindowAbilityEffect>(
++                HeroAbilityWindow{ 35, false, true, 0.85f, 1.0f, 5.5f / 3.5f, 1.0f, 0 },
++                std::make_shared<ValkyrieWhirlwindPulse>(2.5f, 97, 0.5f), 1, 1, -1), 1));
++
++        // Hero Ice Wizard (base: id 34). "Frosty Fella" (2 elixir; guides,
++        // released 7 Sep 2026): a Snowman at the nearest enemy troop within
++        // his 5.5 range; enemy troops within 2.5 tiles take 46 (6 Oct notes:
++        // 89 -> 46) and freeze for 5 s (16 Sep: 7 -> 5 s). The freeze does not
++        // end early when the Snowman dies.
++        add(troop(183, "Hero Ice Wizard", 3.0f, Archetype::RangedSquad, 689, SPEED_MEDIUM, 5.5f, 90, 17, 'i')
++            .withTargetsAir()
++            .withOnHit(std::make_shared<FreezeOnHit>(30, 0.65f))
++            .withSplash(1.5f)
++            .withHeroAbility(2.0f, 0, std::make_shared<HeroIceWizardSnowmanEffect>(heroIceWizardSnowmanStats(),
++                5.5f, 2.5f, 46, 50), 1));
++
++        // Hero Dark Prince (base: id 46). "Destructive Dismount" (3 elixir;
++        // wiki Dark Prince/Hero): the Rhino lands under him after 1 s with 307
++        // spawn damage (none to Crown Towers; radius 2 assumed) and charges
++        // buildings (heroDarkPrinceRhinoStats); he loses his charge.
++        add(troop(184, "Hero Dark Prince", 4.0f, Archetype::MeleeSquad, 1200, SPEED_MEDIUM, 1.2f, 266, 14, 'N')
++            .withShield(256)
++            .withCharge(3.0f, 2.0f)
++            .withChargeSpeed(2.0f)
++            .withIgnoresRiver().withSplash(1.1f)
++            .withHeroAbility(3.0f, 0, std::make_shared<HeroDarkPrinceDismountEffect>(heroDarkPrinceRhinoStats(),
++                10, 307, 2.0f), 1));
++
++        // Hero Bowler (base: id 22). "Stone Swish" (2 elixir; wiki
++        // Bowler/Hero): rooted for 7.3 s, no normal attack; after a 2.5 s cast
++        // three lobs every 1.9 s at the nearest ground enemy within 11.5
++        // tiles, 508 damage (254 to Crown Towers). Lob radius 1.8 (his own
++        // splash) assumed; the flight time is not modelled.
++        add(troop(185, "Hero Bowler", 5.0f, Archetype::RangedSquad, 2081, SPEED_SLOW, 4.0f, 289, 25, 'w')
++            .withSplash(1.8f).withLineSplash(11.5f).withSightRange(4.0f)
++            .withHeroAbility(2.0f, 0, std::make_shared<HeroWindowAbilityEffect>(
++                HeroAbilityWindow{ 73, true, true, 1.0f, 1.0f, 1.0f, 1.0f, 0 },
++                std::make_shared<BowlerLobShot>(11.5f, 1.8f, 508, 0.5f), 25, 19, 3), 1));
++
++        // Hero Electro Wizard (base: id 35). "Surging Strikes" (2 elixir;
++        // guides, released 5 Oct 2026): the 2 nearest enemies within his 5
++        // range are hit and stunned. Neither the damage nor the stun length is
++        // published: his own 115 and 3 s (one guide) assumed. No attack delay
++        // after it (19 Oct notes).
++        add(troop(186, "Hero Electro Wizard", 4.0f, Archetype::MeleeSquad, 714, SPEED_FAST, 5.0f, 115, 18, 'z')
++            .withTargetsAir()
++            .withSplitTargets(2)
++            .withOnHit(std::make_shared<FreezeOnHit>(5, 0.0f))
++            .withSpawnEffect(3.0f, 118, std::make_shared<FreezeOnHit>(5, 0.0f))
++            .withHeroAbility(2.0f, 0, std::make_shared<HeroElectroWizardStrikesEffect>(5.0f, 2, 115, 30), 1));
++
++        // Hero Berserker (base: id 51). "Savage Survival" (3 elixir; wiki
++        // Berserker/Hero; 26 Aug notes: 4 -> 3.5 s): for 3.5 s, 0.2 s hit
++        // speed, Ultra Fast (135/90 = x1.5), cannot drop below 1 hp, -75% to
++        // Crown Towers. The wiki's "Bear Damage" (167) is not modelled.
++        add(troop(187, "Hero Berserker", 2.0f, Archetype::MeleeSquad, 896, SPEED_FAST, 0.8f, 102, 6, 'v')
++            .withHeroAbility(3.0f, 0, std::make_shared<HeroWindowAbilityEffect>(
++                HeroAbilityWindow{ 35, false, false, 1.0f, 0.2f / 0.6f, 1.5f, 0.25f, 1 }), 1));
++
++        // Hero Tombstone (base: id 96). The Tomb Queen (5 elixir; wiki
++        // Tombstone/Hero, 6 Jul and 4 Aug 2026 notes) rises at the Tombstone
++        // (heroTombstoneQueenStats); usable while it stands or within 7 s of
++        // its death (assumed, as Hero Goblins), once per deploy either way.
++        add(building(188, "Hero Tombstone", 3.0f, 529, '5', 0.0f, 0, 100)
++            .withPeriodicEffect(35, std::make_shared<PeriodicSpawnEffect>(skeletonBarrelSkeletonStats()))
++            .withDeathEffect(std::make_shared<SpawnOnDeath>(witchSkeletonStats()))
++            .withHeroAbility(5.0f, 0, std::make_shared<SpawnOnAbility>(heroTombstoneQueenStats()), 1)
++            .withPostDeathAbility(5.0f, 70, std::make_shared<PeriodicSpawnEffect>(heroTombstoneQueenStats())));
++
+     }
+ 
+ public:
+diff --git a/include/core/CardStats.h b/include/core/CardStats.h
+index 83cfc38..da96107 100644
+--- a/include/core/CardStats.h
++++ b/include/core/CardStats.h
+@@ -237,6 +237,8 @@ struct CardStats {
+     std::shared_ptr<ISelfPeriodicEffect> selfPeriodicEffect;
+     int selfPeriodicIntervalTicks = 0;
+     int selfPeriodicFirstTicks = 0;
++    // Crown Tower damage cut on the unit's own melee hits (patch 0017).
++    float crownTowerHitMultiplier = 1.0f;
+     // A faster interval used only while attacking (Evolved Furnace's "Hot
+     // Spawning"). 0 disables it.
+     int periodicHotIntervalTicks = 0;
+@@ -501,6 +503,10 @@ struct CardStats {
+     }
+     // First check `firstTicks` after the deploy ends, then every
+     // `intervalTicks` after each fire (a declined check retries next tick).
++    CardStats& withCrownTowerHitMultiplier(float m) {
++        crownTowerHitMultiplier = m;
++        return *this;
++    }
+     CardStats& withSelfPeriodicEffect(int firstTicks, int intervalTicks, std::shared_ptr<ISelfPeriodicEffect> effect) {
+         selfPeriodicFirstTicks = firstTicks;
+         selfPeriodicIntervalTicks = intervalTicks;
+diff --git a/include/core/GameManager.h b/include/core/GameManager.h
+index e0ba562..4ba11ce 100644
+--- a/include/core/GameManager.h
++++ b/include/core/GameManager.h
+@@ -165,15 +165,23 @@ private:
+             if (!slotDef || slotDef->abilityUsableAfterDeathTicks <= 0) continue;
+             bool anyFound = false; // a unit of this slot's card seen this tick
+             bool anyAlive = false;
++            // A body that already used its alive-path ability (Hero
++            // Tombstone, patch 0017) spends the post-death one too: one use
++            // per deploy.
++            bool spent = false;
+             Vector2D deathPosition = state.lastSquadWipePosition;
+             for (const auto& entity : board.getEntities()) {
+                 if (entity->cardId != deckConfig[slot] || entity->team != team) continue;
+                 anyFound = true;
+                 if (entity->isAlive()) { anyAlive = true; break; }
+                 deathPosition = entity->position;
++                if (auto ce = std::dynamic_pointer_cast<CombatEntity>(entity))
++                    if (ce->abilityEffect && ce->abilityUsesRemaining == 0) spent = true;
+             }
+             if (anyAlive) {
+                 state.lastSquadWipeTick = -1; // a fresh deploy invalidates an unconsumed window
++            } else if (anyFound && spent) {
++                state.lastSquadWipeTick = -1;
+             } else if (anyFound && state.lastSquadWipeTick < 0) {
+                 // anyFound stops the window re-arming every tick after the dead
+                 // squad is erased, which would let the ability fire repeatedly
+diff --git a/include/core/HeroAbilityEffects.h b/include/core/HeroAbilityEffects.h
+new file mode 100644
+index 0000000..ecf10b3
+--- /dev/null
++++ b/include/core/HeroAbilityEffects.h
+@@ -0,0 +1,245 @@
++#pragma once
++#include "AbilityEffect.h"
++#include "../entities/SelfPeriodicEffect.h"
++#include "CombatEntity.h"
++#include "AreaSpell.h"
++#include "CardStats.h"
++#include "CardFactories.h"
++#include "PeriodicSpawnEffect.h"
++#include "Board.h"
++#include <limits>
++#include <memory>
++
++// Hero abilities added in patch 0017 (Heroes 181-188). Every one is single
++// use (withHeroAbility(..., 1)), as all Hero abilities since the official
++// 4 Aug 2026 notes. The timed ones open CombatEntity's ability window.
++
++// The window a timed ability opens on its caster (CombatEntity's window*
++// fields; endAbilityWindow resets them).
++struct HeroAbilityWindow {
++    int ticks = 0;
++    bool rooted = false;
++    bool suppressAttack = false;
++    float damageTakenMultiplier = 1.0f;
++    float cooldownMultiplier = 1.0f;
++    float moveMultiplier = 1.0f;
++    float crownTowerMultiplier = 1.0f;
++    int minHp = 0;
++};
++
++// Opens `window` on the caster and, if given, runs `periodic` on the
++// self-periodic hook for the window's length: first after firstTicks, then
++// every intervalTicks, at most fires times (-1 = until the window ends).
++class HeroWindowAbilityEffect : public IAbilityEffect {
++    HeroAbilityWindow window;
++    std::shared_ptr<ISelfPeriodicEffect> periodic;
++    int firstTicks, intervalTicks, fires;
++
++public:
++    explicit HeroWindowAbilityEffect(HeroAbilityWindow window,
++            std::shared_ptr<ISelfPeriodicEffect> periodic = nullptr,
++            int firstTicks = 1, int intervalTicks = 1, int fires = -1)
++        : window(window), periodic(std::move(periodic)), firstTicks(firstTicks),
++          intervalTicks(intervalTicks), fires(fires) {}
++
++    const HeroAbilityWindow& getWindow() const { return window; }
++
++    void apply(Board&, CombatEntity& self) const override {
++        self.abilityWindowTicksRemaining = window.ticks;
++        self.windowRooted = window.rooted;
++        self.windowSuppressAttack = window.suppressAttack;
++        self.windowDamageTakenMultiplier = window.damageTakenMultiplier;
++        self.windowCooldownMultiplier = window.cooldownMultiplier;
++        self.windowMoveMultiplier = window.moveMultiplier;
++        self.windowCrownTowerMultiplier = window.crownTowerMultiplier;
++        self.windowMinHp = window.minHp;
++        if (periodic) {
++            self.selfPeriodicEffect = periodic;
++            self.selfPeriodicIntervalTicks = intervalTicks;
++            self.selfPeriodicTicksUntilNext = firstTicks;
++            self.selfPeriodicFiresLeft = fires;
++            self.selfPeriodicState = -1;
++            self.selfPeriodicEndsWithWindow = true;
++        }
++    }
++};
++
++namespace hero_detail {
++
++// A one-hit AreaSpell burst at `at` from `self` (detonates on its next update).
++inline void burst(Board& board, const CombatEntity& self, const Vector2D& at, float radius, int damage,
++        float towerMultiplier, std::shared_ptr<IPeriodicEffect> spawnOnDetonate = nullptr, int delayTicks = 0,
++        bool groundOnly = false) {
++    auto spell = std::make_shared<AreaSpell>(board.allocateId(), at.x, at.y, self.team,
++        std::max(radius, 0.01f), damage, delayTicks, '*', nullptr, groundOnly, 1, 0, false, 1.0f, 0, 0.0f,
++        std::move(spawnOnDetonate), false, 0, false, 0, 0, 0, towerMultiplier);
++    spell->name = self.name;
++    spell->cardId = self.cardId;
++    board.addEntity(spell);
++}
++
++struct EnemyFilter {
++    bool troops = true, buildings = true, towers = true, ground = true, air = true;
++};
++
++inline bool passes(const Entity& e, const EnemyFilter& f) {
++    if (e.isTower()) return f.towers;
++    if (e.isBuilding()) return f.buildings && f.ground;
++    if (!f.troops) return false;
++    return e.isFlying ? f.air : f.ground;
++}
++
++// Enemies of `self` within `range`, nearest first, at most `count`.
++inline std::vector<std::shared_ptr<Entity>> nearestEnemies(Board& board, const CombatEntity& self,
++        const Vector2D& from, float range, int count, const EnemyFilter& f) {
++    std::vector<std::pair<float, std::shared_ptr<Entity>>> found;
++    for (const auto& e : board.getEntities()) {
++        if (e->team == self.team || e->team < 0 || !e->isAlive() || !e->isTargetable()) continue;
++        if (!passes(*e, f)) continue;
++        const float d = from.distanceTo(e->position);
++        if (d <= range) found.emplace_back(d, e);
++    }
++    std::sort(found.begin(), found.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
++    std::vector<std::shared_ptr<Entity>> out;
++    for (size_t i = 0; i < found.size() && static_cast<int>(i) < count; ++i) out.push_back(found[i].second);
++    return out;
++}
++
++inline void hit(Board& board, const CombatEntity& self, Entity& target, int damage) {
++    target.takeDamage(damage);
++    board.statsEvents.notifyDamageDealt(
++        { self.id, self.team, self.cardId, target.id, target.cardId, target.team, damage, board.currentTick, target.isTower() });
++}
++
++}  // namespace hero_detail
++
++// Hero Valkyrie's "Whirlwind" pulses: every 0.25 s (alternating 2 and 3
++// ticks: 14 pulses in 3.5 s) an area hit around her. Runs every tick on the
++// hook; per-body tick count in selfPeriodicState.
++class ValkyrieWhirlwindPulse : public ISelfPeriodicEffect {
++    float radius;
++    int damage;
++    float towerMultiplier;
++
++public:
++    ValkyrieWhirlwindPulse(float radius, int damage, float towerMultiplier)
++        : radius(radius), damage(damage), towerMultiplier(towerMultiplier) {}
++
++    bool apply(Board& board, CombatEntity& self) const override {
++        if (self.selfPeriodicState < 0) self.selfPeriodicState = 0;
++        const int k = self.selfPeriodicState++;
++        if ((k * 2) % 5 < 2) hero_detail::burst(board, self, self.position, radius, damage, towerMultiplier, nullptr, 0, true);
++        return true;
++    }
++};
++
++// Hero Bowler's "Stone Swish" shot: a lob at the nearest ground enemy
++// (troop, building or Crown Tower) within range. No target: retry next tick.
++class BowlerLobShot : public ISelfPeriodicEffect {
++    float range, radius;
++    int damage;
++    float towerMultiplier;
++
++public:
++    BowlerLobShot(float range, float radius, int damage, float towerMultiplier)
++        : range(range), radius(radius), damage(damage), towerMultiplier(towerMultiplier) {}
++
++    bool apply(Board& board, CombatEntity& self) const override {
++        hero_detail::EnemyFilter f;
++        f.air = false;
++        auto t = hero_detail::nearestEnemies(board, self, self.position, range, 1, f);
++        if (t.empty()) return false;
++        hero_detail::burst(board, self, t[0]->position, radius, damage, towerMultiplier, nullptr, 0, true);
++        return true;
++    }
++};
++
++// Hero Electro Wizard's "Surging Strikes": the `count` nearest enemies within
++// range take `damage` and are stunned for stunTicks.
++class HeroElectroWizardStrikesEffect : public IAbilityEffect {
++    float range;
++    int count, damage, stunTicks;
++
++public:
++    HeroElectroWizardStrikesEffect(float range, int count, int damage, int stunTicks)
++        : range(range), count(count), damage(damage), stunTicks(stunTicks) {}
++
++    void apply(Board& board, CombatEntity& self) const override {
++        for (const auto& e : hero_detail::nearestEnemies(board, self, self.position, range, count, {})) {
++            hero_detail::hit(board, self, *e, damage);
++            if (auto c = std::dynamic_pointer_cast<CombatEntity>(e)) c->applyFreeze(stunTicks, 0.0f);
++        }
++    }
++};
++
++// Hero Ice Wizard's "Frosty Fella": a snowman at the nearest enemy troop
++// within range (else at the Ice Wizard); every enemy troop within radius of
++// it takes `damage` and is frozen for freezeTicks.
++class HeroIceWizardSnowmanEffect : public IAbilityEffect {
++    CardStats snowman;
++    float range, radius;
++    int damage, freezeTicks;
++
++public:
++    HeroIceWizardSnowmanEffect(CardStats snowman, float range, float radius, int damage, int freezeTicks)
++        : snowman(std::move(snowman)), range(range), radius(radius), damage(damage), freezeTicks(freezeTicks) {}
++
++    void apply(Board& board, CombatEntity& self) const override {
++        hero_detail::EnemyFilter troopsOnly;
++        troopsOnly.buildings = troopsOnly.towers = false;
++        auto t = hero_detail::nearestEnemies(board, self, self.position, range, 1, troopsOnly);
++        const Vector2D at = t.empty() ? self.position : t[0]->position;
++        for (const auto& e : hero_detail::nearestEnemies(board, self, at, radius,
++                 std::numeric_limits<int>::max(), troopsOnly)) {
++            hero_detail::hit(board, self, *e, damage);
++            if (auto c = std::dynamic_pointer_cast<CombatEntity>(e)) c->applyFreeze(freezeTicks, 0.0f);
++        }
++        CardFactories::spawn(snowman, at.x, at.y, self.team, board);
++    }
++};
++
++// Hero Balloon's "Coffin Cadets": a Skeletrooper drops on the nearest enemy
++// ground unit (troop or building) within range, else under the Balloon:
++// landing damage in a radius after delayTicks, then the trooper fights.
++class HeroBalloonCadetEffect : public IAbilityEffect {
++    CardStats trooper;
++    float range, landingRadius;
++    int landingDamage, delayTicks;
++    float landingTowerMultiplier;
++
++public:
++    HeroBalloonCadetEffect(CardStats trooper, float range, float landingRadius, int landingDamage,
++            float landingTowerMultiplier, int delayTicks)
++        : trooper(std::move(trooper)), range(range), landingRadius(landingRadius), landingDamage(landingDamage),
++          delayTicks(delayTicks), landingTowerMultiplier(landingTowerMultiplier) {}
++
++    void apply(Board& board, CombatEntity& self) const override {
++        hero_detail::EnemyFilter ground;
++        ground.air = false;
++        ground.towers = false;
++        auto t = hero_detail::nearestEnemies(board, self, self.position, range, 1, ground);
++        const Vector2D at = t.empty() ? self.position : t[0]->position;
++        hero_detail::burst(board, self, at, landingRadius, landingDamage, landingTowerMultiplier,
++            std::make_shared<PeriodicSpawnEffect>(trooper), delayTicks, true);
++    }
++};
++
++// Hero Dark Prince's "Destructive Dismount": the Rhino lands under him after
++// delayTicks with spawn damage (none to Crown Towers since 1 Jun 2026) and
++// heads for buildings; the Prince loses his charge for good.
++class HeroDarkPrinceDismountEffect : public IAbilityEffect {
++    CardStats rhino;
++    int delayTicks, landingDamage;
++    float landingRadius;
++
++public:
++    HeroDarkPrinceDismountEffect(CardStats rhino, int delayTicks, int landingDamage, float landingRadius)
++        : rhino(std::move(rhino)), delayTicks(delayTicks), landingDamage(landingDamage), landingRadius(landingRadius) {}
++
++    void apply(Board& board, CombatEntity& self) const override {
++        self.chargeThreshold = 0.0f;
++        self.chargeProgress = 0.0f;
++        hero_detail::burst(board, self, self.position, landingRadius, landingDamage, 0.0f,
++            std::make_shared<PeriodicSpawnEffect>(rhino), delayTicks, true);
++    }
++};
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index e6221b6..6917237 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -231,6 +231,26 @@ public:
+     int selfPeriodicIntervalTicks = 0;
+     int selfPeriodicTicksUntilNext = 0;
+     int selfPeriodicState = -1;
++    // Fires left before the hook clears itself (-1 = unlimited): a Hero
++    // ability that runs a fixed number of pulses or shots (patch 0017).
++    int selfPeriodicFiresLeft = -1;
++    // The hook belongs to an ability window and ends with it.
++    bool selfPeriodicEndsWithWindow = false;
++    // A Hero ability's timed window (patch 0017, HeroAbilityEffects.h): while
++    // abilityWindowTicksRemaining > 0 the unit may be rooted, hold its normal
++    // attack, take less damage, attack and move faster, not drop below
++    // windowMinHp, and deal less to Crown Towers. All reset when it ends.
++    int abilityWindowTicksRemaining = 0;
++    bool windowRooted = false;
++    bool windowSuppressAttack = false;
++    float windowDamageTakenMultiplier = 1.0f;
++    float windowCooldownMultiplier = 1.0f;
++    float windowMoveMultiplier = 1.0f;
++    float windowCrownTowerMultiplier = 1.0f;
++    int windowMinHp = 0;
++    // A permanent Crown Tower damage cut on this unit's own hits (Hero
++    // Balloon's Skeletrooper: -90%). MeleeTroop::performAttack applies it.
++    float crownTowerHitMultiplier = 1.0f;
+     // Attacks started, for effects that grow with them (Evolved Giant's rage
+     // radius).
+     int attacksStarted = 0;
+@@ -459,6 +479,25 @@ public:
+         }
+     }
+ 
++    void endAbilityWindow() {
++        abilityWindowTicksRemaining = 0;
++        windowRooted = windowSuppressAttack = false;
++        windowDamageTakenMultiplier = windowCooldownMultiplier = windowMoveMultiplier = 1.0f;
++        windowCrownTowerMultiplier = 1.0f;
++        windowMinHp = 0;
++        if (selfPeriodicEndsWithWindow) {
++            selfPeriodicEffect = nullptr;
++            selfPeriodicIntervalTicks = 0;
++            selfPeriodicEndsWithWindow = false;
++        }
++    }
++    bool inAbilityWindow() const { return abilityWindowTicksRemaining > 0; }
++    // The multiplier on this unit's hit against `target` for Crown Towers.
++    float crownTowerHitFactor(const Entity& target) const {
++        if (!target.isTower()) return 1.0f;
++        return crownTowerHitMultiplier * (inAbilityWindow() ? windowCrownTowerMultiplier : 1.0f);
++    }
++
+     void applyBuff(float multiplier, int ticks) {
+         buffDamageMultiplier = multiplier;
+         buffTicksRemaining = ticks;
+@@ -506,6 +545,9 @@ public:
+         if (curseTicksRemaining > 0) {
+             amount = static_cast<int>(amount * curseDamageTakenMultiplier);
+         }
++        if (inAbilityWindow() && windowDamageTakenMultiplier != 1.0f) {
++            amount = static_cast<int>(amount * windowDamageTakenMultiplier);
++        }
+         if (parryIntervalTicks > 0 && parryTicksUntilReady <= 0) {
+             parryTicksUntilReady = parryIntervalTicks;
+             return; // negated
+@@ -517,6 +559,7 @@ public:
+         }
+         if (amount > 0) {
+             Entity::takeDamage(amount);
++            if (inAbilityWindow() && windowMinHp > 0 && hp < windowMinHp) hp = windowMinHp;
+             if (onDamageTakenEffect) onDamageTakenEffect->apply(*this);
+         }
+     }
+@@ -703,8 +746,12 @@ public:
+         if (selfPeriodicEffect && selfPeriodicIntervalTicks > 0) {
+             if (selfPeriodicTicksUntilNext > 0) selfPeriodicTicksUntilNext--;
+             if (selfPeriodicTicksUntilNext <= 0) {
+-                selfPeriodicTicksUntilNext = selfPeriodicEffect->apply(board, *this)
+-                    ? selfPeriodicIntervalTicks : 1;
++                const bool fired = selfPeriodicEffect->apply(board, *this);
++                selfPeriodicTicksUntilNext = fired ? selfPeriodicIntervalTicks : 1;
++                if (fired && selfPeriodicFiresLeft > 0 && --selfPeriodicFiresLeft == 0) {
++                    selfPeriodicEffect = nullptr;
++                    selfPeriodicIntervalTicks = 0;
++                }
+                 if (hp <= 0) return;
+             }
+         }
+@@ -789,7 +836,7 @@ public:
+                 }
+                 // Not while stunned: a stun holds the cooldown still, and a
+                 // unit that was already ready must not swing through it.
+-                if (!stunned && !loading && currentCooldown == 0.0f) {
++                if (!stunned && !loading && currentCooldown == 0.0f && !windowSuppressAttack) {
+                     // Effects are applied by performAttack, since when they
+                     // fire depends on when the damage lands (at once for a
+                     // direct hit, on arrival for a projectile).
+@@ -833,6 +880,7 @@ public:
+                     }
+                     // Temporary ability haste (Cloaking Cape, Getaway Grenade).
+                     if (temporaryInvisibilityTicksRemaining > 0) currentCooldown *= temporaryHitSpeedMultiplier;
++                    if (inAbilityWindow()) currentCooldown *= windowCooldownMultiplier;
+                     // Blade Rage: refresh the window, then haste the cooldown
+                     // just set, so continued hits keep the haste alive.
+                     if (selfHasteDurationTicks > 0) {
+@@ -903,7 +951,7 @@ public:
+                 // Lane-aware approach: a King objective is walked to up this
+                 // unit's own lane; any other target is its own position
+                 // (LanePath::approachPoint).
+-                moveTowards(board, LanePath::approachPoint(board, team, position, target));
++                if (!windowRooted) moveTowards(board, LanePath::approachPoint(board, team, position, target));
+                 if (chargeThreshold > 0.0f) chargeProgress += beforeMove.distanceTo(position);
+             }
+         } else if (wasFrozen || rampGracePeriodTicks <= 0 || ticksSinceLastHit >= rampGracePeriodTicks) {
+@@ -916,6 +964,10 @@ public:
+         // else: within the grace period with no target, hold the ramp stage for
+         // a new target.
+ 
++        // Counted down after this update's attack and movement, so a window
++        // opened between steps covers exactly its `ticks` updates.
++        if (abilityWindowTicksRemaining > 0 && --abilityWindowTicksRemaining == 0) endAbilityWindow();
++
+         clampPosition(board);
+     }
+ 
+diff --git a/include/entities/MeleeTroop.h b/include/entities/MeleeTroop.h
+index a495a7f..a2b46a9 100644
+--- a/include/entities/MeleeTroop.h
++++ b/include/entities/MeleeTroop.h
+@@ -22,6 +22,8 @@ public:
+ protected:
+     void performAttack(Board& board, std::shared_ptr<Entity> target) override {
+         int dealt = getCurrentDamage();
++        const float towerFactor = crownTowerHitFactor(*target);
++        if (towerFactor != 1.0f) dealt = static_cast<int>(dealt * towerFactor);
+         target->takeDamage(dealt);
+         board.statsEvents.notifyDamageDealt(
+             { id, team, cardId, target->id, target->cardId, target->team, dealt, board.currentTick, target->isTower() });
+diff --git a/include/entities/Troop.h b/include/entities/Troop.h
+index 828ea4d..5834f02 100644
+--- a/include/entities/Troop.h
++++ b/include/entities/Troop.h
+@@ -40,6 +40,8 @@ protected:
+             float currentSpeed = speed * std::min(freezeFactor, moveSlowThisTick);
+             // A charge runs faster (Prince, Battle Ram...: 2x in the game).
+             if (isCharging()) currentSpeed *= chargeSpeedMultiplier;
++            // A Hero ability's dash or sprint (patch 0017).
++            if (inAbilityWindow()) currentSpeed *= windowMoveMultiplier;
+             // Land on the waypoint, never past it: an overshoot along a bank
+             // line keeps the unit "below" the river, so it is handed the same
+             // bridge mouth back and orbits it forever (UPSTREAM_REQUESTS.md
+diff --git a/perception/mapping/card_map.json b/perception/mapping/card_map.json
+index bd76859..37521a0 100644
+--- a/perception/mapping/card_map.json
++++ b/perception/mapping/card_map.json
+@@ -865,6 +865,21 @@
+       "needs_review": false,
+       "notes": ""
+     },
++    "heroballoon": {
++      "real_name": "Hero Balloon",
++      "sim_id": 181,
++      "sim_evo_id": null,
++      "cost": 5.0,
++      "is_spell": false,
++      "is_building": false,
++      "is_champion": false,
++      "is_hero": true,
++      "real_verified": false,
++      "real_only": false,
++      "aliases": [],
++      "needs_review": true,
++      "notes": "Added in patch 0017. In the official API card list (data/cards/api_cards_20261118.json), so it exists live; real_verified stays false until the detector has the label."
++    },
+     "herobarbarianbarrel": {
+       "real_name": "Hero Barbarian Barrel",
+       "sim_id": 174,
+@@ -880,6 +895,66 @@
+       "needs_review": true,
+       "notes": "Registry id >= 165 (Spirit Empress / Hero cards). Confirm this card exists in the recorded build before enabling."
+     },
++    "heroberserker": {
++      "real_name": "Hero Berserker",
++      "sim_id": 187,
++      "sim_evo_id": null,
++      "cost": 2.0,
++      "is_spell": false,
++      "is_building": false,
++      "is_champion": false,
++      "is_hero": true,
++      "real_verified": false,
++      "real_only": false,
++      "aliases": [],
++      "needs_review": true,
++      "notes": "Added in patch 0017. In the official API card list (data/cards/api_cards_20261118.json), so it exists live; real_verified stays false until the detector has the label."
++    },
++    "herobowler": {
++      "real_name": "Hero Bowler",
++      "sim_id": 185,
++      "sim_evo_id": null,
++      "cost": 5.0,
++      "is_spell": false,
++      "is_building": false,
++      "is_champion": false,
++      "is_hero": true,
++      "real_verified": false,
++      "real_only": false,
++      "aliases": [],
++      "needs_review": true,
++      "notes": "Added in patch 0017. In the official API card list (data/cards/api_cards_20261118.json), so it exists live; real_verified stays false until the detector has the label."
++    },
++    "herodarkprince": {
++      "real_name": "Hero Dark Prince",
++      "sim_id": 184,
++      "sim_evo_id": null,
++      "cost": 4.0,
++      "is_spell": false,
++      "is_building": false,
++      "is_champion": false,
++      "is_hero": true,
++      "real_verified": false,
++      "real_only": false,
++      "aliases": [],
++      "needs_review": true,
++      "notes": "Added in patch 0017. In the official API card list (data/cards/api_cards_20261118.json), so it exists live; real_verified stays false until the detector has the label."
++    },
++    "heroelectrowizard": {
++      "real_name": "Hero Electro Wizard",
++      "sim_id": 186,
++      "sim_evo_id": null,
++      "cost": 4.0,
++      "is_spell": false,
++      "is_building": false,
++      "is_champion": false,
++      "is_hero": true,
++      "real_verified": false,
++      "real_only": false,
++      "aliases": [],
++      "needs_review": true,
++      "notes": "Added in patch 0017. In the official API card list (data/cards/api_cards_20261118.json), so it exists live; real_verified stays false until the detector has the label."
++    },
+     "herogiant": {
+       "real_name": "Hero Giant",
+       "sim_id": 169,
+@@ -925,6 +1000,21 @@
+       "needs_review": true,
+       "notes": "Registry id >= 165 (Spirit Empress / Hero cards). Confirm this card exists in the recorded build before enabling."
+     },
++    "heroicewizard": {
++      "real_name": "Hero Ice Wizard",
++      "sim_id": 183,
++      "sim_evo_id": null,
++      "cost": 3.0,
++      "is_spell": false,
++      "is_building": false,
++      "is_champion": false,
++      "is_hero": true,
++      "real_verified": false,
++      "real_only": false,
++      "aliases": [],
++      "needs_review": true,
++      "notes": "Added in patch 0017. In the official API card list (data/cards/api_cards_20261118.json), so it exists live; real_verified stays false until the detector has the label."
++    },
+     "heroknight": {
+       "real_name": "Hero Knight",
+       "sim_id": 166,
+@@ -1000,6 +1090,36 @@
+       "needs_review": true,
+       "notes": "Registry id >= 165 (Spirit Empress / Hero cards). Confirm this card exists in the recorded build before enabling."
+     },
++    "herotombstone": {
++      "real_name": "Hero Tombstone",
++      "sim_id": 188,
++      "sim_evo_id": null,
++      "cost": 3.0,
++      "is_spell": false,
++      "is_building": true,
++      "is_champion": false,
++      "is_hero": true,
++      "real_verified": false,
++      "real_only": false,
++      "aliases": [],
++      "needs_review": true,
++      "notes": "Added in patch 0017. In the official API card list (data/cards/api_cards_20261118.json), so it exists live; real_verified stays false until the detector has the label."
++    },
++    "herovalkyrie": {
++      "real_name": "Hero Valkyrie",
++      "sim_id": 182,
++      "sim_evo_id": null,
++      "cost": 4.0,
++      "is_spell": false,
++      "is_building": false,
++      "is_champion": false,
++      "is_hero": true,
++      "real_verified": false,
++      "real_only": false,
++      "aliases": [],
++      "needs_review": true,
++      "notes": "Added in patch 0017. In the official API card list (data/cards/api_cards_20261118.json), so it exists live; real_verified stays false until the detector has the label."
++    },
+     "herowizard": {
+       "real_name": "Hero Wizard",
+       "sim_id": 167,
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index ddb061f..19d9134 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -131,6 +131,10 @@ TEST_CASE("Every currently-defined card resolves with id/name/cost/isSpell", "[c
+         {178, "Elite Barbarians", 6.0f, false}, // Evolution of id 17 (patch 0015)
+         {179, "Electro Giant", 7.0f, false}, // Evolution of id 84 (patch 0015)
+         {180, "Mirror", 3.0f, true}, // Evolution of id 164 (patch 0016)
++        {181, "Hero Balloon", 5.0f, false}, {182, "Hero Valkyrie", 4.0f, false},
++        {183, "Hero Ice Wizard", 3.0f, false}, {184, "Hero Dark Prince", 4.0f, false},
++        {185, "Hero Bowler", 5.0f, false}, {186, "Hero Electro Wizard", 4.0f, false},
++        {187, "Hero Berserker", 2.0f, false}, {188, "Hero Tombstone", 3.0f, false},
+         {156, "Lumberjack", 4.0f, false}, // Evolution of id 21
+         {157, "Executioner", 5.0f, false}, // Evolution of id 36
+         {158, "Giant Snowball", 2.0f, true}, // Evolution of id 100
+diff --git a/tests/core/test_cards_0017.cpp b/tests/core/test_cards_0017.cpp
+new file mode 100644
+index 0000000..6e224e1
+--- /dev/null
++++ b/tests/core/test_cards_0017.cpp
+@@ -0,0 +1,286 @@
++#include <catch_amalgamated.hpp>
++#include "test_helpers.h"
++#include "Board.h"
++#include "GameManager.h"
++#include "CardRegistry.h"
++#include "CombatEntity.h"
++#include "Tower.h"
++#include "StatsEventBus.h"
++#include "HeroAbilityEffects.h"
++#include <memory>
++#include <set>
++#include <vector>
++
++// Patch 0017: Heroes 181-188 (Balloon, Valkyrie, Ice Wizard, Dark Prince,
++// Bowler, Electro Wizard, Berserker, Tombstone) and CombatEntity's ability
++// window. Each case plays the Hero from deck slot 1 through the real
++// GameManager path and activates it with activateChampionAbility.
++
++namespace {
++
++struct Recorder : IStatsObserver {
++    std::vector<DamageDealtEvent> damage;
++    void onDamageDealt(const DamageDealtEvent& e) override { damage.push_back(e); }
++};
++
++struct HeroMatch {
++    GameManager game;
++    std::shared_ptr<Recorder> rec = std::make_shared<Recorder>();
++    int hero;
++
++    explicit HeroMatch(int heroId)
++        : game(std::vector<int>{ 0, heroId, 2, 3, 4, 5, 6, 7 }, std::vector<int>{ 0, 1, 2, 3, 4, 5, 6, 7 }),
++          hero(heroId) {
++        game.seed(1);
++        game.reset();
++        game.getBoard().statsEvents.subscribe(rec);
++        for (const auto& e : game.getBoard().getEntities())
++            if (auto t = std::dynamic_pointer_cast<Tower>(e)) t->sleep();
++    }
++    Board& board() { return game.getBoard(); }
++    void step(int n = 1) { for (int i = 0; i < n; ++i) game.step(); }
++
++    // Plays the Hero at (x, y) and steps through its deploy; returns its body.
++    std::shared_ptr<CombatEntity> deploy(float x, float y) {
++        REQUIRE(game.setHand(0, { hero, 2, 3, 4 }));
++        game.setElixir(0, 10.0f);
++        REQUIRE(game.playCard(0, hero, x, y));
++        step(DEPLOY_TIME_TICKS + 1);
++        game.setElixir(0, 10.0f);
++        return byName(CardRegistry::getInstance().getCard(hero)->name, 0);
++    }
++    std::shared_ptr<CombatEntity> byName(const std::string& name, int team) {
++        for (const auto& e : board().getEntities())
++            if (e->isAlive() && e->team == team && e->name == name)
++                if (auto c = std::dynamic_pointer_cast<CombatEntity>(e)) return c;
++        return nullptr;
++    }
++    std::shared_ptr<StationaryCombatant> dummy(float x, float y, int hp, bool flying = false) {
++        auto d = std::make_shared<StationaryCombatant>(board().allocateId(), x, y, hp, 1, 0.5f, 0, 1000);
++        d->isFlying = flying;
++        spawn(board(), d);
++        return d;
++    }
++    int damageTo(int targetId, int amount) const {
++        int n = 0;
++        for (const auto& d : rec->damage)
++            if (d.targetId == targetId && d.attackerCardId == hero && d.amount == amount) n++;
++        return n;
++    }
++};
++
++struct HeroRow { int id; const char* name; int base; float abilityCost; };
++const std::vector<HeroRow>& heroes() {
++    static const std::vector<HeroRow> rows = {
++        { 181, "Hero Balloon", 45, 2.0f }, { 182, "Hero Valkyrie", 10, 3.0f },
++        { 183, "Hero Ice Wizard", 34, 2.0f }, { 184, "Hero Dark Prince", 46, 3.0f },
++        { 185, "Hero Bowler", 22, 2.0f }, { 186, "Hero Electro Wizard", 35, 2.0f },
++        { 187, "Hero Berserker", 51, 3.0f }, { 188, "Hero Tombstone", 96, 5.0f } };
++    return rows;
++}
++
++}  // namespace
++
++TEST_CASE("Heroes 181-188: base card's stats, a single-use ability, folded to the base card",
++        "[hero][patch0017]") {
++    for (const auto& r : heroes()) {
++        INFO(r.name);
++        const CardDefinition* def = CardRegistry::getInstance().getCard(r.id);
++        const CardDefinition* base = CardRegistry::getInstance().getCard(r.base);
++        REQUIRE(def != nullptr);
++        REQUIRE(def->name == r.name);
++        REQUIRE(def->isHero);
++        REQUIRE_FALSE(def->isChampion);
++        REQUIRE(def->cost == Catch::Approx(base->cost));
++        REQUIRE(def->hp == base->hp);
++        REQUIRE(def->abilityElixirCost == Catch::Approx(r.abilityCost));
++        REQUIRE(faceCardIdOf(r.id) == r.base);
++
++        Board board;
++        def->spawnEntity(9.0f, 8.0f, 0, board);
++        board.commitPendingEntities();
++        auto body = std::dynamic_pointer_cast<CombatEntity>(board.getEntities()[0]);
++        REQUIRE(body != nullptr);
++        REQUIRE(body->isHero);
++        REQUIRE(body->abilityUsesRemaining == 1);
++        REQUIRE(body->abilityCooldownTicks == 0);
++    }
++}
++
++TEST_CASE("every new Hero's ability is activatable once through the real play path", "[hero][patch0017]") {
++    for (const auto& r : heroes()) {
++        INFO(r.name);
++        HeroMatch m(r.id);
++        m.deploy(9.0f, 8.0f);
++        m.dummy(9.0f, 11.0f, 5000);
++        REQUIRE(m.game.isChampionAbilityReady(0, 1));
++        const float before = m.game.getElixir(0);
++        REQUIRE(m.game.activateChampionAbility(0, 1));
++        REQUIRE(m.game.getElixir(0) == Catch::Approx(before - r.abilityCost));
++        REQUIRE_FALSE(m.game.isChampionAbilityReady(0, 1));
++        REQUIRE_FALSE(m.game.activateChampionAbility(0, 1));
++    }
++}
++
++TEST_CASE("Hero Balloon's Coffin Cadets drops a Skeletrooper with 263 landing damage on the nearest ground unit",
++        "[hero][hero_balloon][patch0017]") {
++    HeroMatch m(181);
++    auto balloon = m.deploy(9.0f, 8.0f);
++    auto near = m.dummy(9.0f, 12.0f, 5000);
++    auto air = m.dummy(9.0f, 10.0f, 5000, true);   // nearer, but air is never the drop
++    REQUIRE(m.game.activateChampionAbility(0, 1));
++    m.step(8);
++    REQUIRE(m.damageTo(near->id, 263) == 1);
++    REQUIRE(m.damageTo(air->id, 263) == 0);
++    auto trooper = m.byName("Skeletrooper", 0);
++    REQUIRE(trooper != nullptr);
++    REQUIRE(trooper->position.distanceTo(near->position) < 1.5f);
++    // -90% to Crown Towers on its own hits.
++    for (const auto& e : m.board().getEntities())
++        if (e->isTower()) { REQUIRE(trooper->crownTowerHitFactor(*e) == Catch::Approx(0.1f)); break; }
++    (void)balloon;
++}
++
++TEST_CASE("Hero Valkyrie's Whirlwind: 14 pulses of 97 in 3.5 s, no swings, 15% less damage taken",
++        "[hero][hero_valkyrie][patch0017]") {
++    HeroMatch m(182);
++    auto valk = m.deploy(9.0f, 8.0f);
++    auto foe = m.dummy(9.0f, 9.5f, 20000);
++    REQUIRE(m.game.activateChampionAbility(0, 1));
++    REQUIRE(valk->inAbilityWindow());
++    const int hp = valk->hp;
++    valk->takeDamage(100);
++    REQUIRE(valk->hp == hp - 85);
++    const int swingsBefore = m.damageTo(foe->id, 266);
++    m.step(35);
++    REQUIRE(m.damageTo(foe->id, 97) == 14);
++    REQUIRE(m.damageTo(foe->id, 266) == swingsBefore);   // no swings for the 35 updates
++    REQUIRE_FALSE(valk->inAbilityWindow());
++    m.step(10);
++    REQUIRE(m.damageTo(foe->id, 97) == 14);
++    REQUIRE(m.damageTo(foe->id, 266) > swingsBefore);    // swings resume
++    REQUIRE(valk->selfPeriodicEffect == nullptr);   // the pulses end with the window
++}
++
++TEST_CASE("Hero Ice Wizard's Frosty Fella freezes and hits enemy troops at the nearest one, and leaves a Snowman",
++        "[hero][hero_ice_wizard][patch0017]") {
++    HeroMatch m(183);
++    m.deploy(9.0f, 8.0f);
++    auto a = m.dummy(9.0f, 12.0f, 5000);
++    auto b = m.dummy(10.5f, 12.5f, 5000);
++    auto far = m.dummy(9.0f, 15.5f, 5000);
++    REQUIRE(m.game.activateChampionAbility(0, 1));
++    REQUIRE(m.damageTo(a->id, 46) == 1);
++    REQUIRE(m.damageTo(b->id, 46) == 1);
++    REQUIRE(m.damageTo(far->id, 46) == 0);
++    REQUIRE(a->freezeTicks == 50);
++    REQUIRE(a->freezeSlow == Catch::Approx(0.0f));
++    m.step(1);
++    auto snowman = m.byName("Snowman", 0);
++    REQUIRE(snowman != nullptr);
++    REQUIRE(snowman->position.distanceTo(Vector2D{ 9.0f, 12.0f }) < 0.01f);   // where a stood
++    m.step(60);
++    REQUIRE(m.byName("Snowman", 0) == nullptr);   // ~5 s life
++}
++
++TEST_CASE("Hero Dark Prince's Destructive Dismount: the Rhino lands after 1 s with 307, and he loses his charge",
++        "[hero][hero_dark_prince][patch0017]") {
++    HeroMatch m(184);
++    auto dp = m.deploy(9.0f, 8.0f);
++    auto foe = m.dummy(10.0f, 8.5f, 20000);
++    REQUIRE(dp->chargeThreshold > 0.0f);
++    REQUIRE(m.game.activateChampionAbility(0, 1));
++    REQUIRE(dp->chargeThreshold == 0.0f);
++    m.step(5);
++    REQUIRE(m.byName("Rhino", 0) == nullptr);
++    m.step(8);
++    auto rhino = m.byName("Rhino", 0);
++    REQUIRE(rhino != nullptr);
++    REQUIRE(rhino->hp == 1356);
++    REQUIRE(m.damageTo(foe->id, 307) == 1);
++}
++
++TEST_CASE("Hero Bowler's Stone Swish: rooted, three 508 lobs at 11.5 tiles after a 2.5 s cast",
++        "[hero][hero_bowler][patch0017]") {
++    HeroMatch m(185);
++    auto bowler = m.deploy(9.0f, 6.0f);
++    auto foe = m.dummy(9.0f, 15.0f, 20000);
++    REQUIRE(m.game.activateChampionAbility(0, 1));
++    const Vector2D at = bowler->position;
++    m.step(24);
++    REQUIRE(m.damageTo(foe->id, 508) == 0);
++    m.step(4);
++    REQUIRE(m.damageTo(foe->id, 508) == 1);
++    m.step(45);
++    REQUIRE(m.damageTo(foe->id, 508) == 3);
++    REQUIRE(bowler->position.distanceTo(at) < 1e-4f);
++    m.step(20);
++    REQUIRE(m.damageTo(foe->id, 508) == 3);         // three shots, then it ends
++    REQUIRE_FALSE(bowler->inAbilityWindow());
++}
++
++TEST_CASE("Hero Electro Wizard's Surging Strikes stun the two nearest enemies for 3 s",
++        "[hero][hero_electro_wizard][patch0017]") {
++    HeroMatch m(186);
++    m.deploy(9.0f, 8.0f);
++    auto a = m.dummy(9.0f, 11.0f, 5000);
++    auto b = m.dummy(9.0f, 11.5f, 5000, true);
++    auto c = m.dummy(9.0f, 12.5f, 5000);
++    REQUIRE(m.game.activateChampionAbility(0, 1));
++    REQUIRE(a->freezeTicks == 30);
++    REQUIRE(b->freezeTicks == 30);
++    REQUIRE(c->freezeTicks < 30);
++    REQUIRE(m.damageTo(a->id, 115) >= 1);
++    REQUIRE(m.damageTo(b->id, 115) >= 1);
++}
++
++TEST_CASE("Hero Berserker's Savage Survival: 3.5 s at 1 hp minimum, 0.2 s hits, -75% to Crown Towers",
++        "[hero][hero_berserker][patch0017]") {
++    HeroMatch m(187);
++    auto berserker = m.deploy(9.0f, 8.0f);
++    REQUIRE(m.game.activateChampionAbility(0, 1));
++    REQUIRE(berserker->windowCooldownMultiplier == Catch::Approx(1.0f / 3.0f));
++    REQUIRE(berserker->windowMoveMultiplier == Catch::Approx(1.5f));
++    for (const auto& e : m.board().getEntities())
++        if (e->isTower()) { REQUIRE(berserker->crownTowerHitFactor(*e) == Catch::Approx(0.25f)); break; }
++    berserker->takeDamage(100000);
++    REQUIRE(berserker->hp == 1);
++    m.step(34);
++    REQUIRE(berserker->isAlive());
++    m.step(2);
++    REQUIRE_FALSE(berserker->inAbilityWindow());
++    berserker->takeDamage(5);
++    REQUIRE_FALSE(berserker->isAlive());
++}
++
++TEST_CASE("Hero Tombstone raises the Tomb Queen once per deploy, alive or just after its death",
++        "[hero][hero_tombstone][patch0017]") {
++    SECTION("used while it stands: no second Queen after it dies") {
++        HeroMatch m(188);
++        auto tomb = m.deploy(9.0f, 8.0f);
++        REQUIRE(tomb != nullptr);
++        REQUIRE(m.game.activateChampionAbility(0, 1));
++        m.step(2);
++        auto queen = m.byName("Tomb Queen", 0);
++        REQUIRE(queen != nullptr);
++        REQUIRE(queen->hp == 4224);
++        tomb->takeDamage(100000);
++        for (int i = 0; i < 20; ++i) {
++            m.step();
++            m.game.setElixir(0, 10.0f);
++            REQUIRE_FALSE(m.game.isChampionAbilityReady(0, 1));
++        }
++    }
++    SECTION("unused when it dies: usable for 7 s after") {
++        HeroMatch m(188);
++        auto tomb = m.deploy(9.0f, 8.0f);
++        tomb->takeDamage(100000);
++        m.step(2);
++        m.game.setElixir(0, 10.0f);
++        REQUIRE(m.game.isChampionAbilityReady(0, 1));
++        REQUIRE(m.game.activateChampionAbility(0, 1));
++        m.step(2);
++        REQUIRE(m.byName("Tomb Queen", 0) != nullptr);
++        REQUIRE_FALSE(m.game.isChampionAbilityReady(0, 1));
++    }
++}
+diff --git a/tests/core/test_sight_range.cpp b/tests/core/test_sight_range.cpp
+index 913bb52..ba76d2b 100644
+--- a/tests/core/test_sight_range.cpp
++++ b/tests/core/test_sight_range.cpp
+@@ -337,6 +337,14 @@ const SightRow SIGHT_CATALOG[] = {
+         { 177, "Giant", 7.5f },
+         { 178, "Elite Barbarians", 5.5f },
+         { 179, "Electro Giant", 5.5f },
++        { 181, "Hero Balloon", 7.7f },
++        { 182, "Hero Valkyrie", 5.5f },
++        { 183, "Hero Ice Wizard", 5.5f },
++        { 184, "Hero Dark Prince", 5.5f },
++        { 185, "Hero Bowler", 4.0f },
++        { 186, "Hero Electro Wizard", 5.5f },
++        { 187, "Hero Berserker", 5.5f },
++        { 188, "Hero Tombstone", 5.5f },
+ };
+ } // namespace
+ 

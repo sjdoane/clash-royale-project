@@ -1,0 +1,430 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 1432220..ee1d9f0 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1035,6 +1035,50 @@ and not applied here: every ranged troop still throws at one speed.
+   7 + 1), `tests/core/test_card_registry.cpp` (`[load_time][patch0048]`), and
+   the existing expectations that moved, each with its source in a comment.
+ 
++## 2026-11-22: a ranged troop's shot flies at its published speed (patch 0049)
++
++**GAMEPLAY-AFFECTING.** Every ranged troop's projectile flew 1.5 tiles a tick
++(`RangedTroop::performAttack`, `RangedBuildingTargeter::performAttack`). New
++`include/core/ProjectileSpeeds.h`: the published Speed of each unit's
++projectile record (FirstLight-Zero card_specs.json / projectiles.json,
++release 15.535.13), keyed by registry NAME (Evolutions inherit; "Hero X"
++without a row flies like X; a row belongs to the card's ranged form, so
++"Rascals" is the Rascal Girl and "Goblinstein" the Doctor). Applied in
++`CardFactories::applyCardMetadata` to `CombatEntity::shotTilesPerTick`,
++exposed as `projectile_speed` / `projectile_tiles_per_tick` in
++`get_card_stats`.
++
++Tiles a tick = published speed / 480: the 48 per tile per second measured on
++thrown spells (patch 0030) and already used for the Princess Tower's arrow
++(patch 0036). **Not measured for a troop's shot**: over 4-6 tiles the old and
++the new flight differ by one or two frames of an 11 fps recording.
++
++| published | tiles a tick | 5 tiles take | units |
++|---|---|---|---|
++| 170 | 0.35 | 1.5 s | Bowler |
++| 350 | 0.73 | 0.7 s | Goblin Machine's rocket |
++| 400 | 0.83 | 0.6 s | Bomber, Goblin Demolisher, Ice / Fire / Heal Spirit, Lava Hound |
++| 500 | 1.04 | 0.5 s | Spear Goblins, Baby Dragon, Firecracker, Skeleton Dragons, Goblinstein's Doctor |
++| 550 | 1.15 | 0.5 s | Executioner, Hunter |
++| 600 | 1.25 | 0.4 s | Archers, Wizard, Princess, Witch, Mother Witch, Furnace, Ram Rider's bola |
++| 700 | 1.46 | 0.4 s | Ice Wizard |
++| 800 | 1.67 | 0.3 s | Dart Goblin, Flying Machine, Archer Queen, Little Prince, Rascal Girl |
++| 1000 | 2.08 | 0.3 s | Musketeer, Three Musketeers, Magic Archer, Royal Giant, Cannon Cart, Electro Spirit |
++| 1400 | 2.92 | 0.2 s | Sparky |
++| (old) 720 | 1.5 | 0.4 s | every one of them before; still Zappies and the Minion Giant |
++
++- No row = the old 1.5: the table has no projectile for the Zappies (instant
++  in the game) and no record for the Minion Giant.
++- **Buildings are not covered.** Cannon (published 1000), X-Bow (1600), Bomb
++  Tower (500) and the rest still hit on the attack tick
++  (`Building::performAttack`); the Mortar's shell keeps its own delay.
++- The Bowler's boulder still homes on one target and applies its line when it
++  arrives; it now arrives 1.1 s after the throw at 4 tiles instead of 0.3 s.
++  The real boulder hits each troop as it passes.
++- Pinned by `python_ai/tests/test_published_stats_table.py` (the fixture's 67
++  `unit_proj_speed` rows are now compared like every other field) and
++  `tests/core/test_card_registry.cpp` `[patch0049]`.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index 21d3ced..5379b37 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -2,6 +2,7 @@
+ #include "CardStats.h"
+ #include "LoadTimes.h"
+ #include "SightClips.h"
++#include "ProjectileSpeeds.h"
+ #include "Board.h"
+ #include "MeleeTroop.h"
+ #include "RangedTroop.h"
+@@ -85,6 +86,8 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+         entity->sightClip = clipRow->clip;
+         entity->sightClipSide = clipRow->clipSide;
+     }
++    // Published speed of the card's shot (ProjectileSpeeds.h, patch 0049).
++    entity->shotTilesPerTick = ProjectileSpeeds::tilesPerTick(stats.name);
+     entity->transformAtHpFraction = stats.transformAtHpFraction;
+     entity->transformCheckMaxHp = stats.hp;
+     entity->transformLifetimeTicks = stats.transformLifetimeTicks;
+diff --git a/include/core/ProjectileSpeeds.h b/include/core/ProjectileSpeeds.h
+new file mode 100644
+index 0000000..f27efd2
+--- /dev/null
++++ b/include/core/ProjectileSpeeds.h
+@@ -0,0 +1,117 @@
++#pragma once
++
++#include <string>
++
++// Published projectile speed of the ranged troops. Read by
++// CardFactories::applyCardMetadata, used where RangedTroop and
++// RangedBuildingTargeter fire (CombatEntity::shotTilesPerTick).
++//
++// Until patch 0049 every ranged troop's shot flew 1.5 tiles a tick, whatever
++// it was: a Musketeer's bullet, a Bomber's bomb and the Bowler's boulder all
++// arrived together. The game's projectile table gives each one a Speed, from
++// 170 (the boulder) to 1400 (Sparky).
++//
++// UNITS. A projectile covers published speed / 48 tiles per second: the
++// divisor measured on thrown spells (patch 0030: eight Goblin Barrels, seven
++// Fireballs frame by frame) and already used for the Princess Tower's arrow
++// (patch 0036). At 10 ticks a second that is speed / 480 tiles a tick. NOT
++// measured for a troop's shot: over a troop's 4-6 tiles the old and the new
++// flight differ by one or two frames of an 11 fps recording. It rests on the
++// published ratios and the thrown-spell divisor.
++//
++// Source: FirstLight-Zero card_specs.json / projectiles.json, release
++// 15.535.13 (the projectile record each unit names). REC rows are projectile
++// records named after the unit that no unit record links (the Ram Rider's
++// bola, the Goblin Machine's rocket).
++//
++// Keyed by registry NAME, like LoadTimes.h: an Evolution inherits the row (the
++// evolved projectile records carry the same Speed wherever they have one) and
++// "Hero X" with no row of its own flies like X. A row belongs to the card's
++// RANGED form: "Rascals" is the Rascal Girl, "Goblinstein" the Doctor; their
++// melee partners never fire.
++//
++// No row = the old 1.5 tiles a tick (720): Zappies and the Minion Giant. The
++// table has no projectile for the Zappies (their bolt is instant in the game)
++// and no record at all for the Minion Giant.
++//
++// NOT covered: the buildings. Cannon (1000), X-Bow (1600), Bomb Tower (500)
++// and the others still hit on the attack tick (Building::performAttack); the
++// Mortar's shell has its own delay.
++namespace ProjectileSpeeds {
++
++// Tiles a tick of a unit without a row (the engine's old constant).
++constexpr float DEFAULT_TILES_PER_TICK = 1.5f;
++// Published speed units per tile a tick (48 per tile a second, 10 ticks).
++constexpr float PUBLISHED_PER_TILE_PER_TICK = 480.0f;
++
++struct Row {
++    const char* name;
++    int speed;   // published units
++};
++
++inline const Row* table(int& count) {
++    static const Row rows[] = {
++        { "Archers",           600 },
++        { "Archer Queen",      800 },
++        { "Baby Dragon",       500 },
++        { "Bomber",            400 },
++        { "Bowler",            170 },
++        { "Cannon Cart",      1000 },
++        { "Dart Goblin",       800 },
++        { "Electro Spirit",   1000 },
++        { "Executioner",       550 },
++        { "Fire Spirit",       400 },
++        { "Firecracker",       500 },
++        { "Flying Machine",    800 },
++        { "Furnace",           600 },
++        { "Goblin Demolisher", 400 },
++        { "Goblin Machine",    350 },   // REC: GoblinMachineRocketProjectile
++        { "Goblinstein",       500 },   // the Doctor
++        { "Heal Spirit",       400 },
++        { "Hunter",            550 },
++        { "Ice Spirit",        400 },
++        { "Ice Wizard",        700 },
++        { "Lava Hound",        400 },
++        { "Little Prince",     800 },
++        { "Magic Archer",     1000 },
++        { "Mother Witch",      600 },
++        { "Musketeer",        1000 },
++        { "Princess",          600 },
++        { "Ram Rider",         600 },   // REC: RamRiderBola
++        { "Rascals",           800 },   // the Rascal Girl
++        { "Royal Giant",      1000 },
++        { "Skeleton Dragons",  500 },
++        { "Sparky",           1400 },
++        { "Spear Goblins",     500 },   // also the Goblin Gang's and the Goblin Giant's
++        { "Three Musketeers", 1000 },
++        { "Witch",             600 },
++        { "Wizard",            600 },
++    };
++    count = static_cast<int>(sizeof(rows) / sizeof(rows[0]));
++    return rows;
++}
++
++inline const Row* find(const std::string& name) {
++    int count = 0;
++    const Row* rows = table(count);
++    for (int i = 0; i < count; ++i) {
++        if (name == rows[i].name) return &rows[i];
++    }
++    static const std::string heroPrefix = "Hero ";
++    if (name.compare(0, heroPrefix.size(), heroPrefix) == 0) return find(name.substr(heroPrefix.size()));
++    return nullptr;
++}
++
++// The published speed of a card's shot, 0 if it has no row.
++inline int forName(const std::string& name) {
++    const Row* row = find(name);
++    return row ? row->speed : 0;
++}
++
++// Tiles a tick of a card's shot.
++inline float tilesPerTick(const std::string& name) {
++    const Row* row = find(name);
++    return row ? static_cast<float>(row->speed) / PUBLISHED_PER_TILE_PER_TICK : DEFAULT_TILES_PER_TICK;
++}
++
++} // namespace ProjectileSpeeds
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index 42dc89e..55a9c34 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -404,6 +404,10 @@ public:
+     // publish one.
+     float sightClip = 0.0f;
+     float sightClipSide = 0.0f;
++    // Tiles a tick of this unit's shot, where it fires one (RangedTroop,
++    // RangedBuildingTargeter). From the published speed in ProjectileSpeeds.h;
++    // 1.5 is the engine's old constant, kept by units without a row.
++    float shotTilesPerTick = 1.5f;
+ 
+     // HP-threshold transform (Cannon Cart: at <= 50% hp it grounds itself and
+     // self-destructs after a fixed lifespan). The fraction is of
+diff --git a/include/entities/RangedBuildingTargeter.h b/include/entities/RangedBuildingTargeter.h
+index ea6b371..1b7240b 100644
+--- a/include/entities/RangedBuildingTargeter.h
++++ b/include/entities/RangedBuildingTargeter.h
+@@ -27,7 +27,7 @@ protected:
+         // lineSplash/lineSplashRange forwarded, as RangedTroop does; dropping
+         // them silently turns a piercing shot into circular splash.
+         auto proj = std::make_shared<Projectile>(
+-            board.allocateId(), position.x, position.y, team, target, 1.5f, getCurrentDamage(), onHitEffects,
++            board.allocateId(), position.x, position.y, team, target, shotTilesPerTick, getCurrentDamage(), onHitEffects,
+             false, 0, id, cardId, splashRadius, lineSplash, lineSplashRange);
+         board.addEntity(proj);
+     }
+diff --git a/include/entities/RangedTroop.h b/include/entities/RangedTroop.h
+index df32c79..da1f4b5 100644
+--- a/include/entities/RangedTroop.h
++++ b/include/entities/RangedTroop.h
+@@ -28,7 +28,7 @@ protected:
+     void performAttack(Board& board, std::shared_ptr<Entity> target) override {
+         // On-hit effects travel with the shot and land when it does.
+         auto arrow = std::make_shared<Projectile>(
+-            board.allocateId(), position.x, position.y, team, target, 1.5f, getCurrentDamage(), onHitEffects,
++            board.allocateId(), position.x, position.y, team, target, shotTilesPerTick, getCurrentDamage(), onHitEffects,
+             boomerang, boomerangReturnDelayTicks, id, cardId, splashRadius, lineSplash, lineSplashRange,
+             splashAppliesOnHit);
+         arrow->crownTowerFactor = crownTowerHitFactor(*target);
+diff --git a/python_ai/tests/data/published_stats_15_535_13.json b/python_ai/tests/data/published_stats_15_535_13.json
+index 9b560ac..66ad117 100644
+--- a/python_ai/tests/data/published_stats_15_535_13.json
++++ b/python_ai/tests/data/published_stats_15_535_13.json
+@@ -298,6 +298,7 @@
+   [34, "Ice Wizard", "base", "sight", 5.5],
+   [34, "Ice Wizard", "base", "deploy_ms", 1000],
+   [34, "Ice Wizard", "base", "count", 1],
++  [34, "Ice Wizard", "base", "unit_proj_speed", 700],
+   [34, "Ice Wizard", "base", "collision", 0.5],
+   [35, "Electro Wizard", "base", "hp", 714],
+   [35, "Electro Wizard", "base", "damage", 117],
+@@ -974,6 +975,7 @@
+   [112, "Goblin Gang", "second", "range", 5.0],
+   [112, "Goblin Gang", "second", "sight", 5.5],
+   [112, "Goblin Gang", "second", "deploy_ms", 1000],
++  [112, "Goblin Gang", "second", "unit_proj_speed", 500],
+   [112, "Goblin Gang", "second", "collision", 0.5],
+   [113, "Rascals", "base", "hp", 1832],
+   [113, "Rascals", "base", "damage", 217],
+@@ -991,6 +993,7 @@
+   [113, "Rascals", "second", "range", 5.0],
+   [113, "Rascals", "second", "sight", 5.5],
+   [113, "Rascals", "second", "deploy_ms", 1000],
++  [113, "Rascals", "second", "unit_proj_speed", 800],
+   [113, "Rascals", "second", "collision", 0.5],
+   [114, "Clone", "base", "radius", 3.0],
+   [115, "Mighty Miner", "base", "hp", 2250],
+@@ -1072,6 +1075,7 @@
+   [121, "Goblinstein", "second", "range", 5.5],
+   [121, "Goblinstein", "second", "sight", 5.5],
+   [121, "Goblinstein", "second", "deploy_ms", 1000],
++  [121, "Goblinstein", "second", "unit_proj_speed", 500],
+   [121, "Goblinstein", "second", "collision", 0.5],
+   [122, "Boss Bandit", "base", "hp", 2624],
+   [122, "Boss Bandit", "base", "damage", 245],
+@@ -1988,6 +1992,7 @@
+   [183, "Hero Ice Wizard", "hero-base", "sight", 5.5],
+   [183, "Hero Ice Wizard", "hero-base", "deploy_ms", 1000],
+   [183, "Hero Ice Wizard", "hero-base", "count", 1],
++  [183, "Hero Ice Wizard", "hero-base", "unit_proj_speed", 700],
+   [183, "Hero Ice Wizard", "hero-base", "collision", 0.5],
+   [184, "Hero Dark Prince", "hero-base", "hp", 1200],
+   [184, "Hero Dark Prince", "hero-base", "shield", 240],
+diff --git a/python_ai/tests/test_published_stats_table.py b/python_ai/tests/test_published_stats_table.py
+index d92607a..93b65b0 100644
+--- a/python_ai/tests/test_published_stats_table.py
++++ b/python_ai/tests/test_published_stats_table.py
+@@ -5,9 +5,10 @@
+ form and field the engine models (hit points, shield, damage, hit speed, first
+ hit, speed, range, sight, deploy time, lifetime, count, spell radius and
+ projectile speed, death damage, charge multiplier, splash), level 11 being
+-floor(level-1 x 2.56). Rows of the fields `collision` (per-card collision
+-radius) and `unit_proj_speed` (per-unit projectile speed) are carried for
+-reference and are pinned by the patch that models them, if any.
++floor(level-1 x 2.56). `unit_proj_speed` is the speed of a ranged troop's
++shot (ProjectileSpeeds.h, patch 0049). Rows of the field `collision` (per-card
++collision radius) are carried for reference and are pinned by the patch that
++models them, if any.
+ 
+ DATING. That release is the game right after the 4 Aug 2026 balance update: it
+ holds every change of that date and none of the later ones, and the "old"
+@@ -49,8 +50,9 @@ FIELDS = {
+     "charge_mult": (0.01, lambda e: e["charge_multiplier"]),
+     "splash": (0.01, lambda e: e["splash_radius"]),
+     "proj_radius": (0.01, lambda e: e["splash_radius"]),
++    "unit_proj_speed": (1, lambda e: e["projectile_speed"]),
+ }
+-NOT_PINNED_HERE = {"collision", "unit_proj_speed"}
++NOT_PINNED_HERE = {"collision"}
+ 
+ # (card, field) -> (current value, the official note). Applies to the card's
+ # Evolution and Hero rows too, not to a second unit of the card. "derived" = the note changes the hit speed and
+@@ -231,3 +233,19 @@ def test_a_hero_without_a_row_of_its_own_loads_like_its_base_card():
+         assert hero["first_hit_windup_ticks"] == base["first_hit_windup_ticks"] > 0, name
+         checked += 1
+     assert checked == 7
++
++
++def test_a_ranged_troops_shot_flies_at_its_published_speed():
++    """Patch 0049: published speed / 480 tiles a tick, the thrown-spell divisor."""
++    rows = [r for r in _rows() if r[3] == "unit_proj_speed"]
++    assert len(rows) >= 60
++    assert {r[4] for r in rows} >= {170, 400, 500, 550, 600, 700, 800, 1000, 1400}
++    musketeer = E.get_card_stats(168)["base"]  # Hero Musketeer: flies like the Musketeer
++    assert musketeer["projectile_speed"] == 1000
++    assert abs(musketeer["projectile_tiles_per_tick"] - 1000 / 480.0) < 1e-6
++    # Projectile records named after the unit that no unit record links.
++    assert E.get_card_stats(87)["base"]["secondary_unit"]["projectile_speed"] == 600   # RamRiderBola
++    assert E.get_card_stats(55)["base"]["secondary_unit"]["projectile_speed"] == 350   # GoblinMachineRocketProjectile
++    # No published projectile: the engine's old 1.5 tiles a tick.
++    zappies = E.get_card_stats(79)["base"]
++    assert zappies["projectile_speed"] == 0 and zappies["projectile_tiles_per_tick"] == 1.5
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index f8d449b..04d051f 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -76,6 +76,9 @@ py::dict statsDict(const CardStats& s, int depth = 0) {
+         d["sight_clip"] = clipRow ? clipRow->clip : 0.0f;
+         d["sight_clip_side"] = clipRow ? clipRow->clipSide : 0.0f;
+     }
++    // Published speed of the card's shot (ProjectileSpeeds.h); 0 = no row.
++    d["projectile_speed"] = ProjectileSpeeds::forName(s.name);
++    d["projectile_tiles_per_tick"] = ProjectileSpeeds::tilesPerTick(s.name);
+     d["deploy_ticks"] = s.deployTicks;
+     d["count"] = static_cast<int>(s.spawnOffsets.size());
+     py::list offs;
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index 4ee661c..3e5b114 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -1982,6 +1982,78 @@ TEST_CASE("Load times of release 15.535.13 and the notes after it", "[card_regis
+     REQUIRE(LoadTimes::forName("Hero Ice Golem") == 15);
+ }
+ 
++TEST_CASE("A ranged troop's shot flies at its published speed", "[card_registry][projectile][patch0049]") {
++    // Published speed / 480 tiles a tick (ProjectileSpeeds.h). The shot lands
++    // on update ceil(distance / tiles a tick). At 4 tiles every shot used to
++    // take 3 updates (1.5 tiles a tick).
++    struct Row { int cardId; const char* name; int published; float distance; int updates; };
++    const Row rows[] = {
++        { 6,  "Musketeer",   1000, 4.0f, 2 },    // 2.08 tiles a tick
++        { 20, "Dart Goblin",  800, 4.0f, 3 },    // 1.67
++        { 34, "Ice Wizard",   700, 4.0f, 3 },    // 1.46
++        { 11, "Wizard",       600, 4.0f, 4 },    // 1.25
++        { 44, "Baby Dragon",  500, 3.5f, 4 },    // 1.04 (range 3.5)
++        { 9,  "Bomber",       400, 4.0f, 5 },    // 0.83
++        { 22, "Bowler",       170, 4.0f, 12 },   // 0.35
++        { 79, "Zappies",        0, 4.0f, 3 },    // no published projectile: the old 1.5
++    };
++    for (const Row& r : rows) {
++        INFO(r.name);
++        REQUIRE(ProjectileSpeeds::forName(r.name) == r.published);
++        const float distance = r.distance;
++        const int expected = r.updates;
++        Board board;
++        auto target = std::make_shared<DummyEntity>(900, 5.0f, 5.0f + distance, 100000, 1);
++        spawn(board, target);
++        CardRegistry::getInstance().getCard(r.cardId)->spawnEntity(5.0f, 5.0f, 0, board);
++        board.commitPendingEntities();
++        // The squad member standing on the placement point.
++        std::shared_ptr<CombatEntity> shooter;
++        for (const auto& e : board.getEntities()) {
++            auto c = std::dynamic_pointer_cast<CombatEntity>(e);
++            if (c && c->team == 0 && (!shooter || std::fabs(c->position.x - 5.0f) < std::fabs(shooter->position.x - 5.0f))) shooter = c;
++        }
++        REQUIRE(shooter);
++        shooter->position = { 5.0f, 5.0f };
++        advancePastDeploy(shooter, board);
++        std::shared_ptr<Projectile> shot;
++        for (int i = 0; i < 60 && !shot; ++i) {
++            shooter->update(board);
++            board.commitPendingEntities();
++            for (const auto& e : board.getEntities()) {
++                if (auto p = std::dynamic_pointer_cast<Projectile>(e)) shot = p;
++            }
++        }
++        REQUIRE(shot);
++        REQUIRE(target->hp == 100000);
++        int updates = 0;
++        while (target->hp == 100000 && updates < 40) { shot->update(board); ++updates; }
++        REQUIRE(updates == expected);
++    }
++}
++
++TEST_CASE("Projectile speeds: Evolutions and Heroes inherit, every row names a registered card",
++          "[card_registry][projectile][patch0049]") {
++    auto& reg = CardRegistry::getInstance();
++    REQUIRE(ProjectileSpeeds::forName(reg.getCard(140)->name) == 1000);   // Evolved Musketeer
++    REQUIRE(ProjectileSpeeds::forName(reg.getCard(168)->name) == 1000);   // Hero Musketeer
++    REQUIRE(ProjectileSpeeds::forName("Hero Bowler") == 170);
++    REQUIRE(ProjectileSpeeds::forName("Knight") == 0);
++    REQUIRE(ProjectileSpeeds::tilesPerTick("Knight") == ProjectileSpeeds::DEFAULT_TILES_PER_TICK);
++    REQUIRE(ProjectileSpeeds::tilesPerTick("Princess") == Catch::Approx(1.25f));   // as the Princess Tower's arrow
++    int count = 0;
++    const ProjectileSpeeds::Row* rows = ProjectileSpeeds::table(count);
++    for (int i = 0; i < count; ++i) {
++        INFO(rows[i].name);
++        bool found = false;
++        for (int id = 0; id < 400 && !found; ++id) {
++            const auto* c = reg.getCard(id);
++            found = c && c->name == rows[i].name;
++        }
++        REQUIRE(found);
++    }
++}
++
+ TEST_CASE("A stun during the wind-up restarts it", "[card_registry][load_time]") {
+     Board board;
+     auto building = std::make_shared<Building>(999, 5.0f, 5.5f, 100000, 1, 'C', 5.0f, 10, 10);

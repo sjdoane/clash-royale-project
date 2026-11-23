@@ -1,0 +1,2435 @@
+{
+ "0": {
+  "name": "Knight",
+  "page": "Knight",
+  "url": "https://clashroyale.fandom.com/wiki/Knight",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "1": {
+  "name": "Archers",
+  "page": "Archers",
+  "url": "https://clashroyale.fandom.com/wiki/Archers",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "2": {
+  "name": "Giant",
+  "page": "Giant",
+  "url": "https://clashroyale.fandom.com/wiki/Giant",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/2/2026, a Balance Update, decreased the Giant's hitpoints by 3%"
+  ],
+  "group": "b"
+ },
+ "3": {
+  "name": "Arrows",
+  "page": "Arrows",
+  "url": "https://clashroyale.fandom.com/wiki/Arrows",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update decreased the Arrows' Crown Tower Damage to 20% of their full damage (from 25%)"
+  ],
+  "group": "b"
+ },
+ "4": {
+  "name": "Goblins",
+  "page": "Goblins",
+  "url": "https://clashroyale.fandom.com/wiki/Goblins",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/2/2026, the febuary 2026 update added the Goblins Hero form.",
+   "On 4/8/2026, a Balance Update, increased the Goblins' damage by 4%."
+  ],
+  "group": "c"
+ },
+ "5": {
+  "name": "Mini PEKKA",
+  "page": "Mini P.E.K.K.A.",
+  "url": "https://clashroyale.fandom.com/wiki/Mini_P.E.K.K.A.",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/1/2026, a Balance Update decreased the Mini P.E.K.K.A.'s Hitpoints by 3%"
+  ],
+  "group": "c"
+ },
+ "6": {
+  "name": "Musketeer",
+  "page": "Musketeer",
+  "url": "https://clashroyale.fandom.com/wiki/Musketeer",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "a"
+ },
+ "7": {
+  "name": "Fireball",
+  "page": "Fireball",
+  "url": "https://clashroyale.fandom.com/wiki/Fireball",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Fireball\u2019s Crown Tower damage to 25% of its full damage (from 30%)"
+  ],
+  "group": "a"
+ },
+ "8": {
+  "name": "Barbarians",
+  "page": "Barbarians",
+  "url": "https://clashroyale.fandom.com/wiki/Barbarians",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, increased the Barbarians' hitpoints by 3%, and increased their attack speed to 1.4 seconds (from 1.3 seconds).",
+   "On 4/8/2026, a Balance Update, increased the Barbarians' hitpoints by 4%"
+  ],
+  "group": "c"
+ },
+ "9": {
+  "name": "Bomber",
+  "page": "Bomber",
+  "url": "https://clashroyale.fandom.com/wiki/Bomber",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "10": {
+  "name": "Valkyrie",
+  "page": "Valkyrie",
+  "url": "https://clashroyale.fandom.com/wiki/Valkyrie",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "11": {
+  "name": "Wizard",
+  "page": "Wizard",
+  "url": "https://clashroyale.fandom.com/wiki/Wizard",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "12": {
+  "name": "Skeleton Army",
+  "page": "Skeleton Army",
+  "url": "https://clashroyale.fandom.com/wiki/Skeleton_Army",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "13": {
+  "name": "P.E.K.K.A.",
+  "page": "P.E.K.K.A.",
+  "url": "https://clashroyale.fandom.com/wiki/P.E.K.K.A.",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/7/2026, a a Balance Update, increased the P.E.K.K.A's damage by 3%"
+  ],
+  "group": "b"
+ },
+ "14": {
+  "name": "Prince",
+  "page": "Prince",
+  "url": "https://clashroyale.fandom.com/wiki/Prince",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "15": {
+  "name": "Hog Rider",
+  "page": "Hog Rider",
+  "url": "https://clashroyale.fandom.com/wiki/Hog_Rider",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "a"
+ },
+ "17": {
+  "name": "Elite Barbarians",
+  "page": "Elite Barbarians",
+  "url": "https://clashroyale.fandom.com/wiki/Elite_Barbarians",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "18": {
+  "name": "Royal Giant",
+  "page": "Royal Giant",
+  "url": "https://clashroyale.fandom.com/wiki/Royal_Giant",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, decreased the Royal Giant's hitpoints to 1.7 seconds (from 1.8 seconds)."
+  ],
+  "group": "b"
+ },
+ "19": {
+  "name": "Golem",
+  "page": "Golem",
+  "url": "https://clashroyale.fandom.com/wiki/Golem",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "20": {
+  "name": "Dart Goblin",
+  "page": "Dart Goblin",
+  "url": "https://clashroyale.fandom.com/wiki/Dart_Goblin",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 151,
+    "wiki": 156.0,
+    "status": "explained",
+    "note": "table predates 4/2/2025: x0.95 = 148"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/1/2026, a Balance Update, decreased the dart goblins damage by 8%.",
+   "On 2/3/2026, a Balance Update, increased the Dart Goblin's sight range to 7.5 tiles (from 7 tiles)."
+  ],
+  "group": "b"
+ },
+ "21": {
+  "name": "Lumberjack",
+  "page": "Lumberjack",
+  "url": "https://clashroyale.fandom.com/wiki/Lumberjack",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "22": {
+  "name": "Bowler",
+  "page": "Bowler",
+  "url": "https://clashroyale.fandom.com/wiki/Bowler",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, decreased the Bowler's projectile range to 7 tiles (from 7.5 tiles)"
+  ],
+  "group": "c"
+ },
+ "23": {
+  "name": "Spear Goblins",
+  "page": "Spear Goblins",
+  "url": "https://clashroyale.fandom.com/wiki/Spear_Goblins",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 7/4/2026, a Balance Update, increased the Spear Goblins' spawn radius.",
+   "On 4/8/2026, a Balance Update, decreased the Spear Goblins' hit speed to 1.6 seconds (from 1.7 seconds)."
+  ],
+  "group": "c"
+ },
+ "24": {
+  "name": "Skeletons",
+  "page": "Skeletons",
+  "url": "https://clashroyale.fandom.com/wiki/Skeletons",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "a"
+ },
+ "25": {
+  "name": "Cannon",
+  "page": "Cannon",
+  "url": "https://clashroyale.fandom.com/wiki/Cannon",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 202,
+    "wiki": 212.0,
+    "status": "explained",
+    "note": "table predates 6/4/2026: x0.95 = 201"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/4/2026, a Balance Update, decreased the Cannon's damage by 5%"
+  ],
+  "group": "a"
+ },
+ "26": {
+  "name": "Tesla",
+  "page": "Tesla",
+  "url": "https://clashroyale.fandom.com/wiki/Tesla",
+  "rows": [
+   {
+    "field": "hp",
+    "engine": 1182,
+    "wiki": 1152.0,
+    "status": "explained",
+    "note": "table predates 1/6/2026: x1.03 = 1187"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Tesla's lifetime to 25 seconds (from 30 seconds). It also increased its hitpoints by 3%"
+  ],
+  "group": "b"
+ },
+ "27": {
+  "name": "Bomb Tower",
+  "page": "Bomb Tower",
+  "url": "https://clashroyale.fandom.com/wiki/Bomb_Tower",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "28": {
+  "name": "Inferno Tower",
+  "page": "Inferno Tower",
+  "url": "https://clashroyale.fandom.com/wiki/Inferno_Tower",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "29": {
+  "name": "Zap",
+  "page": "Zap",
+  "url": "https://clashroyale.fandom.com/wiki/Zap",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Zap's Crown Tower damage to 25% of the full damage (from 30%)"
+  ],
+  "group": "b"
+ },
+ "30": {
+  "name": "Rocket",
+  "page": "Rocket",
+  "url": "https://clashroyale.fandom.com/wiki/Rocket",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Rocket's Crown Tower damage to 23% of the full damage (from 25%)"
+  ],
+  "group": "b"
+ },
+ "31": {
+  "name": "Lightning",
+  "page": "Lightning",
+  "url": "https://clashroyale.fandom.com/wiki/Lightning",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Lightning's Crown Tower damage to 25% of the full damage (from 27%)"
+  ],
+  "group": "b"
+ },
+ "32": {
+  "name": "Poison",
+  "page": "Poison",
+  "url": "https://clashroyale.fandom.com/wiki/Poison",
+  "rows": [
+   {
+    "field": "crown_tower_damage",
+    "engine": 21,
+    "wiki": 22.0,
+    "status": "not comparable",
+    "note": "official June 2026 notes: 21 per pulse (23% of 92); wiki 22 rounds up"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Poison\u2019s Crown Tower damage to 23% of the full damage (from 25%)"
+  ],
+  "group": "b"
+ },
+ "33": {
+  "name": "The Log",
+  "page": "The Log",
+  "url": "https://clashroyale.fandom.com/wiki/The_Log",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased The Log's Crown Tower damage to 13% of the full damage (from 15%)"
+  ],
+  "group": "a"
+ },
+ "34": {
+  "name": "Ice Wizard",
+  "page": "Ice Wizard",
+  "url": "https://clashroyale.fandom.com/wiki/Ice_Wizard",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "35": {
+  "name": "Electro Wizard",
+  "page": "Electro Wizard",
+  "url": "https://clashroyale.fandom.com/wiki/Electro_Wizard",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "36": {
+  "name": "Executioner",
+  "page": "Executioner",
+  "url": "https://clashroyale.fandom.com/wiki/Executioner",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 179,
+    "wiki": 168.0,
+    "status": "explained",
+    "note": "table predates 2/3/2026: x1.07 = 180"
+   },
+   {
+    "field": "hit_speed_s",
+    "engine": 2.4000000953674316,
+    "wiki": 0.9,
+    "status": "not comparable",
+    "note": "engine cooldown spans the whole axe throw (0.9 s hit + 1.5 s axe time)"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, increased the Executioners damage by 7%.",
+   "On 4/8/2026, a Balance Update, decreased the Executioner's projectile range to 7 tiles (from 7.5 tiles)"
+  ],
+  "group": "c"
+ },
+ "39": {
+  "name": "Giant Skeleton",
+  "page": "Giant Skeleton",
+  "url": "https://clashroyale.fandom.com/wiki/Giant_Skeleton",
+  "rows": [
+   {
+    "field": "hp",
+    "engine": 3126,
+    "wiki": 3361.0,
+    "status": "explained",
+    "note": "table predates 4/5/2026: x0.93 = 3126"
+   },
+   {
+    "field": "death_damage",
+    "engine": 886,
+    "wiki": 688.0,
+    "status": "explained",
+    "note": "table predates 4/5/2026: x1.29 = 888"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/1/2026, a Balance Update, decreased the Giant Skeleton's attack time interval to 1.3 seconds (from 1.4 seconds).",
+   "On 4/5/2026, a Balance Update, increased the Giant Skeleton's death damage by 29%, decreased his hitpoints by 7%, decreased his collision radius to 0.75 tiles (from 1 tile), reduced his model size and removed his bomb's ability to inflict double damage on Crown Towers."
+  ],
+  "group": "c"
+ },
+ "40": {
+  "name": "Ice Golem",
+  "page": "Ice Golem",
+  "url": "https://clashroyale.fandom.com/wiki/Ice_Golem",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "a"
+ },
+ "41": {
+  "name": "Minions",
+  "page": "Minions",
+  "url": "https://clashroyale.fandom.com/wiki/Minions",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/2/2026, the February 2026 Update increased the Minions' Attack Period to 1.2 seconds (from 1.1 seconds)."
+  ],
+  "group": "b"
+ },
+ "42": {
+  "name": "Minion Horde",
+  "page": "Minion Horde",
+  "url": "https://clashroyale.fandom.com/wiki/Minion_Horde",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "43": {
+  "name": "Mega Minion",
+  "page": "Mega Minion",
+  "url": "https://clashroyale.fandom.com/wiki/Mega_Minion",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/2/2026, the February 2026 Update changed the Mega Minion's card image."
+  ],
+  "group": "b"
+ },
+ "44": {
+  "name": "Baby Dragon",
+  "page": "Baby Dragon",
+  "url": "https://clashroyale.fandom.com/wiki/Baby_Dragon",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/7/2026, a Balance Update, increased the Baby Dragon's damage by 4% going from 161->168 dps +3% 107->112"
+  ],
+  "group": "b"
+ },
+ "45": {
+  "name": "Balloon",
+  "page": "Balloon",
+  "url": "https://clashroyale.fandom.com/wiki/Balloon",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/2/2026, a Balance Update, increased the Balloon's damage by 0.02%."
+  ],
+  "group": "b"
+ },
+ "46": {
+  "name": "Dark Prince",
+  "page": "Dark Prince",
+  "url": "https://clashroyale.fandom.com/wiki/Dark_Prince",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/5/2026, a Balance Update, increased the Dark Prince's Hit Speed to 1.4s (from 1.3s)"
+  ],
+  "group": "c"
+ },
+ "47": {
+  "name": "Royal Ghost",
+  "page": "Royal Ghost",
+  "url": "https://clashroyale.fandom.com/wiki/Royal_Ghost",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, decreased the Royal Ghost's invisibility delay to 2 seconds (from 1.8 seconds)."
+  ],
+  "group": "b"
+ },
+ "48": {
+  "name": "Mega Knight",
+  "page": "Mega Knight",
+  "url": "https://clashroyale.fandom.com/wiki/Mega_Knight",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "49": {
+  "name": "Battle Healer",
+  "page": "Battle Healer",
+  "url": "https://clashroyale.fandom.com/wiki/Battle_Healer",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, increased the Battle Healer's damage by 81%, increased her hit speed to 2 seconds (from 1.5 seconds), decreased her heal radius to 3 tiles (from 4 tiles), decreased her heal area to 28.3 square tiles (from 50.3 square tiles), and made it to where she can no longer hear herself nor other Battle Healers"
+  ],
+  "group": "c"
+ },
+ "50": {
+  "name": "Bandit",
+  "page": "Bandit",
+  "url": "https://clashroyale.fandom.com/wiki/Bandit",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "51": {
+  "name": "Berserker",
+  "page": "Berserker",
+  "url": "https://clashroyale.fandom.com/wiki/Berserker",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "52": {
+  "name": "Miner",
+  "page": "Miner",
+  "url": "https://clashroyale.fandom.com/wiki/Miner",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/7/2026, a Balance Update, decreased the Miner's Crown Tower damage to 20% of the full damage (from 25%)"
+  ],
+  "group": "b"
+ },
+ "53": {
+  "name": "Fisherman",
+  "page": "Fisherman",
+  "url": "https://clashroyale.fandom.com/wiki/Fisherman",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/4/2026, a Balance Update, removed the FIsherman's slowdown effect entirely"
+  ],
+  "group": "b"
+ },
+ "54": {
+  "name": "Ronin",
+  "page": "Ronin",
+  "url": "https://clashroyale.fandom.com/wiki/Ronin",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/7/2026, the Ronin was added into the game",
+   "On 4/8/2026, a Balance Update, increased the Ronin's first hit time to 0.4 seconds (from 0.3 seconds)",
+   "On 8/9/2026, a Balance update, decreased the Ronin's Hit Speed to 1.3 seconds (from 1.4 seconds)"
+  ],
+  "group": "c"
+ },
+ "55": {
+  "name": "Goblin Machine",
+  "page": "Goblin Machine",
+  "url": "https://clashroyale.fandom.com/wiki/Goblin_Machine",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, decreased the Goblin Machine's rocket hit speed to 5 seconds (from 3.5 seconds), increased the rocket speed by 40%, increased the melee damage by 9%, and increased his hitpoints by 5%"
+  ],
+  "group": "c"
+ },
+ "56": {
+  "name": "Inferno Dragon",
+  "page": "Inferno Dragon",
+  "url": "https://clashroyale.fandom.com/wiki/Inferno_Dragon",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "57": {
+  "name": "Electro Dragon",
+  "page": "Electro Dragon",
+  "url": "https://clashroyale.fandom.com/wiki/Electro_Dragon",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, increased the Electro Dragon's hitpoints by 5%.",
+   "On 1/6/2026, a Balance Update, increased the Electro Dragon's hitpoints by 5%."
+  ],
+  "group": "c"
+ },
+ "58": {
+  "name": "Night Witch",
+  "page": "Night Witch",
+  "url": "https://clashroyale.fandom.com/wiki/Night_Witch",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "59": {
+  "name": "Phoenix",
+  "page": "Phoenix",
+  "url": "https://clashroyale.fandom.com/wiki/Phoenix",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, increased the Phoenix Egg's hitpoints by 32%, and increased the Egg's lifetime to 4.3 seconds (from 3.8 seconds)."
+  ],
+  "group": "c"
+ },
+ "60": {
+  "name": "Sparky",
+  "page": "Sparky",
+  "url": "https://clashroyale.fandom.com/wiki/Sparky",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "61": {
+  "name": "Princess",
+  "page": "Princess",
+  "url": "https://clashroyale.fandom.com/wiki/Princess",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "62": {
+  "name": "Hunter",
+  "page": "Hunter",
+  "url": "https://clashroyale.fandom.com/wiki/Hunter",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "63": {
+  "name": "Magic Archer",
+  "page": "Magic Archer",
+  "url": "https://clashroyale.fandom.com/wiki/Magic_Archer",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 143,
+    "wiki": 133.0,
+    "status": "explained",
+    "note": "table predates 1/12/2025: x1.08 = 144"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, decreased the Magic Archer's damage by 6%"
+  ],
+  "group": "c"
+ },
+ "64": {
+  "name": "Firecracker",
+  "page": "Firecracker",
+  "url": "https://clashroyale.fandom.com/wiki/Firecracker",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/4/2026, a Balance Update, increased her projectile speed to 500 (from 400)."
+  ],
+  "group": "b"
+ },
+ "65": {
+  "name": "Skeleton Dragons",
+  "page": "Skeleton Dragons",
+  "url": "https://clashroyale.fandom.com/wiki/Skeleton_Dragons",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 151,
+    "wiki": 161.0,
+    "status": "explained",
+    "note": "table predates 4/5/2026: x0.94 = 151"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/4/2026, a Balance Update, increased the Skeleton Dragons' splash radius to 1.5 tiles (from 0.8 tiles). Their hit speed was also increased to 2s (from 1.9s)",
+   "On 4/5/2026, a Balance Update, decreased the Skeleton Dragons' damage by 6%"
+  ],
+  "group": "b"
+ },
+ "66": {
+  "name": "Goblin Demolisher",
+  "page": "Goblin Demolisher",
+  "url": "https://clashroyale.fandom.com/wiki/Goblin_Demolisher",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "67": {
+  "name": "Flying Machine",
+  "page": "Flying Machine",
+  "url": "https://clashroyale.fandom.com/wiki/Flying_Machine",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "68": {
+  "name": "Mother Witch",
+  "page": "Mother Witch",
+  "url": "https://clashroyale.fandom.com/wiki/Mother_Witch",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "69": {
+  "name": "Cannon Cart",
+  "page": "Cannon Cart",
+  "url": "https://clashroyale.fandom.com/wiki/Cannon_Cart",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "70": {
+  "name": "Furnace",
+  "page": "Furnace",
+  "url": "https://clashroyale.fandom.com/wiki/Furnace",
+  "rows": [
+   {
+    "field": "hit_speed_s",
+    "engine": 1.7000000476837158,
+    "wiki": 1.8,
+    "status": "not comparable",
+    "note": "table stale: History sets 1.7 s on 12/1/2026; engine follows History"
+   },
+   {
+    "field": "range",
+    "engine": 5.5,
+    "wiki": 6.0,
+    "status": "not comparable",
+    "note": "table stale: History sets 5.5 on 1/6/2026; engine follows History"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/1/2026, a Balance Update increased Furnace's attack speed to 1.7 (from 1.8)",
+   "On 1/6/2026, a Balance Update, decreased the Furnace's range to 5.5 tiles (from 6 tiles)",
+   "On 4/8/2026, a Balance Update, decreased the Furnace's spawn duration to 5 seconds (from 7 seconds)"
+  ],
+  "group": "b"
+ },
+ "71": {
+  "name": "Witch",
+  "page": "Witch",
+  "url": "https://clashroyale.fandom.com/wiki/Witch",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "72": {
+  "name": "Ice Spirit",
+  "page": "Ice Spirit",
+  "url": "https://clashroyale.fandom.com/wiki/Ice_Spirit",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, decreased the Ice Spirit's hitpoints by 6%"
+  ],
+  "group": "a"
+ },
+ "73": {
+  "name": "Fire Spirit",
+  "page": "Fire Spirit",
+  "url": "https://clashroyale.fandom.com/wiki/Fire_Spirit",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, decreased the Fire Spirit's hitpoints by 6%"
+  ],
+  "group": "c"
+ },
+ "74": {
+  "name": "Heal Spirit",
+  "page": "Heal Spirit",
+  "url": "https://clashroyale.fandom.com/wiki/Heal_Spirit",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, decreased the Heal Spirit's hitpoints by 6%"
+  ],
+  "group": "c"
+ },
+ "75": {
+  "name": "Electro Spirit",
+  "page": "Electro Spirit",
+  "url": "https://clashroyale.fandom.com/wiki/Electro_Spirit",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, decreased the Electro Spirit's hitpoints by 6%"
+  ],
+  "group": "b"
+ },
+ "76": {
+  "name": "Guards",
+  "page": "Guards",
+  "url": "https://clashroyale.fandom.com/wiki/Guards",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "77": {
+  "name": "Royal Recruits",
+  "page": "Royal Recruits",
+  "url": "https://clashroyale.fandom.com/wiki/Royal_Recruits",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "78": {
+  "name": "Bats",
+  "page": "Bats",
+  "url": "https://clashroyale.fandom.com/wiki/Bats",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, decreased the Bats' hitpoints to 1.2 seconds (from 1.3 seconds)."
+  ],
+  "group": "b"
+ },
+ "79": {
+  "name": "Zappies",
+  "page": "Zappies",
+  "url": "https://clashroyale.fandom.com/wiki/Zappies",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, increased the Zappies' hit speed to 2.2 seconds (from 2.1 seconds)"
+  ],
+  "group": "b"
+ },
+ "80": {
+  "name": "Three Musketeers",
+  "page": "Three Musketeers",
+  "url": "https://clashroyale.fandom.com/wiki/Three_Musketeers",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/2/2026, increased attack speed to 1.3 seconds (from 1.2 seconds)."
+  ],
+  "group": "b"
+ },
+ "81": {
+  "name": "Battle Ram",
+  "page": "Battle Ram",
+  "url": "https://clashroyale.fandom.com/wiki/Battle_Ram",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, increased the Barbarians' hitpoints by 3%, and increased their attack speed to 1.4 seconds (from 1.3 seconds).",
+   "On 4/8/2026, a Balance Update, increased the Barbarians' hitpoints by 4%"
+  ],
+  "group": "b"
+ },
+ "82": {
+  "name": "Royal Hogs",
+  "page": "Royal Hogs",
+  "url": "https://clashroyale.fandom.com/wiki/Royal_Hogs",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "83": {
+  "name": "Wall Breakers",
+  "page": "Wall Breakers",
+  "url": "https://clashroyale.fandom.com/wiki/Wall_Breakers",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, decreased the Wall Breakers\u2019 damage by 20%"
+  ],
+  "group": "b"
+ },
+ "84": {
+  "name": "Electro Giant",
+  "page": "Electro Giant",
+  "url": "https://clashroyale.fandom.com/wiki/Electro_Giant",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 184,
+    "wiki": 163.0,
+    "status": "not comparable",
+    "note": "table stale: official 26 Aug 2026 notes set 184; engine follows the notes"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/5/2026, a Balance Update, decreased the Electro Giant's attack time interval to 1.8 seconds (from 2.1 seconds) and his first attack time interval to 1 second (from 1.5 seconds), but also decreased his reflected tower damage by 24%.",
+   "On 6/7/2026, a Balance Update, increased the Electro Giant's hitpoints by 3%."
+  ],
+  "group": "c"
+ },
+ "85": {
+  "name": "Suspicious Bush",
+  "page": "Suspicious Bush",
+  "url": "https://clashroyale.fandom.com/wiki/Suspicious_Bush",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/4/2026, a Balance Update, increased the Bush range to 1.6 tiles (from 0.5 tiles), now classified as Melee: Long",
+   "On 4/8/2026, a Balance Update, increased the Bush Goblins' hitpoints by 11%"
+  ],
+  "group": "c"
+ },
+ "86": {
+  "name": "Rune Giant",
+  "page": "Rune Giant",
+  "url": "https://clashroyale.fandom.com/wiki/Rune_Giant",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 153,
+    "wiki": 120.0,
+    "status": "explained",
+    "note": "table predates 1/6/2026: x1.28 = 154"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/4/2026, a Balance Update, made it so that the Rune Giant's bonus damage will no longer apply to Hero Magic Archer Ability",
+   "On 1/6/2026, a Balance Update, increased the Rune Giant's damage by 28%",
+   "On 4/8/2026, a Balance Update, increased the Rune Giant's Hitpoints by 6%, her Enchantment Cast Time Delay has been removed, and she no longer enchants suicide troops (such as Wall Breakers, Spirits, etc.)"
+  ],
+  "group": "c"
+ },
+ "87": {
+  "name": "Ram Rider",
+  "page": "Ram Rider",
+  "url": "https://clashroyale.fandom.com/wiki/Ram_Rider",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/1/2026, a Balance Update increased the Ram Rider's attack speed to 1.7 (from 1.8)",
+   "On 6/7/2026, a Balance Update, increased her hitpoints by 4%"
+  ],
+  "group": "c"
+ },
+ "88": {
+  "name": "Goblin Giant",
+  "page": "Goblin Giant",
+  "url": "https://clashroyale.fandom.com/wiki/Goblin_Giant",
+  "rows": [
+   {
+    "field": "hp",
+    "engine": 3110,
+    "wiki": 3022.0,
+    "status": "explained",
+    "note": "table predates 1/6/2026: x1.03 = 3113"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, increased the Goblin Giant's Hitpoints by 3%",
+   "On 4/8/2026, a Balance Update, decreased the Backpack Spear Goblins' hit speed to 1.6 seconds (from 1.7 seconds)"
+  ],
+  "group": "c"
+ },
+ "89": {
+  "name": "Skeleton Barrel",
+  "page": "Skeleton Barrel",
+  "url": "https://clashroyale.fandom.com/wiki/Skeleton_Barrel",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "90": {
+  "name": "Elixir Golem",
+  "page": "Elixir Golem",
+  "url": "https://clashroyale.fandom.com/wiki/Elixir_Golem",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "91": {
+  "name": "Lava Hound",
+  "page": "Lava Hound",
+  "url": "https://clashroyale.fandom.com/wiki/Lava_Hound",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "92": {
+  "name": "X-Bow",
+  "page": "X-Bow",
+  "url": "https://clashroyale.fandom.com/wiki/X-Bow",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, increased the X-Bow's hit speed to 0.4 seconds (from 0.3 seconds), increased its damage by 35%, and increased its projectile speed by 14%",
+   "On 8/10/2026, a Balance Update, increased the X-Bow's damage by 5%"
+  ],
+  "group": "b"
+ },
+ "93": {
+  "name": "Mortar",
+  "page": "Mortar",
+  "url": "https://clashroyale.fandom.com/wiki/Mortar",
+  "rows": [
+   {
+    "field": "hit_speed_s",
+    "engine": 4.699999809265137,
+    "wiki": 5.0,
+    "status": "not comparable",
+    "note": "table stale: History sets 4.7 s on 4/8/2026; engine follows History"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, decreased the Mortar's hit speed to 4.7 seconds (from 5 seconds)"
+  ],
+  "group": "b"
+ },
+ "94": {
+  "name": "Barbarian Hut",
+  "page": "Barbarian Hut",
+  "url": "https://clashroyale.fandom.com/wiki/Barbarian_Hut",
+  "rows": [],
+  "wiki_inconsistencies": [
+   "Hitpoints 716 vs Hitpoints lost per second 38.8 x lifetime 30 s = 1164"
+  ],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, increased the Barbarians' hitpoints by 3%, and increased their attack speed to 1.4 seconds (from 1.3 seconds).",
+   "On 4/8/2026, a Balance Update, increased the Barbarians' hitpoints by 4%"
+  ],
+  "group": "c"
+ },
+ "95": {
+  "name": "Goblin Hut",
+  "page": "Goblin Hut",
+  "url": "https://clashroyale.fandom.com/wiki/Goblin_Hut",
+  "rows": [
+   {
+    "field": "hp",
+    "engine": 1180,
+    "wiki": 1227,
+    "status": "explained",
+    "note": "table predates 6/10/2025: x0.96 = 1178"
+   }
+  ],
+  "wiki_inconsistencies": [
+   "Hitpoints 133 vs Hitpoints lost per second 40.9 x lifetime 30 s = 1227"
+  ],
+  "history_2026": [
+   "On 6/4/2026, a Balance Update, increased the Goblin Hut's  Spawn Period to 2.2 seconds (from 2.1 seconds)"
+  ],
+  "group": "c"
+ },
+ "96": {
+  "name": "Tombstone",
+  "page": "Tombstone",
+  "url": "https://clashroyale.fandom.com/wiki/Tombstone",
+  "rows": [],
+  "wiki_inconsistencies": [
+   "Hitpoints 81 vs Hitpoints lost per second 17.6 x lifetime 30 s = 528"
+  ],
+  "history_2026": [],
+  "group": "b"
+ },
+ "97": {
+  "name": "Goblin Cage",
+  "page": "Goblin Cage",
+  "url": "https://clashroyale.fandom.com/wiki/Goblin_Cage",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "98": {
+  "name": "Goblin Drill",
+  "page": "Goblin Drill",
+  "url": "https://clashroyale.fandom.com/wiki/Goblin_Drill",
+  "rows": [],
+  "wiki_inconsistencies": [
+   "Goblin Drill Hitpoints 1313 vs Goblin Drill Hitpoints lost per second 20.2 x lifetime 10 s = 202"
+  ],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, the Goblin Drill spawn damage to towers has been removed entirely (from 30% of the full spawn damage)"
+  ],
+  "group": "c"
+ },
+ "99": {
+  "name": "Elixir Collector",
+  "page": "Elixir Collector",
+  "url": "https://clashroyale.fandom.com/wiki/Elixir_Collector",
+  "rows": [],
+  "wiki_inconsistencies": [
+   "Hitpoints 1070 vs Hitpoints lost per second 9.7 x lifetime 1 s = 9.7"
+  ],
+  "history_2026": [
+   "On 05/10/2026 the Balance Update, increased the production time interval to 15 second (from 13 seconds), but increased its lifetime to 110 seconds (from 93 seconds)."
+  ],
+  "group": "b"
+ },
+ "100": {
+  "name": "Giant Snowball",
+  "page": "Giant Snowball",
+  "url": "https://clashroyale.fandom.com/wiki/Giant_Snowball",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Giant Snowball's Crown Tower damage to 25% of the full damage (from 30%)"
+  ],
+  "group": "c"
+ },
+ "101": {
+  "name": "Barbarian Barrel",
+  "page": "Barbarian Barrel",
+  "url": "https://clashroyale.fandom.com/wiki/Barbarian_Barrel",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/2/2026, a Balance Update, increased the Barbarian Barrel's damage by 1%."
+  ],
+  "group": "b"
+ },
+ "102": {
+  "name": "Goblin Curse",
+  "page": "Goblin Curse",
+  "url": "https://clashroyale.fandom.com/wiki/Goblin_Curse",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, added a slowdown mechanic to the Goblin Curse"
+  ],
+  "group": "c"
+ },
+ "103": {
+  "name": "Earthquake",
+  "page": "Earthquake",
+  "url": "https://clashroyale.fandom.com/wiki/Earthquake",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Earthquake's Crown Tower damage to 58% of the full troop damage (from 65%)"
+  ],
+  "group": "c"
+ },
+ "104": {
+  "name": "Void",
+  "page": "Void",
+  "url": "https://clashroyale.fandom.com/wiki/Void",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, increased the Void's elixir cost to 5 elixir (from 3), increased its hit speed to 1.2 seconds (from 1 second), increased the single target damage by 105%, increased the 2-4 unit target damage by 83%, and increased the 5 or more target damage by 101%"
+  ],
+  "group": "c"
+ },
+ "105": {
+  "name": "Vines",
+  "page": "Vines",
+  "url": "https://clashroyale.fandom.com/wiki/Vines",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, increased the Vines deploy time to 0.9 seconds (from 0.4 seconds).",
+   "On 1/6/2026, a Balance Update, decreased the Vines' Crown Tower damage to 23% of its full damage (from 25%)"
+  ],
+  "group": "c"
+ },
+ "106": {
+  "name": "Tornado",
+  "page": "Tornado",
+  "url": "https://clashroyale.fandom.com/wiki/Tornado",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "107": {
+  "name": "Freeze",
+  "page": "Freeze",
+  "url": "https://clashroyale.fandom.com/wiki/Freeze",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Freeze's Crown Tower damage to 25% of the full damage (from 30%)"
+  ],
+  "group": "c"
+ },
+ "108": {
+  "name": "Rage",
+  "page": "Rage",
+  "url": "https://clashroyale.fandom.com/wiki/Rage",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Rage's Crown Tower damage to 25% of the full damage (from 30%)"
+  ],
+  "group": "c"
+ },
+ "109": {
+  "name": "Goblin Barrel",
+  "page": "Goblin Barrel",
+  "url": "https://clashroyale.fandom.com/wiki/Goblin_Barrel",
+  "rows": [
+   {
+    "field": "radius",
+    "engine": 0.5,
+    "wiki": 1.5,
+    "status": "not comparable",
+    "note": "wiki radius is the Goblins' landing spread; engine radius is a hitbox"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "110": {
+  "name": "Graveyard",
+  "page": "Graveyard",
+  "url": "https://clashroyale.fandom.com/wiki/Graveyard",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/1/2026, a Balance Update changed the graveyard's spawn pattern from random to defined, and increased the amount of skeletons to 14 (from 13).",
+   "On 14/1/2026, a Maintenance Break, decreased the amount of skeletons to 13 (from 14), and made it to where the skeletons spawn closer to the edge of the graveyard",
+   "On 2/2/2026, a Balance Update, increased the spawn radius to 3.3 tiles (from 2.9 tiles)",
+   "On 1/6/2026, a Balance Update, decreased the amount of skeletons to 12 (from 13)"
+  ],
+  "group": "b"
+ },
+ "111": {
+  "name": "Royal Delivery",
+  "page": "Royal Delivery",
+  "url": "https://clashroyale.fandom.com/wiki/Royal_Delivery",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, decreased the Royal Delivery's landing damage by 12%"
+  ],
+  "group": "c"
+ },
+ "112": {
+  "name": "Goblin Gang",
+  "page": "Goblin Gang",
+  "url": "https://clashroyale.fandom.com/wiki/Goblin_Gang",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "b"
+ },
+ "113": {
+  "name": "Rascals",
+  "page": "Rascals",
+  "url": "https://clashroyale.fandom.com/wiki/Rascals",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Rascal Boy's Hitpoints by 4%"
+  ],
+  "group": "c"
+ },
+ "114": {
+  "name": "Clone",
+  "page": "Clone",
+  "url": "https://clashroyale.fandom.com/wiki/Clone",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "115": {
+  "name": "Mighty Miner",
+  "page": "Mighty Miner",
+  "url": "https://clashroyale.fandom.com/wiki/Mighty_Miner",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, made it so that the Mighty Miner would no longer have a cooldown timer in-between abilities. Instead, his ability will now be single use. His base damage was increased by 8%"
+  ],
+  "group": "c"
+ },
+ "116": {
+  "name": "Golden Knight",
+  "page": "Golden Knight",
+  "url": "https://clashroyale.fandom.com/wiki/Golden_Knight",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/1/2026, a Balance Update, decreased the cooldown of Dashing Dash to 12 seconds (from 8 seconds)."
+  ],
+  "group": "c"
+ },
+ "117": {
+  "name": "Skeleton King",
+  "page": "Skeleton King",
+  "url": "https://clashroyale.fandom.com/wiki/Skeleton_King",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "118": {
+  "name": "Archer Queen",
+  "page": "Archer Queen",
+  "url": "https://clashroyale.fandom.com/wiki/Archer_Queen",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "119": {
+  "name": "Monk",
+  "page": "Monk",
+  "url": "https://clashroyale.fandom.com/wiki/Monk",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "120": {
+  "name": "Little Prince",
+  "page": "Little Prince",
+  "url": "https://clashroyale.fandom.com/wiki/Little_Prince",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/1/2026, a Balance Update, increased the Little Prince's damage by 5%.",
+   "On 4/8/2026, a Balance Update, made it so that the Little Prince would no longer have a cooldown timer in-between abilities. Instead, his ability will no be single use. The Little Prince will now maintain his charged-up Hit Speed for up to 0.3 seconds while moving. The Guardian Melee Damage was also increased by 7%"
+  ],
+  "group": "c"
+ },
+ "121": {
+  "name": "Goblinstein",
+  "page": "Goblinstein",
+  "url": "https://clashroyale.fandom.com/wiki/Goblinstein",
+  "rows": [
+   {
+    "field": "hit_speed_s",
+    "engine": 1.5,
+    "wiki": 1.8,
+    "status": "not comparable",
+    "note": "wiki attributes are the Doctor; engine models the Monster (TODO)"
+   },
+   {
+    "field": "range",
+    "engine": 1.2000000476837158,
+    "wiki": 5.5,
+    "status": "not comparable",
+    "note": "wiki attributes are the Doctor; engine models the Monster (TODO)"
+   },
+   {
+    "field": "speed_tier",
+    "engine": 45.3,
+    "wiki": 60.0,
+    "status": "not comparable",
+    "note": "wiki attributes are the Doctor; engine models the Monster (TODO)"
+   },
+   {
+    "field": "targets_air",
+    "engine": false,
+    "wiki": true,
+    "status": "not comparable",
+    "note": "wiki attributes are the Doctor; engine models the Monster (TODO)"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, made it so that the Goblinstein would no longer have a cooldown timer in-between abilities. Instead, his ability will no be single use. The doctor's damage was increased by 47% and the ability DPS was decreased by 12%",
+   "On 26/8/2026 a balance update decreased the goblin steins monster hp from 2385->2240 -6%",
+   "On 16/9/2026 a balance change decreased the goblin steins ability duration going from 4s->3.5s -13%"
+  ],
+  "group": "c"
+ },
+ "122": {
+  "name": "Boss Bandit",
+  "page": "Boss Bandit",
+  "url": "https://clashroyale.fandom.com/wiki/Boss_Bandit",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/1/2026, a Balance Update, decreased the Boss Bandit's damage and dash damage by 9%, and increased it's attack speed to 1.1 (from 1.2)"
+  ],
+  "group": "c"
+ },
+ "123": {
+  "name": "Wall Breakers",
+  "page": "Wall Breakers/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Wall_Breakers/Evolution",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 302,
+    "wiki": 391.0,
+    "status": "not comparable",
+    "note": "Evolution page row disagrees with the base Wall Breakers page (302)"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/4/2026, a Balance Update, decreased the Evolved Wall Breakers' damage to troops by 26%",
+   "On 4/8/2026, a Balance Update, decreased the Evolved Wall Breakers\u2019 death damage by 20%"
+  ],
+  "group": "c"
+ },
+ "124": {
+  "name": "Zap",
+  "page": "Zap/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Zap/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Zap's Crown Tower damage to 25% of the full damage (from 30%)"
+  ],
+  "group": "c"
+ },
+ "125": {
+  "name": "Skeletons",
+  "page": "Skeletons/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Skeletons/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "a"
+ },
+ "126": {
+  "name": "Bats",
+  "page": "Bats/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Bats/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, decreased the Evolved Bats' hitpoints to 1.2 seconds (from 1.3 seconds)."
+  ],
+  "group": "c"
+ },
+ "127": {
+  "name": "Bomber",
+  "page": "Bomber/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Bomber/Evolution",
+  "rows": [
+   {
+    "field": "hp",
+    "engine": 380,
+    "wiki": 332.0,
+    "status": "not comparable",
+    "note": "Evolution page row disagrees with the base Bomber page"
+   },
+   {
+    "field": "damage",
+    "engine": 212,
+    "wiki": 225.0,
+    "status": "not comparable",
+    "note": "Evolution page row disagrees with the base Bomber page (212)"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "128": {
+  "name": "Archers",
+  "page": "Archers/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Archers/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Change, decreased the power shot damage to 125% (from 150%)."
+  ],
+  "group": "c"
+ },
+ "129": {
+  "name": "Cannon",
+  "page": "Cannon/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Cannon/Evolution",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 202,
+    "wiki": 212.0,
+    "status": "explained",
+    "note": "table predates 6/4/2026: x0.95 = 201"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/4/2026, a Balance Update, decreased the Evolved Cannon's damage by 5%"
+  ],
+  "group": "a"
+ },
+ "130": {
+  "name": "Firecracker",
+  "page": "Firecracker/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Firecracker/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/4/2026, a Balance Update, increased her projectile speed by 25%"
+  ],
+  "group": "c"
+ },
+ "131": {
+  "name": "Dart Goblin",
+  "page": "Dart Goblin/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Dart_Goblin/Evolution",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 151,
+    "wiki": 156.0,
+    "status": "explained",
+    "note": "table predates 4/2/2025: x0.95 = 148"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/1/2026, a Balance Update, decreased the dart goblins damage by 8%.",
+   "On 2/3/2026, a Balance Update, increased the Dart Goblin's sight range to 7.5 tiles (from 7 tiles).",
+   "On 1/6/2026, a Balance Update, increased the Stage 1 poison damage by 25% and Stage 2's damage by 11%"
+  ],
+  "group": "c"
+ },
+ "132": {
+  "name": "Goblin Barrel",
+  "page": "Goblin Barrel/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Goblin_Barrel/Evolution",
+  "rows": [
+   {
+    "field": "radius",
+    "engine": 0.5,
+    "wiki": 1.5,
+    "status": "not comparable",
+    "note": "wiki radius is the Goblins' landing spread; engine radius is a hitbox"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a balance Update, decreased the Decoy Goblins' damage by 26%."
+  ],
+  "group": "c"
+ },
+ "133": {
+  "name": "Skeleton Army",
+  "page": "Skeleton Army/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Skeleton_Army/Evolution",
+  "rows": [
+   {
+    "field": "count",
+    "engine": 16,
+    "wiki": 15.0,
+    "status": "not comparable",
+    "note": "wiki counts 15 Skeletons; engine adds the General as a 16th body"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/01/2026, a Balance Update decreased the Shadow Skeletons' speed to 60 (from 90), classifying them as Medium. It also changed the Evolved Skeleton Army's spawn formation by spawning the General closer to the Shadow Skeletons."
+  ],
+  "group": "c"
+ },
+ "134": {
+  "name": "Skeleton Barrel",
+  "page": "Skeleton Barrel/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Skeleton_Barrel/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/1/2026, a Balance Update decreased the Skeleton Barrel's death damage by 8%.",
+   "On 6/4/2026, a Balance Update, decreased the Skeleton Barrel's death damage by 13%"
+  ],
+  "group": "c"
+ },
+ "135": {
+  "name": "Knight",
+  "page": "Knight/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Knight/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "136": {
+  "name": "Royal Ghost",
+  "page": "Royal Ghost/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Royal_Ghost/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, decreased the Evolved Royal Ghost's invisibility delay to 2 seconds (from 1.8 seconds).",
+   "On 6/4/2026, a Balance Update, decreased the Souldier Spawn Damage by 60% and the souldier damage by 21%"
+  ],
+  "group": "c"
+ },
+ "137": {
+  "name": "Baby Dragon",
+  "page": "Baby Dragon/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Baby_Dragon/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/7/2026, a Balance Update, increased the Evolved Baby Dragon's damage by 4%"
+  ],
+  "group": "c"
+ },
+ "138": {
+  "name": "Furnace",
+  "page": "Furnace/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Furnace/Evolution",
+  "rows": [
+   {
+    "field": "hit_speed_s",
+    "engine": 1.7000000476837158,
+    "wiki": 1.8,
+    "status": "not comparable",
+    "note": "table stale: History sets 1.7 s on 12/1/2026; engine follows History"
+   },
+   {
+    "field": "range",
+    "engine": 5.5,
+    "wiki": 6.0,
+    "status": "not comparable",
+    "note": "table stale: History sets 5.5 on 1/6/2026; engine follows History"
+   },
+   {
+    "field": "speed_tier",
+    "engine": 60.0,
+    "wiki": 45.0,
+    "status": "not comparable",
+    "note": "Evolution page says Slow; base Furnace page says Medium"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/1/2026, a Balance Update increased Furnace's attack speed to 1.7 (from 1.8)",
+   "On 1/6/2026, a Balance Update, decreased the Furnace's range to 5.5 tiles (from 6 tiles)",
+   "On 4/8/2026, a Balance Update, decreased the Furnace's spawn duration to 5 seconds (from 7 seconds)"
+  ],
+  "group": "c"
+ },
+ "139": {
+  "name": "Goblin Cage",
+  "page": "Goblin Cage/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Goblin_Cage/Evolution",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 40,
+    "wiki": 337.0,
+    "status": "not comparable",
+    "note": "wiki figure is the evolved cage's trapped damage, not an attack"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, increased the Evolved Goblin Cage's number of cycles to 2 (from 1), increased its trapped DPS by 9%, and decreased its ability cooldown to 0.3 seconds (from 0.5 seconds)"
+  ],
+  "group": "c"
+ },
+ "140": {
+  "name": "Musketeer",
+  "page": "Musketeer/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Musketeer/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "a"
+ },
+ "141": {
+  "name": "Wizard",
+  "page": "Wizard/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Wizard/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "142": {
+  "name": "Witch",
+  "page": "Witch/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Witch/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/2/2026, a Balance Update, decreased the Evolved Witch's heal per skeleton by 11%",
+   "On 4/8/2026, a Balance Update, increased the Evolved Witch's heal per skeleton by 189%, increased her max hitpoints by 40%, increased her overheal ratio to x1.73 (from x1.24), and made it to where she can only be healed by the first 4 skeletons that she spawns."
+  ],
+  "group": "c"
+ },
+ "143": {
+  "name": "Royal Giant",
+  "page": "Royal Giant/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Royal_Giant/Evolution",
+  "rows": [
+   {
+    "field": "hit_speed_s",
+    "engine": 1.7999999523162842,
+    "wiki": 1.7,
+    "status": "not comparable",
+    "note": "Evolution page says 1.7 s; base Royal Giant page says 1.8 s"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, decreased the Evolved Royal Giant's hitpoints to 1.7 seconds (from 1.8 seconds)."
+  ],
+  "group": "c"
+ },
+ "144": {
+  "name": "Ice Spirit",
+  "page": "Ice Spirit/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Ice_Spirit/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, decreased the Evolved Ice Spirit's hitpoints by 6%"
+  ],
+  "group": "a"
+ },
+ "145": {
+  "name": "Princess",
+  "page": "Princess/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Princess/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, decreased the number of slow attacks to every 2 hits (from every 3 hits) and decreased the slowdown duration to 5.5 seconds (from 7 seconds)"
+  ],
+  "group": "c"
+ },
+ "146": {
+  "name": "Hunter",
+  "page": "Hunter/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Hunter/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "147": {
+  "name": "Valkyrie",
+  "page": "Valkyrie/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Valkyrie/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/8/2026, a Balance Update, decreased the Evolved Valkyrie's tornado damage by 50%"
+  ],
+  "group": "c"
+ },
+ "148": {
+  "name": "P.E.K.K.A.",
+  "page": "P.E.K.K.A./Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/P.E.K.K.A./Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/2/2026, increased the Evolved P.E.K.K.A.'s Heal per Kill from all forms by 5%.",
+   "On 6/7/2026, a Balance Update, increased the Evolved P.E.K.K.A's damage by 3%"
+  ],
+  "group": "c"
+ },
+ "149": {
+  "name": "Minion Horde",
+  "page": "Minion Horde/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Minion_Horde/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/4/2026, Evo Minion Horde was added in the game, along with Hero Balloon",
+   "On 4/8/2026, a Balance Update, increased the Evolved Minion Horde's invisible hit speed multiplier to x0.67 (from x0.5)"
+  ],
+  "group": "c"
+ },
+ "150": {
+  "name": "Royal Recruits",
+  "page": "Royal Recruits/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Royal_Recruits/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "151": {
+  "name": "Electro Dragon",
+  "page": "Electro Dragon/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Electro_Dragon/Evolution",
+  "rows": [
+   {
+    "field": "hp",
+    "engine": 1049,
+    "wiki": 1451.0,
+    "status": "not comparable",
+    "note": "Evolution page row does not match the base Electro Dragon page; not trusted"
+   },
+   {
+    "field": "damage",
+    "engine": 192,
+    "wiki": 267.0,
+    "status": "not comparable",
+    "note": "Evolution page row does not match the base Electro Dragon page; not trusted"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, increased the Evolved Electro Dragon's hitpoints by 5%, and also decreased it's chain damage by 50%.",
+   "On 1/6/2026, a Balance Update, increased the Evolved Electro Dragon's hitpoints by 5%."
+  ],
+  "group": "c"
+ },
+ "152": {
+  "name": "Mortar",
+  "page": "Mortar/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Mortar/Evolution",
+  "rows": [
+   {
+    "field": "hit_speed_s",
+    "engine": 4.0,
+    "wiki": 4.0,
+    "status": "not comparable",
+    "note": "table stale: History sets 4.7 s on 4/8/2026; engine follows History"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, increased the Evolved Mortar's Goblin Deploy Time to 0.5 seconds (from 0.2 seconds)",
+   "On 4/8/2026, a Balance Update, increased the Evolved Mortar's hit speed to 4.7 seconds (from 4 seconds)"
+  ],
+  "group": "c"
+ },
+ "153": {
+  "name": "Goblin Drill",
+  "page": "Goblin Drill/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Goblin_Drill/Evolution",
+  "rows": [
+   {
+    "field": "hp",
+    "engine": 1313,
+    "wiki": 202.0,
+    "status": "not comparable",
+    "note": "wiki 202 is a spawned Goblin's hp"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/2/2026, a Balance Update, increased the second submerges\u2019s spawned Goblins to 2 (from 1).",
+   "On 4/5/2026, a Balance Update, decreased the second submerge's spawned Goblins to 1 (from 2)",
+   "On 4/8/2026, a Balance Update, the Evolved Goblin Drill's spawn damage to towers has been removed entirely (from 30% of the full spawn damage)"
+  ],
+  "group": "c"
+ },
+ "154": {
+  "name": "Tesla",
+  "page": "Tesla/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Tesla/Evolution",
+  "rows": [
+   {
+    "field": "hp",
+    "engine": 1182,
+    "wiki": 1152.0,
+    "status": "explained",
+    "note": "table predates 1/6/2026: x1.03 = 1187"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/5/2026, a Balance Update, decreased the Evolved Tesla's pulse damage by 15%.",
+   "On 1/6/2026, a Balance Update, decreased the Evolved Tesla's lifetime to 25 seconds (from 30 seconds). It also increased its hitpoints by 3%"
+  ],
+  "group": "c"
+ },
+ "155": {
+  "name": "Barbarians",
+  "page": "Barbarians/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Barbarians/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, increased the Evolved Barbarians' hitpoints by 3%, and increased their attack speed to 1.4 seconds (from 1.3 seconds).",
+   "On 4/8/2026, a Balance Update, removed the Evolved Barbarians' Extra Hitpoints. Their rage duration was increased to 5 seconds (from 3 seconds)"
+  ],
+  "group": "c"
+ },
+ "156": {
+  "name": "Lumberjack",
+  "page": "Lumberjack/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Lumberjack/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Ghost's Tower Damage by 50%"
+  ],
+  "group": "c"
+ },
+ "157": {
+  "name": "Executioner",
+  "page": "Executioner/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Executioner/Evolution",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 179,
+    "wiki": 168.0,
+    "status": "explained",
+    "note": "table predates 2/3/2026: x1.07 = 180"
+   },
+   {
+    "field": "hit_speed_s",
+    "engine": 2.4000000953674316,
+    "wiki": 0.9,
+    "status": "not comparable",
+    "note": "engine cooldown spans the whole axe throw (0.9 s hit + 1.5 s axe time)"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, increased the Evolved Executioners damage by 7%, and decreased push back to 1 tile (from 1.5 tiles).",
+   "On 6/7/2026, a Balance Update, decreased the Evolved Executioner\u2019s Close Quarters Damage by 10% and decreased its Close Quarters Range to 2.5 tiles (from 3.5 tiles)",
+   "On 4/8/2026, a Balance Update, decreased the Evolved Executioner's projectile range to 7 tiles (from 7.5 tiles)"
+  ],
+  "group": "c"
+ },
+ "158": {
+  "name": "Giant Snowball",
+  "page": "Giant Snowball/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Giant_Snowball/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/5/2026, a Balance Update, decreased the Evolved Giant Snowball's slow duration to 3 seconds (from 4 seconds)",
+   "On 1/6/2026, a Balance Update, decreased the Evolved Giant Snowball's Crown Tower damage to 25% of the full damage (from 30%)",
+   "On 4/8/2026, a Balance Update, decreased the Evolved Giant Snowball's projectile range to 4 tiles (from 4.5 tiles)"
+  ],
+  "group": "c"
+ },
+ "159": {
+  "name": "Goblin Giant",
+  "page": "Goblin Giant/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Goblin_Giant/Evolution",
+  "rows": [
+   {
+    "field": "hp",
+    "engine": 3110,
+    "wiki": 3223.0,
+    "status": "not comparable",
+    "note": "Evolution page row disagrees with the base Goblin Giant page"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, increased the Goblin Giant's Hitpoints by 3%"
+  ],
+  "group": "c"
+ },
+ "160": {
+  "name": "Mega Knight",
+  "page": "Mega Knight/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Mega_Knight/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Evolved Mega Knight's knockback against large troops to 2.5 tiles (from 4 tiles)",
+   "On 4/8/2026, a Balance Update, made it so that the Evolved Mega Knight knocks back troops every 2 hits instead of every hit. It also increased the Evolved Mega Knight's knockback against large troops to 4 tiles (from 2.5 tiles)"
+  ],
+  "group": "c"
+ },
+ "161": {
+  "name": "Battle Ram",
+  "page": "Battle Ram/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Battle_Ram/Evolution",
+  "rows": [
+   {
+    "field": "hp",
+    "engine": 967,
+    "wiki": 737.0,
+    "status": "not comparable",
+    "note": "Evolution page row is the Barbarians' stats, not the Ram's"
+   },
+   {
+    "field": "damage",
+    "engine": 286,
+    "wiki": 192.0,
+    "status": "not comparable",
+    "note": "Evolution page row is the Barbarians' stats, not the Ram's"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "162": {
+  "name": "Royal Hogs",
+  "page": "Royal Hogs/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Royal_Hogs/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, decreased the Evolved Royal Hogs' Landing Damage by 27%.",
+   "On 4/5/2026, a Balance Update, decreased the Evolved Royal Hogs' Landing Damage by 49%."
+  ],
+  "group": "c"
+ },
+ "163": {
+  "name": "Inferno Dragon",
+  "page": "Inferno Dragon/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Inferno_Dragon/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 1/6/2026, a Balance Update, decreased the Evo Inferno Dragon's ability duration to 7 seconds (from 9 seconds)"
+  ],
+  "group": "c"
+ },
+ "164": {
+  "name": "Mirror",
+  "page": "Mirror",
+  "url": "https://clashroyale.fandom.com/wiki/Mirror",
+  "rows": [
+   {
+    "field": "cost",
+    "engine": 3.0,
+    "wiki": 1.0,
+    "status": "not comparable",
+    "note": "Mirror costs the mirrored card + 1; no fixed cost"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "165": {
+  "name": "Spirit Empress",
+  "page": "Spirit Empress",
+  "url": "https://clashroyale.fandom.com/wiki/Spirit_Empress",
+  "rows": [
+   {
+    "field": "hp",
+    "engine": 926,
+    "wiki": 1121.0,
+    "status": "not comparable",
+    "note": "two forms; wiki row is the other form (TODO)"
+   },
+   {
+    "field": "damage",
+    "engine": 249,
+    "wiki": 320.0,
+    "status": "not comparable",
+    "note": "two forms; wiki row is the other form (TODO)"
+   },
+   {
+    "field": "range",
+    "engine": 1.2000000476837158,
+    "wiki": 5.0,
+    "status": "not comparable",
+    "note": "two forms; wiki row is the other form (TODO)"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, increased the Spirit Empress' Ground speed to fast (from medium), decreased her Ground hitpoints by 7%, and decreased her Air Hitpoints by 1%.",
+   "On 4/5/2026, a Balance Update, decreased the Sprirt Empress' Ground Hitpoints by 3% and decreased her Air Hitpoints by 5%. Her ground hit speed was also increased to 1.2 seconds (from 1.1 seconds)",
+   "On 8/9/2026, a Balance Update, increased the Spirit Empress' Damage in both forms by 4%."
+  ],
+  "group": "c"
+ },
+ "166": {
+  "name": "Hero Knight",
+  "page": "Knight/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Knight/Hero",
+  "rows": [
+   {
+    "field": "shield_hp",
+    "engine": 0,
+    "wiki": 512.0,
+    "status": "not comparable",
+    "note": "512 is the Triumphant Taunt ability shield (patch 0018), not a base shield"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/1/2026, a Balance Update, decreased the Hero Knight's shield hitpoints by 6%.",
+   "On 2/3/2026, a Balance Update, decreased the radius of Triumphant Taunt to 6.5 tiles (from 7.5 tiles).",
+   "On 6/4/2026, a Balance Update, decreased the Taunt Trigger Window to 0.1s (from 0.7s).",
+   "On 6/7/2026, a Balance Update, decreased the Hero Knight's shield hitpoints by 33%.",
+   "On 4/8/2026, a Balance Update, made the ability single use (from 20sec cooldown)."
+  ],
+  "group": "c"
+ },
+ "167": {
+  "name": "Hero Wizard",
+  "page": "Wizard/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Wizard/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/2/2026, a Balance Update, increased tornado pull to 250 (from 200).",
+   "On 23/2/2026, the 2026 Quarter 1 Update, decreased the hero wizards crown tower damage by 64%.",
+   "On 4/8/2026, a Balance Update, made the ability single use (from 20sec cooldown)."
+  ],
+  "group": "c"
+ },
+ "168": {
+  "name": "Hero Musketeer",
+  "page": "Musketeer/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Musketeer/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [
+   "Turret Hitpoints 721 vs Turret Hitpoints lost per second 153.6 x lifetime 10 s = 1536"
+  ],
+  "history_2026": [
+   "On 12/1/2026, a Balance Update, increased turret deploy time to 2 seconds (from 1 second).",
+   "On 4/8/2026, a Balance Update, made the ability single use (from 22sec cooldown)."
+  ],
+  "group": "a"
+ },
+ "169": {
+  "name": "Hero Giant",
+  "page": "Giant/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Giant/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/2/2026 the February 2026 update reduced hero giants hitpoints by 3%.",
+   "On 4/8/2026, a Balance Update, made the ability single use (from 14sec cooldown)."
+  ],
+  "group": "c"
+ },
+ "170": {
+  "name": "Hero Mini P.E.K.K.A.",
+  "page": "Mini P.E.K.K.A./Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Mini_P.E.K.K.A./Hero",
+  "rows": [
+   {
+    "field": "hp",
+    "engine": 1390,
+    "wiki": 1433.0,
+    "status": "explained",
+    "note": "table predates 12/1/2026: x0.97 = 1390"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 12/1/2026, a  Balance Update, decreased the Hero Mini P.E.K.K.A.'s healing to 30% (from 40%), and decreased the it's Hitpoints by 3%.",
+   "On 2/2/2026, a Balance Update, increased the Hero Mini P.E.K.K.A.'s cook time to 22 seconds (from 20 seconds)."
+  ],
+  "group": "c"
+ },
+ "171": {
+  "name": "Hero Magic Archer",
+  "page": "Magic Archer/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Magic_Archer/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, with the March 2026 update, Hero Magic Archer Was added to the game along with Hero Barbarian Barrel.",
+   "On 7/4/2026, a Balance Update, increased the Hero Magic Archer's ability cost to 2 elixir (from 1 elixir).",
+   "On 6/7/2026, a Balance Update, decreased the Hero Magic Archer's ability range to 13.5 tiles (from 15.4 tiles), decreased his teleportation distance to 3.5 tiles (from 5 tiles), and decreased the decoy hitpoints by 57%.",
+   "On 4/8/2026, a Balance Update, decreased the Hero Magic Archer's damage by 6%. This also made the ability single use (from 25sec cooldown)."
+  ],
+  "group": "c"
+ },
+ "172": {
+  "name": "Hero Goblins",
+  "page": "Goblins/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Goblins/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 23/2/2026, the 2026 Quarter 1 Update, decreased Banner Brigades spawned units to 3 (from 4), and decreased banner duration to 5 seconds (from 7 seconds).",
+   "On 7/4/2026, a Balance Update, the brigade goblins now spawn a tile back from where the banner is dropped at.",
+   "On 6/7/2026, a Balance Update, the deploy time for the brigade goblins increased to 1.3 seconds (from 1 second).",
+   "On 4/8/2026, a Balance Update, increased the Hero Goblins' damage by 4%, decreased the number of brigade goblins to 2 (from 3), and decreased the deploy time for the brigade goblins to 1 second (from 1.3 seconds)."
+  ],
+  "group": "c"
+ },
+ "173": {
+  "name": "Hero Mega Minion",
+  "page": "Mega Minion/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Mega_Minion/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, the March 2026 Update decreased the Wounding Warp's damage by 12%.",
+   "On 7/4/2026, a Balance Update, a first target delay of 1.5s was implemented on the Hero Mega Minion, to where it could no longer instantly spawn to targeted troop when ability is activated.",
+   "On 4/5/2026, a Balance Update, decreased the Hero Mega Minion's warp damage by 9%.",
+   "On 4/8/2026, a Balance Update, decreased the Hero Mega Minion's tower multiplier to x0.25 (from x0.5), it's crown tower damage reduction is now permanent, and its warp damage has been increased by 7%."
+  ],
+  "group": "c"
+ },
+ "174": {
+  "name": "Hero Barbarian Barrel",
+  "page": "Barbarian Barrel/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Barbarian_Barrel/Hero",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 215,
+    "wiki": 232.0,
+    "status": "not comparable",
+    "note": "OPEN: Hero page 232 vs base Barbarian Barrel page 215; engine keeps the base value"
+   },
+   {
+    "field": "crown_tower_damage",
+    "engine": 108,
+    "wiki": 116.0,
+    "status": "not comparable",
+    "note": "OPEN: Hero page 116 vs base 108; engine keeps the base value"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, along with the March 2026 Update the Hero Barbarian Barrel was added into the game, along with Hero Magic Archer.",
+   "On 4/5/2026, a Balance Update, decreased the reroll range to 3 tiles (from 4 tiles).",
+   "On 4/8/2026, a Balance Update increased the barbarian's hitpoint by 4%."
+  ],
+  "group": "c"
+ },
+ "175": {
+  "name": "Hero Ice Golem",
+  "page": "Ice Golem/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Ice_Golem/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 2/3/2026, a Balance Update, decreased Freeze duration to 1.5sec (from 2sec).",
+   "On 7/4/2026, a Balance Update, the pushback on the Hero Ice Golem was removed entirely.",
+   "On 4/8/2026, a Balance Update, the 3rd Blast Effect went from being a freeze effect to a slowdown effect, and the blast damage was increased by 82%. This also made the ability single use (from 17 sec cooldown)."
+  ],
+  "group": "a"
+ },
+ "176": {
+  "name": "Minion Giant",
+  "page": "Minion Giant",
+  "url": "https://clashroyale.fandom.com/wiki/Minion_Giant",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 153,
+    "wiki": 168.0,
+    "status": "not comparable",
+    "note": "table stale: official 19 Oct 2026 notes set 153 (from 168); engine follows the notes"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "177": {
+  "name": "Giant",
+  "page": "Giant/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Giant/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "178": {
+  "name": "Elite Barbarians",
+  "page": "Elite Barbarians/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Elite_Barbarians/Evolution",
+  "rows": [
+   {
+    "field": "damage",
+    "engine": 384,
+    "wiki": 220.0,
+    "status": "not comparable",
+    "note": "Evolution page's Damage cell repeats its Spear Damage (220); base page swing is 384"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "179": {
+  "name": "Electro Giant",
+  "page": "Electro Giant/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Electro_Giant/Evolution",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "180": {
+  "name": "Mirror",
+  "page": "Mirror/Evolution",
+  "url": "https://clashroyale.fandom.com/wiki/Mirror/Evolution",
+  "rows": [
+   {
+    "field": "cost",
+    "engine": 3.0,
+    "wiki": 1.0,
+    "status": "not comparable",
+    "note": "Mirror costs the mirrored card + 1; no fixed cost"
+   }
+  ],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "181": {
+  "name": "Hero Balloon",
+  "page": "Balloon/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Balloon/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 6/4/2026, with the April 2026 Update, the Hero Balloon was added in the game, along with Evo Minion Horde.",
+   "On 1/6/2026, a Balance Update, decreased the Skeletrooper's Landing Damage by 14%.",
+   "On 6/7/2026, a Balance Update, decreased the Skeletrooper's Attack Damage by 20% and increased his hit speed to 1.1 seconds (from 0.9 seconds).",
+   "On 4/8/2026, a Balance Update, made the ability single use (from 12sec cooldown)."
+  ],
+  "group": "c"
+ },
+ "182": {
+  "name": "Hero Valkyrie",
+  "page": "Valkyrie/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Valkyrie/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "183": {
+  "name": "Hero Ice Wizard",
+  "page": "Ice Wizard/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Ice_Wizard/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "184": {
+  "name": "Hero Dark Prince",
+  "page": "Dark Prince/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Dark_Prince/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/5/2026, the May 2026 update added the Hero Dark Prince into the game, along with the Hero Bowler.",
+   "On 1/6/2026, a Balance Update, removed the Rhino's spawn damage to Crown Towers, the Rhino's first charge distance increased to 2.5 tiles (from 0 tiles), and the ability deploy time decreased to 1 second (from 2 seconds)."
+  ],
+  "group": "c"
+ },
+ "185": {
+  "name": "Hero Bowler",
+  "page": "Bowler/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Bowler/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [
+   "On 4/5/2026, with the May 2026 Update the Hero Bowler was added into the game, along with Hero Dark Prince.",
+   "On 1/6/2026, a Balance Update, decreased his ability duration to 7.3 seconds (from 9 seconds).",
+   "On 4/8/2026, a Balance Update, decreased the Hero Bowler's projectile range to 7 tiles (from 7.5 tiles). This also made the ability single use (from 22sec cooldown)."
+  ],
+  "group": "c"
+ },
+ "186": {
+  "name": "Hero Electro Wizard",
+  "page": "Electro Wizard/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Electro_Wizard/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "187": {
+  "name": "Hero Berserker",
+  "page": "Berserker/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Berserker/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [],
+  "history_2026": [],
+  "group": "c"
+ },
+ "188": {
+  "name": "Hero Tombstone",
+  "page": "Tombstone/Hero",
+  "url": "https://clashroyale.fandom.com/wiki/Tombstone/Hero",
+  "rows": [],
+  "wiki_inconsistencies": [
+   "Hitpoints 81 vs Hitpoints lost per second 17.6 x lifetime 30 s = 528"
+  ],
+  "history_2026": [],
+  "group": "c"
+ }
+}

@@ -1,0 +1,520 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index b876180..28a8334 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -518,6 +518,49 @@ the cast window has a start as well as an end (see the sweep in the patch-0030
+ report); against troops already walking in the lane nothing changes.
+ Checkpoints still load.
+ 
++## 2026-11-21: first hit = hit speed - load time (patch 0034)
++
++Patch 0006 gave every unit a wind-up before its first hit, but made it as long
++as the published load time. The load time is the part of the attack cycle a
++unit does in ADVANCE (it walks loaded); what is left once a target is in range
++is `hit speed - load time`. So the wind-ups were the complement of the real
++ones: Hog Rider 1.0 s (real 0.6), Princess 2.7 s (0.3), Mortar 3.7 s (1.0),
++Ice Golem 1.5 s (1.0), Knight 0.7 s (0.5), and too SHORT for Musketeer 0.3 s
++(0.7), Cannon 0.1 s (0.9), Minions 0.7 (0.5 - the same by luck for a few).
++
++- Rule and sources in `core/LoadTimes.h`: `firstHitTicks(name, cooldown)`,
++  used by `CardFactories::applyCardMetadata`. The table still holds the
++  published LOAD times; `CombatEntity::loadTicks` is the wind-up derived from
++  them. A row may carry the published hit speed where the engine's cooldown is
++  not it (the spirits, Executioner, Battle Ram, Goblin Drill). A load time not
++  shorter than the hit speed (Inferno Tower / Dragon, Mighty Miner) stays the
++  whole wind-up, as before. `CardStats::withLoadTicks(n)` is a first-hit time
++  given outright (the Tower Troops) and is untouched.
++- Evidence: RoyaleAPI's "first hit" is this difference; the 2023 and current
++  game files agree on it where a hit speed changed (Cannon 0.9 s / 0 then
++  1.0 s / 0.1 s; Mortar 5.0 / 4.0 then 4.7 / 3.7); live recording
++  `runs/live/20261120-185026` has the Hog's first hit 0.58-0.75 s after it
++  reaches the tower, then every 1.6 s.
++- Second half of the same rule: the wind-up belongs to the ENGAGEMENT, not the
++  target. Going straight from one target in range to another no longer
++  restarts it (`CombatEntity::windupTargetId`); only a unit that had nothing
++  in range, left range or was stunned winds up again. In the recording a
++  Princess Tower's arrows stay 0.8 s apart through the three Goblins of a
++  barrel. This only bites where the wind-up is not shorter than what is left
++  of the cooldown (the Tower Troops' 0.8 s, a target killed by someone else).
++- NOT modelled: Sparky deploys unloaded in the real game (here she fires 1 s
++  after her first target, as when charged); a stun still only restarts the
++  wind-up, it does not unload.
++- Exposed as `get_card_stats(id)["base"]["first_hit_windup_ticks"]`;
++  `load_ticks` is still the published load time.
++- Tests: `tests/core/test_card_registry.cpp` (`[load_time]`).
++
++**GAMEPLAY-AFFECTING, and Hog Rider, Musketeer, Cannon and Ice Golem are in
++`DEFAULT_DECK`.** A lone Hog at the bridge gets its first hit 0.4 s sooner,
++a Princess shoots 2.4 s sooner, a Cannon and a Musketeer answer 0.8 s / 0.4 s
++later. Every win rate earned before this date describes different first hits.
++Checkpoints still load.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index d573878..5e24986 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -30,7 +30,11 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     // its own). Set here because every troop and building passes through;
+     // spells and deploy effects do not, since a spell has its own delay.
+     entity->deployTicksRemaining = stats.deployTicks;
+-    entity->loadTicks = stats.loadTicksOverride >= 0 ? stats.loadTicksOverride : LoadTimes::forName(stats.name);
++    // First-hit wind-up: hit speed minus the published load time (LoadTimes.h),
++    // or a first-hit time given outright (CardStats::withLoadTicks).
++    entity->loadTicks = stats.loadTicksOverride >= 0
++        ? stats.loadTicksOverride
++        : LoadTimes::firstHitTicks(stats.name, stats.attackCooldown);
+     entity->isFlying = stats.isFlying;
+     entity->targetsAir = stats.targetsAir;
+     entity->deathEffect = stats.deathEffect;
+diff --git a/include/core/CardStats.h b/include/core/CardStats.h
+index f8ae85f..6bac024 100644
+--- a/include/core/CardStats.h
++++ b/include/core/CardStats.h
+@@ -359,8 +359,9 @@ struct CardStats {
+     // CombatEntity's magazine (Dagger Duchess); 0 = none.
+     int magazineSize = 0;
+     int magazineReloadTicks = 0;
+-    // A load time for bodies the name-keyed LoadTimes table cannot reach (the
+-    // Tower Troops, which are all named "Princess Tower"); -1 = use the table.
++    // A first-hit wind-up in ticks, given outright, for bodies the name-keyed
++    // LoadTimes table cannot reach (the Tower Troops, which are all named
++    // "Princess Tower"); -1 = hit speed minus the table's load time.
+     int loadTicksOverride = -1;
+     float burstDamageMultiplier = 1.0f;
+ 
+diff --git a/include/core/LoadTimes.h b/include/core/LoadTimes.h
+index 33c793d..571fb7d 100644
+--- a/include/core/LoadTimes.h
++++ b/include/core/LoadTimes.h
+@@ -2,14 +2,27 @@
+ 
+ #include <string>
+ 
+-// Attack load time ("first hit"): how long a unit winds up after it comes
+-// into range of a new target before its first hit lands, in ticks (10 = 1 s).
+-// After that it hits every CardStats::attackCooldown. Read by
+-// CardFactories::applyCardMetadata, used in CombatEntity::update.
++// Attack load time, in ticks (10 = 1 s), and the first-hit wind-up that
++// follows from it. Read by CardFactories::applyCardMetadata, used in
++// CombatEntity::update.
+ //
+-// Before this every unit hit the instant it came into range (a Hog 0.1 s after
+-// reaching a tower; the real game is 1.0 s), because the cooldown runs down
+-// while a unit walks. perception/UPSTREAM_REQUESTS.md item 40.
++// The published "LoadTime" is the part of the attack cycle a unit can do in
++// advance, with no target: a unit walks around already loaded. What is left
++// once it has a target in range is
++//
++//     first hit = hit speed - load time            (firstHitTicks below)
++//
++// and later hits follow every hit speed. A Hog Rider (hit speed 1.6 s, load
++// time 1.0 s) lands its first hit 0.6 s after reaching a building; a Princess
++// (3.0 s, 2.7 s) 0.3 s after stopping; a Cannon (1.0 s, 0.1 s) 0.9 s after
++// seeing something. Sources: RoyaleAPI lists "First Hit" as exactly this
++// difference; a live recording (runs/live/20261120-185026, patch 0034) has the
++// Hog's first hit 0.58-0.75 s after it reaches the tower.
++//
++// History: before patch 0006 every unit hit the tick it came into range.
++// Patch 0006 added the wind-up but used the load time itself as its length
++// (Hog 1.0 s, Princess 2.7 s, Cannon 0.1 s), which is the complement of the
++// real number. Patch 0034 corrected it to the difference.
+ //
+ // Keyed by the registry NAME, not the id, because Evolutions reuse the base
+ // card's name verbatim and their load time is the base card's. A name not in
+@@ -30,6 +43,11 @@ struct Row {
+     const char* name;
+     int ticks;
+     Source source;
++    // The published hit speed in ticks, for the few cards whose engine
++    // attackCooldown is not it (a spirit's cooldown is never used again; the
++    // Executioner's covers his axe's flight out and back). 0 = the card's
++    // attackCooldown is the published hit speed.
++    int hitSpeedTicks = 0;
+ };
+ 
+ inline const Row* table(int& count) {
+@@ -42,7 +60,7 @@ inline const Row* table(int& count) {
+         { "Barbarians", 10, Source::FLZ }, // Barbarians 1000 ms
+         { "Bats", 6, Source::FLZ }, // Bats 600 ms
+         { "Battle Healer", 16, Source::FLZ }, // BattleHealer 1600 ms
+-        { "Battle Ram", 4, Source::FLZ }, // BattleRam 350 ms
++        { "Battle Ram", 4, Source::FLZ, 4 }, // BattleRam 350 ms, hit speed 400 ms
+         { "Bomb Tower", 13, Source::FLZ }, // BombTower 1300 ms
+         { "Bomber", 16, Source::FLZ }, // Bomber 1600 ms
+         { "Bowler", 20, Source::FLZ }, // Bowler 2000 ms
+@@ -52,25 +70,25 @@ inline const Row* table(int& count) {
+         { "Dart Goblin", 4, Source::CRAPI }, // BlowdartGoblin 350 ms
+         { "Electro Dragon", 14, Source::FLZ }, // ElectroDragon 1400 ms
+         { "Electro Giant", 8, Source::FLZ }, // ElectroGiant 800 ms
+-        { "Electro Spirit", 1, Source::FLZ }, // ElectroSpirit 100 ms
++        { "Electro Spirit", 1, Source::FLZ, 3 }, // ElectroSpirit 100 ms, hit speed 300 ms
+         { "Electro Wizard", 12, Source::FLZ }, // ElectroWizard 1200 ms
+         { "Elite Barbarians", 9, Source::CRAPI }, // AngryBarbarian 900 ms
+         { "Elixir Golem", 3, Source::FLZ }, // ElixirGolem 300 ms
+-        { "Executioner", 4, Source::CRAPI }, // AxeMan 400 ms
+-        { "Fire Spirit", 1, Source::CRAPI }, // FireSpirits 100 ms
++        { "Executioner", 4, Source::CRAPI, 9 }, // AxeMan 400 ms, hit speed 900 ms
++        { "Fire Spirit", 1, Source::CRAPI, 3 }, // FireSpirits 100 ms, hit speed 300 ms
+         { "Firecracker", 24, Source::FLZ }, // Firecracker 2350 ms
+         { "Fisherman", 12, Source::FLZ }, // Fisherman 1200 ms
+         { "Flying Machine", 6, Source::CRAPI }, // DartBarrell 600 ms
+         { "Giant", 10, Source::FLZ }, // Giant 1000 ms
+         { "Giant Skeleton", 10, Source::FLZ }, // GiantSkeleton 1000 ms
+-        { "Goblin Drill", 2, Source::FLZ }, // GoblinDrill 200 ms
++        { "Goblin Drill", 2, Source::FLZ, 11 }, // GoblinDrill 200 ms, hit speed 1100 ms
+         { "Goblin Gang", 5, Source::FLZ }, // GoblinGang 500 ms
+         { "Goblin Giant", 7, Source::FLZ }, // GoblinGiant 700 ms
+         { "Goblins", 5, Source::FLZ }, // Goblins 500 ms
+         { "Golden Knight", 7, Source::FLZ }, // GoldenKnight 700 ms
+         { "Golem", 15, Source::FLZ }, // Golem 1500 ms
+         { "Guards", 6, Source::CRAPI }, // SkeletonWarrior 600 ms
+-        { "Heal Spirit", 1, Source::CRAPI }, // HealSpirit 100 ms
++        { "Heal Spirit", 1, Source::CRAPI, 3 }, // HealSpirit 100 ms, hit speed 300 ms
+         { "Hero Giant", 10, Source::FLZ }, // Giant 1000 ms
+         { "Hero Goblins", 5, Source::FLZ }, // Goblins 500 ms
+         { "Hero Ice Golem", 15, Source::CRAPI }, // IceGolemite 1500 ms
+@@ -83,7 +101,7 @@ inline const Row* table(int& count) {
+         { "Hog Rider", 10, Source::FLZ }, // HogRider 1000 ms
+         { "Hunter", 15, Source::FLZ }, // Hunter 1500 ms
+         { "Ice Golem", 15, Source::CRAPI }, // IceGolemite 1500 ms
+-        { "Ice Spirit", 1, Source::FLZ }, // IceSpirits 100 ms
++        { "Ice Spirit", 1, Source::FLZ, 3 }, // IceSpirits 100 ms, hit speed 300 ms
+         { "Ice Wizard", 12, Source::FLZ }, // IceWizard 1200 ms
+         { "Inferno Dragon", 12, Source::FLZ }, // InfernoDragon 1200 ms
+         { "Inferno Tower", 12, Source::FLZ }, // InfernoTower 1200 ms
+@@ -129,13 +147,38 @@ inline const Row* table(int& count) {
+     return rows;
+ }
+ 
+-inline int forName(const std::string& name) {
++inline const Row* find(const std::string& name) {
+     int n = 0;
+     const Row* rows = table(n);
+     for (int i = 0; i < n; ++i) {
+-        if (name == rows[i].name) return rows[i].ticks;
++        if (name == rows[i].name) return &rows[i];
+     }
+-    return 0;
++    return nullptr;
++}
++
++// The published load time of a card, 0 if it has no row.
++inline int forName(const std::string& name) {
++    const Row* row = find(name);
++    return row ? row->ticks : 0;
++}
++
++// The first-hit wind-up for a load time and a hit speed, both in ticks: how
++// long a unit that already walks loaded still needs once a target is in range.
++// No load time: no wind-up, the unit hits at once. A load time no shorter than
++// the hit speed (the Inferno beams: 1.2 s against 0.4 s) cannot be done in
++// advance within the cycle, so it stays the whole wind-up.
++inline int firstHitTicksFor(int loadTicks, int hitSpeedTicks) {
++    if (loadTicks <= 0) return 0;
++    if (loadTicks >= hitSpeedTicks) return loadTicks;
++    return hitSpeedTicks - loadTicks;
++}
++
++// The first-hit wind-up of a card whose attackCooldown is `attackCooldownTicks`
++// (taken as its hit speed unless the row carries the published one).
++inline int firstHitTicks(const std::string& name, int attackCooldownTicks) {
++    const Row* row = find(name);
++    if (!row) return 0;
++    return firstHitTicksFor(row->ticks, row->hitSpeedTicks > 0 ? row->hitSpeedTicks : attackCooldownTicks);
+ }
+ 
+ } // namespace LoadTimes
+diff --git a/include/core/TowerTroops.h b/include/core/TowerTroops.h
+index 3cffec5..56781b7 100644
+--- a/include/core/TowerTroops.h
++++ b/include/core/TowerTroops.h
+@@ -43,8 +43,9 @@ namespace RoyalChef {
+ //
+ // Level-11 stats from the Clash Royale wiki pages (current as of the 4 Aug and
+ // 1 Sep 2025 balance changes; the 2026 notes did not touch Tower Troops).
+-// "First hit" is the sourced first-attack time, as a load time (LoadTimes.h)
+-// the name-keyed table cannot give a tower.
++// "First hit" is the sourced first-attack time, given outright as the
++// wind-up (CardStats::withLoadTicks) because the name-keyed LoadTimes table
++// cannot reach a tower.
+ inline CardStats towerTroopStats(TowerTroopType type) {
+     CardStats stats;
+     stats.spawnOffsets = { {0.0f, 0.0f} };
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index bbffa30..f57b4a2 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -106,12 +106,18 @@ public:
+     // and a new unit has not been stunned. The implicit copy carries it, so
+     // snapshots keep the exact remaining deploy time.
+     int deployTicksRemaining = 0;
+-    // Attack load time (LoadTimes.h): after coming into range of a new
+-    // target, wind up this many ticks before the first hit. 0 = hit at once.
++    // First-hit wind-up (LoadTimes.h: hit speed minus the published load
++    // time): after a target comes into range, wind up this many ticks before
++    // the first hit. 0 = hit at once.
+     int loadTicks = 0;
+-    // The target the current wind-up is for, -1 for none. A stun, leaving
+-    // range, losing the target or switching target cancels it, so the next
+-    // engagement winds up from the start, as in the real game.
++    // The target of the current engagement, -1 for none. An engagement starts
++    // when a target comes into range of a unit that had none in range, and
++    // only then does the wind-up start. A stun, leaving range or having no
++    // target ends it, so the next one winds up again. Going straight from one
++    // target in range to another (the first died, or something came closer)
++    // does NOT: the unit keeps its hit-speed rhythm, as a Princess Tower keeps
++    // shooting every 0.8 s through a Goblin Barrel's three Goblins (live
++    // recording runs/live/20261120-185026, patch 0034).
+     int windupTargetId = -1;
+     float windupRemaining = 0.0f;
+ 
+@@ -852,16 +858,18 @@ public:
+             float effectiveAttackRange = effectiveRangeTo(target);
+ 
+             if (dist <= effectiveAttackRange) {
+-                // Load time: a new engagement winds up for loadTicks first,
++                // First hit: a new engagement winds up for loadTicks first,
+                 // so the first hit lands loadTicks after coming into range
+                 // and later hits follow every attackCooldown. A slow slows
+-                // the wind-up as it slows the cooldown.
++                // the wind-up as it slows the cooldown. Only a NEW engagement
++                // winds up; a switch between targets in range keeps the rhythm
++                // (windupTargetId above).
+                 bool loading = false;
+                 if (!stunned && loadTicks > 0) {
+-                    if (target->id != windupTargetId) {
+-                        windupTargetId = target->id;
++                    if (windupTargetId == -1) {
+                         windupRemaining = static_cast<float>(loadTicks);
+                     }
++                    windupTargetId = target->id;
+                     if (windupRemaining > 0.0f) {
+                         windupRemaining -= wasFrozen ? slowThisTick : 1.0f;
+                         if (windupRemaining < 0.0f) windupRemaining = 0.0f;
+diff --git a/python_ai/tests/test_teacher_combos.py b/python_ai/tests/test_teacher_combos.py
+index b547368..c6e7f0d 100644
+--- a/python_ai/tests/test_teacher_combos.py
++++ b/python_ai/tests/test_teacher_combos.py
+@@ -400,11 +400,13 @@ def test_the_teacher_actually_executes_a_planned_pair_end_to_end():
+     """
+     env = _env()
+     _stage_hand(env, 0, [ICE_GOLEM, HOG, CANNON, SKELETONS], 10.0)
+-    # 100 ticks, the top rung's horizon. The follow-up is re-scored when it
+-    # falls due, and since the Hog winds up 1.0 s before its first hit
+-    # (LoadTimes.h, UPSTREAM item 40) a 50-tick rollout no longer reaches
+-    # the tower damage that makes it the best play here.
+-    t = _teacher(horizon=100)
++    # 70 ticks. The pair has to win twice: when it is planned, and again when
++    # the follow-up is re-scored as it falls due. Which horizons do both
++    # depends on how many Hog hits fit in the rollout: with the Hog's first
++    # hit 0.6 s after reaching the tower (LoadTimes.h, patch 0034) a lone Hog
++    # out-scores the pair at 100 ticks and the follow-up loses at 50; at 70
++    # the pair holds, as it did with the 1.0 s wind-up before.
++    t = _teacher(horizon=70)
+     spent0 = env.get_elixir_spent(0)
+ 
+     slot, x, y = t.act(env, _obs(env))
+diff --git a/python_ai/tests/test_thrown_spell_flight.py b/python_ai/tests/test_thrown_spell_flight.py
+index 388c5b1..5242877 100644
+--- a/python_ai/tests/test_thrown_spell_flight.py
++++ b/python_ai/tests/test_thrown_spell_flight.py
+@@ -112,13 +112,14 @@ def test_a_goblin_barrel_is_pending_until_it_lands_and_then_the_goblins_appear()
+     _wait(env)
+     assert env.get_pending_spells() == []
+ 
+-    # The Goblins deploy for a second and stab after their load time: the
+-    # tower is first hurt 1.6 s after the landing (1.43-1.53 s measured).
++    # The Goblins deploy for a second and stab after their first-hit wind-up
++    # (hit speed 1.1 s - load time 0.5 s, LoadTimes.h): the tower is first
++    # hurt 1.7 s after the landing (1.43-1.53 s measured).
+     for after_landing in range(1, 30):
+         _wait(env)
+         if env.get_tower_hp(0, 1) < hp:
+             break
+-    assert after_landing == 16
++    assert after_landing == 17
+ 
+ 
+ def test_a_fireball_hits_only_when_its_flight_is_over():
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index 0538841..8ff8169 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -54,7 +54,12 @@ py::dict statsDict(const CardStats& s, int depth = 0) {
+     d["hp"] = s.hp;
+     d["damage"] = s.damage;
+     d["attack_cooldown_ticks"] = s.attackCooldown;
+-    d["load_ticks"] = LoadTimes::forName(s.name);
++    d["load_ticks"] = LoadTimes::forName(s.name);   // published load time
++    // What a unit of this card winds up before its first hit on a target in
++    // range (CardFactories::applyCardMetadata): hit speed minus load time.
++    d["first_hit_windup_ticks"] = s.loadTicksOverride >= 0
++        ? s.loadTicksOverride
++        : LoadTimes::firstHitTicks(s.name, s.attackCooldown);
+     d["hit_speed_s"] = s.attackCooldown / TICKS_PER_SECOND;
+     d["first_hit_ticks"] = s.initialCooldownTicks;   // 0 = no seeded first-hit delay
+     d["speed_tiles_per_tick"] = s.speed;
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index 19d9134..fdaaf80 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -1796,7 +1796,7 @@ TEST_CASE("every spawned unit moves at the speed of its own playable card",
+     REQUIRE(offenders.empty());
+ }
+ 
+-// ---------------- attack load time (UPSTREAM item 40) ----------------
++// ---------------- attack load time and first hit (UPSTREAM item 40, patch 0034) ----------------
+ 
+ namespace {
+ // Updates `unit` until `target` loses hp, returning how many updates it took;
+@@ -1813,25 +1813,67 @@ int updatesUntilHit(const std::shared_ptr<Entity>& unit, const std::shared_ptr<E
+ }
+ }
+ 
+-TEST_CASE("A Hog Rider's first hit lands its load time after it reaches the building, then every hit speed",
++TEST_CASE("A Hog Rider's first hit lands hit speed minus load time after it reaches the building, then every hit speed",
+           "[card_registry][load_time]") {
+-    // 1.0 s load, 1.6 s hit speed (FLZ HogRider).
++    // 1.0 s load, 1.6 s hit speed (FLZ HogRider): first hit 0.6 s. A live
++    // recording has it 0.58-0.75 s after the Hog reaches the tower (patch 0034).
+     REQUIRE(LoadTimes::forName("Hog Rider") == 10);
++    REQUIRE(LoadTimes::firstHitTicks("Hog Rider", 16) == 6);
+     Board board;
+     auto building = std::make_shared<Building>(999, 5.0f, 5.5f, 100000, 1, 'C', 5.0f, 10, 10);
+     spawn(board, building);
+     CardRegistry::getInstance().getCard(15)->spawnEntity(5.0f, 5.0f, 0, board);
+     board.commitPendingEntities();
+     auto hog = board.getEntities().back();
+-    REQUIRE(std::dynamic_pointer_cast<CombatEntity>(hog)->loadTicks == 10);
++    REQUIRE(std::dynamic_pointer_cast<CombatEntity>(hog)->loadTicks == 6);
+     advancePastDeploy(hog, board);
+ 
+-    // In range from the first live tick: wind up 10 ticks, hit on the 11th.
+-    REQUIRE(updatesUntilHit(hog, building, board) == 11);
++    // In range from the first live tick: wind up 6 ticks, hit on the 7th.
++    REQUIRE(updatesUntilHit(hog, building, board) == 7);
+     // Then the period is the hit speed, with no second wind-up on the same target.
+     REQUIRE(updatesUntilHit(hog, building, board) == CardRegistry::getInstance().getCard(15)->stats->attackCooldown);
+ }
+ 
++TEST_CASE("The first-hit wind-up is hit speed minus load time", "[card_registry][load_time]") {
++    // Published hit speed and load time, and the first hit they give.
++    struct Row { int id; const char* name; int hitSpeed; int load; int firstHit; };
++    const Row rows[] = {
++        { 15, "Hog Rider", 16, 10, 6 },
++        { 6, "Musketeer", 10, 3, 7 },
++        { 168, "Hero Musketeer", 10, 3, 7 },
++        { 40, "Ice Golem", 25, 15, 10 },
++        { 0, "Knight", 12, 7, 5 },
++        { 61, "Princess", 30, 27, 3 },
++        { 52, "Miner", 13, 8, 5 },
++        { 4, "Goblins", 11, 5, 6 },
++    };
++    auto& reg = CardRegistry::getInstance();
++    for (const Row& r : rows) {
++        INFO(r.name);
++        const CardDefinition* card = reg.getCard(r.id);
++        REQUIRE(card != nullptr);
++        REQUIRE(card->name == r.name);
++        REQUIRE(card->stats->attackCooldown == r.hitSpeed);
++        REQUIRE(LoadTimes::forName(card->name) == r.load);
++        Board board;
++        card->spawnEntity(5.0f, 5.0f, 0, board);
++        board.commitPendingEntities();
++        auto unit = std::dynamic_pointer_cast<CombatEntity>(board.getEntities().back());
++        REQUIRE(unit != nullptr);
++        REQUIRE(unit->loadTicks == r.firstHit);
++    }
++    // No row: no wind-up. A load time no shorter than the hit speed (the
++    // Inferno beams) cannot be done in advance, and stays the whole wind-up.
++    REQUIRE(LoadTimes::firstHitTicks("No Such Card", 10) == 0);
++    // A row that carries its own published hit speed uses it, not the engine's
++    // cooldown: a spirit jumps 0.2 s after reaching range (0.3 s - 0.1 s).
++    REQUIRE(LoadTimes::firstHitTicks("Ice Spirit", reg.getCard(72)->stats->attackCooldown) == 2);
++    REQUIRE(LoadTimes::firstHitTicks("Executioner", reg.getCard(36)->stats->attackCooldown) == 5);
++    REQUIRE(LoadTimes::firstHitTicksFor(12, 4) == 12);
++    REQUIRE(LoadTimes::firstHitTicksFor(10, 10) == 10);
++    REQUIRE(LoadTimes::firstHitTicksFor(9, 10) == 1);
++}
++
+ TEST_CASE("A stun during the wind-up restarts it", "[card_registry][load_time]") {
+     Board board;
+     auto building = std::make_shared<Building>(999, 5.0f, 5.5f, 100000, 1, 'C', 5.0f, 10, 10);
+@@ -1841,11 +1883,43 @@ TEST_CASE("A stun during the wind-up restarts it", "[card_registry][load_time]")
+     auto hog = std::dynamic_pointer_cast<CombatEntity>(board.getEntities().back());
+     advancePastDeploy(hog, board);
+ 
+-    for (int i = 0; i < 6; ++i) hog->update(board); // 6 of the 10 wind-up ticks
++    for (int i = 0; i < 4; ++i) hog->update(board); // 4 of the 6 wind-up ticks
+     REQUIRE(building->hp == 100000);
+     hog->applyFreeze(3, 0.0f);
+-    // 3 stunned ticks, then the full 10-tick wind-up again, then the hit.
+-    REQUIRE(updatesUntilHit(hog, building, board) == 3 + 10 + 1);
++    // 3 stunned ticks, then the full 6-tick wind-up again, then the hit.
++    REQUIRE(updatesUntilHit(hog, building, board) == 3 + 6 + 1);
++}
++
++TEST_CASE("Switching between targets in range keeps the hit-speed rhythm; a new engagement winds up again",
++          "[card_registry][load_time]") {
++    // Knight: hit speed 1.2 s, first hit 0.5 s. Two targets in reach.
++    Board board;
++    auto first = std::make_shared<DummyEntity>(901, 5.0f, 5.6f, 1000, 1);
++    auto second = std::make_shared<DummyEntity>(902, 5.2f, 5.7f, 1000, 1);
++    spawn(board, first);
++    spawn(board, second);
++    CardRegistry::getInstance().getCard(0)->spawnEntity(5.0f, 5.0f, 0, board);
++    board.commitPendingEntities();
++    auto knight = std::dynamic_pointer_cast<CombatEntity>(board.getEntities().back());
++    REQUIRE(knight->loadTicks == 5);
++    advancePastDeploy(knight, board);
++
++    REQUIRE(updatesUntilHit(knight, first, board) == 6);   // 5 wind-up ticks, hit on the 6th
++    REQUIRE(second->hp == 1000);
++    // The first target dies 0.9 s into the 1.2 s cycle, to something else.
++    for (int i = 0; i < 9; ++i) knight->update(board);
++    first->hp = 0;
++    // The next hit is due 3 ticks later and lands then, on the second target:
++    // no new 5-tick wind-up (that would be the 6th update).
++    REQUIRE(updatesUntilHit(knight, second, board) == 3);
++
++    // With nothing left in range the engagement is over, and the next one
++    // winds up from the start however long the Knight has been ready.
++    second->hp = 0;
++    for (int i = 0; i < 30; ++i) knight->update(board);
++    auto third = std::make_shared<DummyEntity>(903, knight->position.x, knight->position.y + 0.6f, 1000, 1);
++    spawn(board, third);
++    REQUIRE(updatesUntilHit(knight, third, board) == 6);
+ }
+ 
+ TEST_CASE("An Evolution winds up like its base card, and every load-time row names a registered card",
+diff --git a/tests/core/test_game_manager.cpp b/tests/core/test_game_manager.cpp
+index c7715eb..a9dddf3 100644
+--- a/tests/core/test_game_manager.cpp
++++ b/tests/core/test_game_manager.cpp
+@@ -388,8 +388,8 @@ TEST_CASE("A full scripted mini-match produces sane getStatistics() output", "[g
+     auto enemy = std::make_shared<DummyEntity>(board.allocateId(), 9.0f, 10.5f, 1000, 1);
+     spawn(board, enemy);
+ 
+-    // 5 ticks of combat after the Knight's 10-tick deploy time and its load time.
+-    for (int i = 0; i < 5 + DEPLOY_TIME_TICKS + LoadTimes::forName("Knight"); ++i) game.step();
++    // 5 ticks of combat after the Knight's 10-tick deploy time and its first-hit wind-up.
++    for (int i = 0; i < 5 + DEPLOY_TIME_TICKS + LoadTimes::firstHitTicks("Knight", 12); ++i) game.step();
+ 
+     const auto& stats = game.getStatistics();
+     REQUIRE(stats.elixirSpent(0) == Catch::Approx(3.0f));
+diff --git a/tests/entities/test_helpers.h b/tests/entities/test_helpers.h
+index fd124a2..0f8cbe5 100644
+--- a/tests/entities/test_helpers.h
++++ b/tests/entities/test_helpers.h
+@@ -23,7 +23,7 @@ inline void advancePastDeploy(const std::shared_ptr<Entity>& entity, Board& boar
+ }
+ 
+ // Steps a deployed unit that already has its target in range through its
+-// attack load time (LoadTimes.h), so its next update() lands the first hit. For
++// first-hit wind-up (LoadTimes.h), so its next update() lands the first hit. For
+ // tests about what a hit does, not when.
+ inline void windUp(const std::shared_ptr<Entity>& entity, Board& board) {
+     auto ce = std::dynamic_pointer_cast<CombatEntity>(entity);

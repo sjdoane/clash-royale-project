@@ -1,0 +1,508 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index ee57fc4..e87078d 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1005,6 +1005,28 @@ never by subtracting from the end.** This layout only ever grows by appending,
+ so a forward offset is stable by construction and a backward one is a
+ scheduled defect — it survives until the next append and then fails silently.
+ 
++**AND ON 2026-11-18: `observation_size()` 13977 → 13981, towers read their OWN
++max** (`UPSTREAM_REQUESTS.md` item 44). Each tower's six scalars and its
++building-channel cells are `hp / Building::getMaxHp()` in [0, 1]
++(`ClashEnv::towerHpFraction`), so every full tower reads 1.0 at any level; a
++deployed building still reads `min(hp / MAX_BUILDING_HP, 1)`. Before this a
++level-11 Princess read 0.633 and a level-15 King 1.453, and
++`cr-robot/training/reward.py` rescaled by level-11 HP and clipped, so the first
++31% of a level-15 tower's HP paid no tower reward. Appended after the cycle
++blocks, at the forward offset `LEVEL_START = CYCLE_START + CYCLE_BLOCK_SIZE`:
++
++```
++LEVEL_START + 0..3   own card, own tower, opp card, opp tower level
++                     each (L - 11) / 5, so a level-11 match reads all zeros
++```
++
++The real game shows each King's level, so this is observable. `ScalarEncoder.extra`
++takes the level section with the extra scalars, `Linear(14, 12)` (was 10), so the
++branch width and the LSTM input are unchanged and only that one layer's weight
++is discarded on a warm start. The perception encoder fills it from
++`encode(levels=...)`; `level_scalar(level)` is bound so neither side restates the
++formula.
++
+ **Combat is deterministic.** The only RNG in the engine is the opening-hand
+ shuffle (`PlayerState::initializeDeck`) and `HeuristicOpponent`. Nothing in
+ `include/entities/` is random — so identical inputs give identical outcomes,
+diff --git a/include/core/ClashEnv.h b/include/core/ClashEnv.h
+index 9ce24e1..ce25b78 100644
+--- a/include/core/ClashEnv.h
++++ b/include/core/ClashEnv.h
+@@ -73,7 +73,9 @@ public:
+     // highest registered id.
+     static constexpr int NUM_CARD_IDS = CARD_ID_COUNT;
+     static constexpr float MAX_TROOP_HP = 4256.0f;
+-    // The level-11 King's hp, so a full King still reads 1.0.
++    // The level-11 King's hp: the normaliser for deployed buildings (Cannon,
++    // Tesla...). Crown Towers do NOT use it: each reads hp over ITS OWN maximum
++    // (towerHpFraction), so a full tower is 1.0 at any level (UPSTREAM item 44).
+     static constexpr float MAX_BUILDING_HP = static_cast<float>(CrownTower::KING_HP);
+ 
+     // Normalisers for the attribute channels, from the registry's real spread.
+@@ -124,6 +126,35 @@ public:
+         + HAND_SIZE                                    // hand costs
+         + HAND_SIZE * NUM_CARD_IDS;                    // hand identity one-hots
+     static constexpr int CYCLE_START = EXTRA_SCALARS_START + NUM_EXTRA_SCALARS;
++
++    // --- levels (UPSTREAM_REQUESTS.md item 44) ---
++    // Four scalars after the cycle blocks, from the observer's side:
++    //
++    //   0 own card level | 1 own tower level | 2 opp card level | 3 opp tower level
++    //
++    // each (level - TOURNAMENT_LEVEL) / (MAX_LEVEL - TOURNAMENT_LEVEL), so the
++    // level-11 match every earlier run trained on reads all zeros, and a
++    // level-15 opponent 0.8. Not cheating: the real game shows both players'
++    // King levels on the towers. Without them a curriculum over opponent level
++    // is not Markovian (the same board is a different fight at 11 and 15).
++    static constexpr int NUM_LEVEL_SCALARS = 4;
++    static constexpr int LEVEL_START = CYCLE_START + CYCLE_BLOCK_SIZE;
++    static float levelScalar(int level) {
++        return static_cast<float>(level - CardLevels::TOURNAMENT_LEVEL)
++             / static_cast<float>(CardLevels::MAX_LEVEL - CardLevels::TOURNAMENT_LEVEL);
++    }
++
++    // A Crown Tower's hp over its OWN maximum (its level's), in [0, 1]. The
++    // building channel and the six tower scalars both use it, so a full
++    // level-15 King reads 1.0 rather than 1.45 (UPSTREAM item 44). Live
++    // perception reports exactly this fraction (hud_live: hp / that tower's
++    // max). Deployed buildings keep hp / MAX_BUILDING_HP.
++    static float towerHpFraction(const Entity& tower) {
++        const auto* b = static_cast<const Building*>(&tower);
++        const int maxHp = b->getMaxHp();
++        if (maxHp <= 0) return 0.0f;
++        return std::clamp(static_cast<float>(tower.hp) / static_cast<float>(maxHp), 0.0f, 1.0f);
++    }
+     // Ceiling on cumulative per-match elixir spend, the normaliser of scalars
+     // 1-2. Sized for a full-length match under the elixir phases (~278
+     // including the starting 5), so the spend scalars never saturate mid-match.
+@@ -206,7 +237,9 @@ private:
+             else typeOffset = 0;
+ 
+             float maxHp = isBuilding ? MAX_BUILDING_HP : MAX_TROOP_HP;
+-            float normalizedHp = std::min(static_cast<float>(entity->hp) / maxHp, 1.0f);
++            float normalizedHp = entity->isTower()
++                ? towerHpFraction(*entity)
++                : std::min(static_cast<float>(entity->hp) / maxHp, 1.0f);
+             // "Ally" is whichever team this observation is for.
+             bool isAlly = (entity->team == team);
+             int channel = (isAlly ? 0 : 4) + typeOffset;
+@@ -284,7 +317,7 @@ private:
+             const bool isKing = (entity->cardId == GameManager::TOWER_KING_ID);
+             const int which = isKing ? 0
+                 : (entity->position.x < ArenaLayout::CENTER_X ? 1 : 2);
+-            towerHp[side][which] = entity->hp / MAX_BUILDING_HP;
++            towerHp[side][which] = towerHpFraction(*entity);
+         }
+         for (int which = 0; which < 3; ++which) obs.push_back(towerHp[0][which]);
+         for (int which = 0; which < 3; ++which) obs.push_back(towerHp[1][which]);
+@@ -321,6 +354,12 @@ private:
+             }
+         }
+ 
++        // --- levels (item 44), at LEVEL_START ---
++        obs.push_back(levelScalar(game.getTeamCardLevel(team)));
++        obs.push_back(levelScalar(game.getTeamTowerLevel(team)));
++        obs.push_back(levelScalar(game.getTeamCardLevel(opponent)));
++        obs.push_back(levelScalar(game.getTeamTowerLevel(opponent)));
++
+         return obs;
+     }
+ 
+@@ -365,7 +404,7 @@ public:
+     ClashEnv snapshot() const { return ClashEnv(*this, SnapshotTag{}); }
+ 
+     // Built from the named offsets, so size and offsets cannot disagree.
+-    int observationSize() const { return CYCLE_START + CYCLE_BLOCK_SIZE; }
++    int observationSize() const { return LEVEL_START + NUM_LEVEL_SCALARS; }
+ 
+     // How many of `team`'s towers stand (King and Princesses only). The reward
+     // puts a deliberately non-potential-based bonus on destroying a tower: the
+diff --git a/perception/tests/test_perception_encoder.py b/perception/tests/test_perception_encoder.py
+index abded57..561bd51 100644
+--- a/perception/tests/test_perception_encoder.py
++++ b/perception/tests/test_perception_encoder.py
+@@ -113,18 +113,18 @@ def test_round_trip_is_bit_exact(enc, engine, tag, injects):
+     assert np.array_equal(enc.encode(state), truth), tag
+ 
+ 
+-def test_a_full_princess_is_not_encoded_as_1(enc, engine):
+-    """Tower scalars are hp / MAX_BUILDING_HP, so an undamaged Princess reads
+-    0.632 (2534/4008), while GameState carries a fraction of the tower's own
+-    maximum. Kings hide this (they are 4008), so only the Princesses disagree.
++def test_a_full_tower_reads_1_like_the_engine(enc, engine):
++    """Tower scalars are hp / that tower's OWN max (item 44), the same fraction
++    GameState carries, so every undamaged tower, King or Princess, reads 1.0 and
++    the encoder's value equals the engine's for the same board.
+     """
+     env = _engine_with(engine, [])
+     obs = enc.encode(_blank_state(env))
+     extra = enc.SPATIAL_SIZE + 1 + enc.HAND_SIZE + enc.HAND_SIZE * enc.NUM_CARD_IDS
+-    king, princess = obs[extra + 3], obs[extra + 4]
+-    assert king == pytest.approx(1.0)
+-    assert 0.5 < princess < 0.8
+-    assert princess < king
++    for k in range(3, 9):
++        assert obs[extra + k] == pytest.approx(1.0)
++    ref = np.asarray(env.get_observation_for_team(0), np.float32)
++    assert np.allclose(obs[extra + 3:extra + 9], ref[extra + 3:extra + 9])
+ 
+ 
+ def test_a_destroyed_tower_zeroes_its_cells_and_scalar(enc, engine):
+diff --git a/python_ai/engine_constants.py b/python_ai/engine_constants.py
+index 51101cc..341483e 100644
+--- a/python_ai/engine_constants.py
++++ b/python_ai/engine_constants.py
+@@ -62,15 +62,16 @@ CYCLE_START = clash_royale_env.ClashRoyaleEnv.CYCLE_START
+ CYCLE_BLOCK_SIZE = clash_royale_env.ClashRoyaleEnv.CYCLE_BLOCK_SIZE
+ 
+ def _own_tower_hp_total():
+-    """Total starting HP of our three towers, read from a fresh board's tower
+-    scalars (hp / MAX_BUILDING_HP).
++    """Total starting HP of our three towers, from a fresh board's tower max HP.
++
++    Read through get_tower_max_hp rather than the observation: since UPSTREAM
++    item 44 the tower scalars are fractions of each tower's own max (1.0 when
++    full), so they no longer carry absolute HP.
+     """
+     E = clash_royale_env.ClashRoyaleEnv
+     probe = E(list(range(8)), list(range(8)), 100)
+-    obs = np.asarray(probe.reset(), dtype=np.float32)
+-    tail = E.EXTRA_SCALARS_START
+-    # tail: 0 time | 1-2 elixir spent | 3-5 own king/left/right | 6-8 enemy
+-    return float(obs[tail + 3:tail + 6].sum()) * E.MAX_BUILDING_HP
++    probe.reset()
++    return float(sum(probe.get_tower_max_hp(0, slot) for slot in range(3)))
+ 
+ OWN_TOWER_HP_TOTAL = _own_tower_hp_total()
+ 
+diff --git a/python_ai/models/net.py b/python_ai/models/net.py
+index 12b42dc..2528f08 100644
+--- a/python_ai/models/net.py
++++ b/python_ai/models/net.py
+@@ -222,7 +222,8 @@ class ScalarEncoder(nn.Module):
+     """
+ 
+     def __init__(self, hand_size, num_card_ids, num_extra_scalars,
+-                 cycle_block_size, extra_start, cycle_start):
++                 cycle_block_size, extra_start, cycle_start,
++                 num_level_scalars=0, level_start=None):
+         super().__init__()
+         self.hand_size = hand_size
+         self.num_card_ids = num_card_ids
+@@ -230,6 +231,11 @@ class ScalarEncoder(nn.Module):
+         self.cycle_block_size = cycle_block_size
+         self.extra_start = extra_start
+         self.cycle_start = cycle_start
++        # The level section (UPSTREAM item 44) joins the extra branch: it is
++        # match context of the same kind (clock, spend, tower HP), and the
++        # branch's 12 outputs are unchanged, so the 64-dim total holds.
++        self.num_level_scalars = num_level_scalars
++        self.level_start = level_start
+         self.onehot_start = 1 + hand_size
+ 
+         hand_dim = hand_size * HAND_SLOT_EMBED_DIM
+@@ -249,7 +255,7 @@ class ScalarEncoder(nn.Module):
+         # One projection shared across hand slots, which all hold the same kind
+         # of thing.
+         self.hand_slot = nn.Linear(num_card_ids, HAND_SLOT_EMBED_DIM)
+-        self.extra = nn.Linear(num_extra_scalars, EXTRA_BRANCH_DIM)
++        self.extra = nn.Linear(num_extra_scalars + num_level_scalars, EXTRA_BRANCH_DIM)
+         self.cycle_card = nn.Linear(num_card_ids, CYCLE_EMBED_DIM, bias=False)
+         self.cycle_out = nn.Linear(2 * CYCLE_EMBED_DIM, CYCLE_BRANCH_DIM)
+ 
+@@ -261,6 +267,9 @@ class ScalarEncoder(nn.Module):
+                          self.onehot_start + self.hand_size * self.num_card_ids]
+         extra = scalar[:, self.extra_start:
+                        self.extra_start + self.num_extra_scalars]
++        if self.num_level_scalars:
++            extra = torch.cat([extra, scalar[:, self.level_start:
++                                             self.level_start + self.num_level_scalars]], dim=1)
+         cycle = scalar[:, self.cycle_start:
+                        self.cycle_start + self.cycle_block_size]
+ 
+@@ -380,12 +389,18 @@ class MicroRoyaleNet(nn.Module):
+         # The opponent's card cycle: seen[] and recency[], appended after the
+         # extra scalars.
+         self.cycle_block_size = clash_royale_env.ClashRoyaleEnv.CYCLE_BLOCK_SIZE
++        # The level section (item 44), appended after the cycle blocks. getattr:
++        # an engine without it has none, and the layout is then unchanged.
++        self.num_level_scalars = getattr(clash_royale_env.ClashRoyaleEnv,
++                                         "NUM_LEVEL_SCALARS", 0)
+         self.scalar_size = (1 + hand_size + hand_size * num_card_ids
+-                            + self.num_extra_scalars + self.cycle_block_size)
++                            + self.num_extra_scalars + self.cycle_block_size
++                            + self.num_level_scalars)
+         self.extra_start = 1 + hand_size + hand_size * num_card_ids
+         # Forward offsets, never measured back from the end, which breaks on
+         # the next append.
+         self.cycle_start = self.extra_start + self.num_extra_scalars
++        self.level_start = self.cycle_start + self.cycle_block_size
+ 
+         # 1. CNN over (Batch, NUM_CHANNELS, 34, 18). ceil_mode on both pools:
+         #    floor would drop a row (34 -> 17 -> 8). The pre-flatten map also
+@@ -418,7 +433,8 @@ class MicroRoyaleNet(nn.Module):
+         if branched_scalars:
+             self.scalar_mlp = ScalarEncoder(
+                 hand_size, num_card_ids, self.num_extra_scalars,
+-                self.cycle_block_size, self.extra_start, self.cycle_start)
++                self.cycle_block_size, self.extra_start, self.cycle_start,
++                self.num_level_scalars, self.level_start)
+             scalar_feature_dim = self.scalar_mlp.out_dim
+         else:
+             # The monolithic layer it replaced, kept so the A/B and the
+diff --git a/python_ai/models/perception_encoder.py b/python_ai/models/perception_encoder.py
+index b9a5d86..59c41f2 100644
+--- a/python_ai/models/perception_encoder.py
++++ b/python_ai/models/perception_encoder.py
+@@ -57,8 +57,10 @@ PLANE = BOARD_WIDTH * BOARD_HEIGHT
+ SPATIAL_SIZE = NUM_CHANNELS * PLANE
+ # Plus the opponent card-cycle blocks after the extra scalars.
+ CYCLE_BLOCK_SIZE = _E.CYCLE_BLOCK_SIZE
++# Then the level section (UPSTREAM item 44); 0 on an engine without one.
++NUM_LEVEL_SCALARS = getattr(_E, "NUM_LEVEL_SCALARS", 0)
+ SCALAR_SIZE = (1 + HAND_SIZE + HAND_SIZE * NUM_CARD_IDS + NUM_EXTRA_SCALARS
+-               + CYCLE_BLOCK_SIZE)
++               + CYCLE_BLOCK_SIZE + NUM_LEVEL_SCALARS)
+ OBSERVATION_SIZE = SPATIAL_SIZE + SCALAR_SIZE
+ 
+ # See the module docstring.
+@@ -204,10 +206,12 @@ class TowerCells:
+ 
+     indices: tuple[int, ...]
+     full_hp_channel_value: float
+-    """The building channel's value for an undamaged tower: hp / MAX_BUILDING_HP.
+-    A Princess reads 0.632 (2534/4008), a King 1.0 -- so a GameState fraction,
+-    which is relative to the tower's OWN maximum, has to be multiplied by this
+-    rather than written straight in."""
++    """The building channel's value for an undamaged tower, read off the
++    engine's fresh board. Since UPSTREAM item 44 the engine writes a tower's hp
++    over its OWN maximum, so this is 1.0 for every tower and a GameState
++    fraction (also own-max) goes in unscaled. On an older engine it is
++    hp / MAX_BUILDING_HP (a level-11 Princess 0.633); scaling by it keeps both
++    conventions right."""
+ 
+ 
+ def _tower_cells() -> dict[str, TowerCells]:
+@@ -240,7 +244,7 @@ _BASE: np.ndarray | None = None
+ _TOWERS: dict[str, TowerCells] | None = None
+ 
+ 
+-def encode(state, *, card_table_=None) -> np.ndarray:
++def encode(state, *, card_table_=None, levels=None) -> np.ndarray:
+     """A GameState -> one observation vector, from our side (team 0).
+ 
+     Mirrors `ClashEnv::extractObservationForTeam(0)`: the HP channels assign,
+@@ -251,6 +255,11 @@ def encode(state, *, card_table_=None) -> np.ndarray:
+     GameState carries no play history. The live mirror should instead call
+     `ClashEnv.note_played_card(1, card_id)` per opponent play and read the
+     observation off the engine.
++
++    `levels` is (own card, own tower, opp card, opp tower) level for the level
++    section (item 44); None means all TOURNAMENT_LEVEL, which reads zeros. The
++    real game shows each player's King level on the tower, which is the tower
++    level; perception passes it through.
+     """
+     global _BASE, _TOWERS
+     table = card_table_ if card_table_ is not None else card_table()
+@@ -322,9 +331,9 @@ def encode(state, *, card_table_=None) -> np.ndarray:
+     opp_spend = (OPP_SPEND_WHEN_UNMEASURED if state.opp_elixir_spent is None
+                  else min(state.opp_elixir_spent / MAX_MATCH_ELIXIR, 1.0))
+     obs[e + 2] = opp_spend
+-    # Tower scalars are hp / MAX_BUILDING_HP, so a full Princess reads 0.632
+-    # and only a King 1.0; the GameState fraction is scaled by what a full
+-    # tower reads.
++    # Tower scalars use the same convention as the building channel; the
++    # GameState fraction is scaled by what a full tower reads there (1.0 since
++    # item 44, so the fraction goes in as is).
+     for offset, key in enumerate(("own_king", "own_princess_left",
+                                   "own_princess_right", "opp_king",
+                                   "opp_princess_left", "opp_princess_right")):
+@@ -341,4 +350,10 @@ def encode(state, *, card_table_=None) -> np.ndarray:
+     obs[e + 9] = (engine.elixir_multiplier_at_tick(
+                       int(state.seconds_elapsed * TICKS_PER_SECOND))
+                   / MAX_ELIXIR_MULTIPLIER)
++
++    if NUM_LEVEL_SCALARS:
++        lv = levels if levels is not None else (engine.TOURNAMENT_LEVEL,) * NUM_LEVEL_SCALARS
++        start = _E.LEVEL_START
++        for k, level in enumerate(lv[:NUM_LEVEL_SCALARS]):
++            obs[start + k] = engine.level_scalar(int(level))
+     return obs
+diff --git a/python_ai/tests/test_opponent_cycle_observation.py b/python_ai/tests/test_opponent_cycle_observation.py
+index d98135f..6fba618 100644
+--- a/python_ai/tests/test_opponent_cycle_observation.py
++++ b/python_ai/tests/test_opponent_cycle_observation.py
+@@ -43,7 +43,8 @@ def test_observation_size_grew_by_exactly_the_cycle_blocks(env):
+     assert len(obs) == env.observation_size()
+     expected = (_E.BOARD_WIDTH * _E.BOARD_HEIGHT * _E.NUM_CHANNELS
+                 + 1 + _E.HAND_SIZE + _E.HAND_SIZE * _E.NUM_CARD_IDS
+-                + _E.NUM_EXTRA_SCALARS + _E.CYCLE_BLOCK_SIZE)
++                + _E.NUM_EXTRA_SCALARS + _E.CYCLE_BLOCK_SIZE
++                + _E.NUM_LEVEL_SCALARS)          # item 44, appended after
+     assert env.observation_size() == expected
+ 
+ 
+@@ -71,8 +72,8 @@ def test_the_tower_hp_scalars_still_read_as_tower_hp(env):
+     enemy = obs[start + 6:start + 9]
+     assert np.all(own > 0.0), f"own tower HP scalars read {own}, expected all > 0"
+     assert np.all(enemy > 0.0), f"enemy tower HP scalars read {enemy}"
+-    recovered = float(own.sum()) * _E.MAX_BUILDING_HP
+-    assert recovered == pytest.approx(EC.OWN_TOWER_HP_TOTAL, rel=1e-5)
++    # Each is hp over that tower's own max (UPSTREAM item 44): 1.0 when full.
++    assert np.allclose(own, 1.0) and np.allclose(enemy, 1.0), (own, enemy)
+ 
+ 
+ def test_a_fresh_board_has_an_entirely_empty_cycle(env):
+diff --git a/python_ai/tests/test_scalar_encoder_branches.py b/python_ai/tests/test_scalar_encoder_branches.py
+index 14cf7c0..5f2c0a3 100644
+--- a/python_ai/tests/test_scalar_encoder_branches.py
++++ b/python_ai/tests/test_scalar_encoder_branches.py
+@@ -67,7 +67,10 @@ def test_the_scalar_encoder_reads_its_blocks_from_the_engines_own_offsets():
+     # ...and the blocks tile the scalar vector exactly: a gap is an ignored
+     # input, an overlap double counts.
+     assert net.extra_start + net.num_extra_scalars == net.cycle_start
+-    assert net.cycle_start + net.cycle_block_size == net.scalar_size
++    # The level section (card/tower level of each side) follows the cycle
++    # blocks and closes the vector.
++    assert enc.level_start == net.cycle_start + net.cycle_block_size
++    assert enc.level_start + net.num_level_scalars == net.scalar_size
+ 
+ 
+ def test_the_cycle_block_owns_a_dedicated_slice_of_the_scalar_features():
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index 10e478c..b6489ca 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -179,6 +179,12 @@ PYBIND11_MODULE(clash_royale_env, m) {
+           py::arg("tick"),
+           "Elixir regeneration multiplier (1.0 / 2.0 / 3.0) in force at `tick`. "
+           "10 ticks = 1 second: double from 2:00, triple from 3:00.");
++    // The level section's encoding (UPSTREAM item 44), so perception's encoder
++    // derives it rather than restating (level - 11) / 5.
++    m.attr("TOURNAMENT_LEVEL") = CardLevels::TOURNAMENT_LEVEL;
++    m.def("level_scalar", &ClashEnv::levelScalar, py::arg("level"),
++          "What a card or tower level reads in the observation's level section: "
++          "(level - TOURNAMENT_LEVEL) / (MAX_LEVEL - TOURNAMENT_LEVEL).");
+ 
+     py::class_<StepResult>(m, "StepResult")
+         .def_readonly("observation", &StepResult::observation)
+@@ -352,6 +358,9 @@ PYBIND11_MODULE(clash_royale_env, m) {
+         // Forward offsets into the observation: an append cannot move them.
+         .def_readonly_static("EXTRA_SCALARS_START", &ClashEnv::EXTRA_SCALARS_START)
+         .def_readonly_static("CYCLE_START", &ClashEnv::CYCLE_START)
++        // The level section (UPSTREAM item 44), appended after the cycle blocks.
++        .def_readonly_static("LEVEL_START", &ClashEnv::LEVEL_START)
++        .def_readonly_static("NUM_LEVEL_SCALARS", &ClashEnv::NUM_LEVEL_SCALARS)
+         .def_readonly_static("NUM_EXTRA_SCALARS", &ClashEnv::NUM_EXTRA_SCALARS)
+         .def_readonly_static("MAX_MATCH_ELIXIR", &ClashEnv::MAX_MATCH_ELIXIR)
+         // Elixir phase boundaries in ticks, from GameManager.
+diff --git a/tests/core/test_card_cycle_observation.cpp b/tests/core/test_card_cycle_observation.cpp
+index 109c8c4..36fb9c0 100644
+--- a/tests/core/test_card_cycle_observation.cpp
++++ b/tests/core/test_card_cycle_observation.cpp
+@@ -62,9 +62,10 @@ TEST_CASE("the observation carries two card-cycle blocks after the extra scalars
+     std::vector<float> obs = env.getObservationForTeam(0);
+ 
+     REQUIRE(static_cast<int>(obs.size()) == env.observationSize());
+-    // The blocks are last, so the base plus both blocks ends exactly at the
+-    // vector's end; this fails if anything is inserted rather than appended.
+-    REQUIRE(cycleBase() + ClashEnv::CYCLE_BLOCK_SIZE == env.observationSize());
++    // The blocks end where the level section (item 44) starts, which is last;
++    // this fails if anything is inserted rather than appended.
++    REQUIRE(cycleBase() + ClashEnv::CYCLE_BLOCK_SIZE == ClashEnv::LEVEL_START);
++    REQUIRE(ClashEnv::LEVEL_START + ClashEnv::NUM_LEVEL_SCALARS == env.observationSize());
+     REQUIRE(ClashEnv::CYCLE_BLOCK_SIZE
+             == ClashEnv::NUM_CYCLE_BLOCKS * ClashEnv::NUM_CARD_IDS);
+ }
+diff --git a/tests/core/test_clash_env.cpp b/tests/core/test_clash_env.cpp
+index 89ff47f..c987411 100644
+--- a/tests/core/test_clash_env.cpp
++++ b/tests/core/test_clash_env.cpp
+@@ -6,7 +6,7 @@
+ 
+ // The observation size, asserted both ways:
+ //
+-//   18*34*21 + 1 + 4 + 4*185 + 10 + 2*185 = 13977
++//   18*34*21 + 1 + 4 + 4*185 + 10 + 2*185 + 4 = 13981
+ //
+ //   * the formula catches observationSize() disagreeing with the constants it is built from, which would split the flat vector at the wrong offset and misread every scalar silently;
+ //   * the literal catches the size changing at all. A resize invalidates every checkpoint, so it must never happen by accident; when intended, updating the literal is the acknowledgement.
+@@ -24,10 +24,12 @@ TEST_CASE("ClashEnv::observationSize matches its declared layout", "[clash_env]"
+         + ClashEnv::HAND_SIZE                            // hand costs
+         + ClashEnv::HAND_SIZE * ClashEnv::NUM_CARD_IDS   // hand identity one-hots
+         + ClashEnv::NUM_EXTRA_SCALARS                    // time, elixir spent, tower HP
+-        + ClashEnv::CYCLE_BLOCK_SIZE;                    // opponent seen[] + recency[]
++        + ClashEnv::CYCLE_BLOCK_SIZE                     // opponent seen[] + recency[]
++        + ClashEnv::NUM_LEVEL_SCALARS;                   // card/tower levels (item 44)
+ 
+     REQUIRE(env.observationSize() == expected);
+-    REQUIRE(env.observationSize() == 13977);
++    REQUIRE(env.observationSize() == 13981);
++    REQUIRE(ClashEnv::LEVEL_START == ClashEnv::CYCLE_START + ClashEnv::CYCLE_BLOCK_SIZE);
+ 
+     // The CYCLE_START literal is a tripwire: +1 means a scalar was appended to
+     // the extra block; a larger jump means something was inserted earlier. The
+@@ -44,7 +46,8 @@ TEST_CASE("ClashEnv::observationSize matches its declared layout", "[clash_env]"
+     const int spatial = ClashEnv::BOARD_WIDTH * ClashEnv::BOARD_HEIGHT * ClashEnv::NUM_CHANNELS;
+     REQUIRE(env.observationSize() - spatial
+             == 1 + ClashEnv::HAND_SIZE + ClashEnv::HAND_SIZE * ClashEnv::NUM_CARD_IDS
+-               + ClashEnv::NUM_EXTRA_SCALARS + ClashEnv::CYCLE_BLOCK_SIZE);
++               + ClashEnv::NUM_EXTRA_SCALARS + ClashEnv::CYCLE_BLOCK_SIZE
++               + ClashEnv::NUM_LEVEL_SCALARS);
+     // ...and the spatial block ends exactly where EXTRA_SCALARS_START says.
+     REQUIRE(ClashEnv::EXTRA_SCALARS_START - spatial
+             == 1 + ClashEnv::HAND_SIZE + ClashEnv::HAND_SIZE * ClashEnv::NUM_CARD_IDS);
+@@ -162,3 +165,46 @@ TEST_CASE("CONTROL: a tower hit is still booked as tower damage",
+     REQUIRE(towerHpTotal(env, 1) < team1Before);
+     CHECK(env.getTowerDamageDealt(0) > 0);
+ }
++
++TEST_CASE("each tower reads hp over ITS OWN max at any level, and the levels are observed", "[clash_env][level]") {
++    // UPSTREAM item 44. Under hp / MAX_BUILDING_HP a full level-15 King read
++    // 1.45 and a level-11 Princess 0.63; live perception reports own-max
++    // fractions, so the two disagreed by a per-level factor.
++    std::vector<int> deck = { 0, 1, 2, 3, 4, 5, 6, 7 };
++    for (int level : { 11, 13, 15 }) {
++        ClashEnv env(deck, deck, 3000);
++        REQUIRE(env.setTeamLevel(1, level));
++        env.seed(3);
++        auto obs = env.getObservationForTeam(0);
++        const int e = ClashEnv::EXTRA_SCALARS_START;
++        for (int k = 3; k < 9; ++k) REQUIRE(obs[e + k] == Catch::Approx(1.0f));
++
++        // A quarter off every enemy tower reads 0.75, whatever its level.
++        for (int slot = 0; slot < 3; ++slot) {
++            REQUIRE(env.setTowerHp(1, slot, env.getTowerMaxHp(1, slot) * 3 / 4));
++        }
++        obs = env.getObservationForTeam(0);
++        for (int k = 6; k < 9; ++k) REQUIRE(obs[e + k] == Catch::Approx(0.75f).margin(1e-3));
++
++        // The building channel's tower cells follow the same convention: the
++        // enemy King's cell (channel 7) is 0.75 too, never above 1.
++        float maxCell = 0.0f;
++        for (int i = 7 * ClashEnv::BOARD_WIDTH * ClashEnv::BOARD_HEIGHT;
++             i < 8 * ClashEnv::BOARD_WIDTH * ClashEnv::BOARD_HEIGHT; ++i) {
++            maxCell = std::max(maxCell, obs[i]);
++        }
++        REQUIRE(maxCell == Catch::Approx(0.75f).margin(1e-3));
++
++        // Level section: own 11 reads 0, the opponent (level - 11) / 5.
++        const int l = ClashEnv::LEVEL_START;
++        REQUIRE(obs[l + 0] == Catch::Approx(0.0f));
++        REQUIRE(obs[l + 1] == Catch::Approx(0.0f));
++        REQUIRE(obs[l + 2] == Catch::Approx((level - 11) / 5.0f));
++        REQUIRE(obs[l + 3] == Catch::Approx((level - 11) / 5.0f));
++
++        // Team 1's view is the mirror: its own levels in slots 0-1.
++        auto obs1 = env.getObservationForTeam(1);
++        REQUIRE(obs1[l + 0] == Catch::Approx((level - 11) / 5.0f));
++        REQUIRE(obs1[l + 2] == Catch::Approx(0.0f));
++    }
++}

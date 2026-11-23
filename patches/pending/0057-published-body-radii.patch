@@ -1,0 +1,899 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 92bf85c..ba05d4d 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1366,6 +1366,124 @@ What does not agree, and is NOT changed:
+   the play. A policy acting live is that much later than the same policy in
+   the simulator.
+ 
++## 2026-11-22: every troop and building has its published body radius (patch 0057)
++
++**GAMEPLAY-AFFECTING for every match.** Until now every troop was one implicit
++0.4 (`Entity::IMPLICIT_TROOP_RADIUS`) and every building 1.0
++(`Building::COLLISION_RADIUS`). The game's unit table gives each body a
++`CollisionRadius` (FirstLight-Zero card_specs.json, release 15.535.13). New
++`include/core/BodySizes.h` holds all of them, keyed by registry NAME
++(Evolutions inherit, "Hero X" without a row is X, a row may carry an id where
++two bodies share a name: Rascals -28 the Girls, Goblinstein -40 the Doctor).
++`CardFactories::applyCardMetadata` copies it to the new `Entity::bodyRadius`.
++
++| published | tiles | bodies |
++|---|---|---|
++| 400 | 0.4 | Ice / Fire / Heal / Electro Spirit, Wall Breakers |
++| 450 | 0.45 | Mini P.E.K.K.A. (and its Hero), Berserker |
++| 500 | 0.5 | Knight, Archers, Goblins, Skeletons, Barbarians, Elite Barbarians, Musketeer, Wizard, Valkyrie, Witch, Miner, Minions, Bats, Balloon, Baby Dragon, Princess, Royal Recruits, Guards and most others (101 of the pack's 158 forms) |
++| 600 | 0.6 | Hog Rider, Royal Hogs, Prince, Dark Prince, Ram Rider, Bandit, Royal Ghost, Hunter, Executioner, Magic Archer, Zappies, Mega Minion, Electro Dragon, Elixir Golem, Goblin Demolisher, Boss Bandit, Ronin, Furnace |
++| 700 | 0.7 | Ice Golem |
++| 750 | 0.75 | Giant, Royal Giant, Goblin Giant, Electro Giant, Rune Giant, Golem, P.E.K.K.A., Mega Knight, Giant Skeleton, Bowler, Battle Ram, Lava Hound, Rascal Boy, Goblin Machine, Goblinstein's Monster |
++| 800 / 900 | | Golden Knight / Skeleton Dragons |
++| 1000 | 1.0 | Sparky, Skeleton King |
++| buildings 500 | 0.5 | Tesla, Goblin Drill |
++| buildings 600 | 0.6 | Cannon, Bomb Tower, Inferno Tower, X-Bow, Mortar |
++| buildings 1000 | 1.0 | Barbarian Hut, Goblin Hut, Tombstone, Goblin Cage, Elixir Collector |
++
++**No published record, and what they take:** Golemite, Lava Pups, Elixir
++Golemite and Blob, Goblin Brawler, Cursed Hog, the Minion Giant and the bodies
++the Hero abilities summon take `BodySizes::DEFAULT_RADIUS` 0.5, the value of 101
++of the 158 published forms. The two ability buildings (Trusty Turret, Snowman)
++take `DEFAULT_BUILDING_RADIUS` 0.6, the body of every published building that
++shoots except the Tesla. A troop or building built by hand with no card (test
++fixtures) keeps 0.4 / 1.0. **The Crown Towers are not in this pack and keep 1.5
++(Princess) and 2.0 (King)**; the older RoyaleAPI file gives 1.0 / 1.4 (see patch
++0043), not applied.
++
++One radius, used everywhere a body matters:
++
++- **contact**: `Board::resolveCollisions` separates two troops to
++  `bodyRadius + bodyRadius` and a troop from a building to the building's body
++  plus its own; `Board::resolvePositionAgainstBuildings` the same while walking.
++  A Hog Rider and an Ice Golem one tile apart now overlap (1.3) and push each
++  other; with 0.4 + 0.4 they never touched. The push is still half each,
++  whatever the two weigh.
++- **reach and sight**: `CombatEntity::effectiveRadiusOf` returns `bodyRadius`
++  for a troop and a building (`Building::getCollisionRadius` now returns it)
++  and the tower's own radius for a tower. So reach is range + own body + target
++  body and sight the same with the sight range (patch 0044), and the sight clip
++  (patch 0042) and the nearest-footprint ranking of targets use the same
++  bodies. Area effects measured to the body (`AreaSpell`, the Hero Barbarian
++  Barrel) follow.
++- **not the placement footprint**: `Entity::getPlacementRadius()` is what
++  `GameManager::isValidPlacement` keeps a new card clear of; a building's is
++  still `Building::COLLISION_RADIUS` 1.0 and a tower's its 1.5 / 2.0, and a
++  placed troop still needs its 0.4 (`CardFactories::placementRadius`). The real
++  game decides placement by tiles, which this table does not give. The
++  placement mask is unchanged.
++
++Distances that moved (centre to centre):
++
++| | before | now |
++|---|---|---|
++| two ordinary troops in contact | 0.8 | 1.0 |
++| Hog Rider behind an Ice Golem | 0.8 | 1.3 |
++| Knight (range 1.2) hits a Knight from | 2.0 | 2.2 |
++| Knight hits a Cannon from | 2.6 | 2.3 |
++| Musketeer (6.0) shoots a Cannon from | 7.4 | 7.1 |
++| Hog Rider (0.8) hits a Princess Tower from | 2.7 | 2.9 |
++| Giant (1.2) hits a Princess Tower from | 3.1 | 3.45 |
++| Princess Tower (7.5) shoots a Knight / a Giant from | 9.4 / 9.4 | 9.5 / 9.75 |
++| a Cannon pulls a Hog Rider from, sideways (clip 5.5) | 6.9 | 6.7 |
++| Fireball (2.5) catches a Knight / a Giant / a Cannon within | 2.9 / 2.9 / 3.5 | 3.0 / 3.25 / 3.1 |
++
++To know:
++
++- A lone Hog Rider from the bridge corner now lands its first hit 4.1 s after
++  it starts moving (tick 52; 4.2 s before; recordings 4.2-4.5 s), because it
++  stops 0.2 tiles further from the tower. The published tower body (1.0) would
++  put it at about 4.3 s. Not changed here: the tower's reach rests on the same
++  1.5.
++- Units of one card that spawn closer than their bodies allow are pushed apart
++  on their first tick, deploying or not (Elite Barbarians land exactly in
++  contact at 1.0).
++- The Spirit Empress has two published bodies (500 on foot, 600 mounted and
++  flying) under one name and id; both forms take 500.
++- `get_card_stats(id)["base"]` reports `published_collision_radius`
++  (thousandths, 0 = no record) and `body_radius`; `get_units()` reports each
++  unit's `body_radius`.
++
++Tests: `python_ai/tests/test_body_sizes.py` (published values through the
++bindings and on what is spawned; every troop and building card has a row except
++the Minion Giant; contact at 1.3; reach on a tower and on a Cannon; the
++placement footprint), `tests/core/test_card_registry.cpp` `[patch0057]` (table,
++name and id rules, every row names a registered card, hand-built bodies keep
++0.4).
++
++Existing expectations that moved, and what each had encoded:
++
++- `tests/core/test_lane_pathing.cpp` "an Ice Golem walking to the King never
++  stalls": "arrived" was 3.2, the Golem's reach on the King with the 0.4 body
++  (0.75 + 0.4 + 2.0); now computed from its body (3.45). The 0.4.
++- `tests/core/test_card_registry.cpp` "DefensiveBuilding archetype (Cannon)":
++  radius 1.0 -> 0.6. The engine's uniform building body, not a published value.
++- `tests/core/test_sight_range.cpp`: no expectation changed (a Cannon 7.0 to
++  the side does not pull, 6.0 does; a Battle Ram is not pulled from 8.0);
++  comments now give the boundaries with the published bodies (6.7, 6.85, 7.85).
++- `python_ai/tests/test_sight_clip_of_building_targeters.py`: expectation kept
++  (the Balloon goes for the Cannon 6 to the side). Its detector read "the
++  Cannon lost a chunk of HP"; the Balloon now arrives a little later, the
++  decayed Cannon dies to the one bomb and was reported as never hit. A Cannon
++  that vanishes with HP left now counts.
++- `python_ai/tests/test_teacher_combos.py` "both cards get their OWN deploy
++  time": the Hog was placed one tile behind the Ice Golem and expected not to
++  move while deploying; that relied on 0.4 + 0.4 < 1. Placed two tiles behind.
++- `python_ai/tests/test_hog_26_offence_timeline.py` (patch 0056): the Ice
++  Spirit was injected on the Hog's own tile, which now pushes the Hog. Injected
++  two tiles to the side; the published 1.1 s freeze and 110 damage are pinned
++  as before, now for any alignment of the freeze with the arrows.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/Board.h b/include/core/Board.h
+index 0df6cc1..f5d1da5 100644
+--- a/include/core/Board.h
++++ b/include/core/Board.h
+@@ -278,7 +278,8 @@ public:
+         return colliderCache;
+     }
+ 
+-    Vector2D resolvePositionAgainstBuildings(const Vector2D& pos, int entityId) const {
++    Vector2D resolvePositionAgainstBuildings(const Vector2D& pos, int entityId,
++                                             float bodyRadius = Entity::IMPLICIT_TROOP_RADIUS) const {
+         Vector2D resolved = pos;
+         // Ascending index order: the pushes compose, so order is part of the
+         // answer.
+@@ -286,7 +287,7 @@ public:
+             const auto& entity = activeEntities[c.index];
+             if (entity->id == entityId || !entity->isAlive()) continue;
+ 
+-            resolved = pushAwayFrom(resolved, entity->position, c.radius + Entity::IMPLICIT_TROOP_RADIUS);
++            resolved = pushAwayFrom(resolved, entity->position, c.radius + bodyRadius);
+         }
+         return resolved;
+     }
+@@ -331,7 +332,8 @@ public:
+                     float dx = e1->position.x - e2->position.x;
+                     float dy = e1->position.y - e2->position.y;
+                     float dist = std::sqrt(dx * dx + dy * dy);
+-                    float minRadius = 2.0f * Entity::IMPLICIT_TROOP_RADIUS;
++                    // Two troops touch at the sum of their published bodies.
++                    float minRadius = e1->bodyRadius + e2->bodyRadius;
+ 
+                     if (dist < minRadius) {
+                         if (dist < 0.001f) { dx = 1.0f; dy = 0.0f; dist = 1.0f; }
+@@ -352,10 +354,10 @@ public:
+                 }
+ 
+                 if (isTroop1 && isBuilding2 && !b1.flying) {
+-                    e1->position = pushAwayFrom(e1->position, e2->position, r2 + Entity::IMPLICIT_TROOP_RADIUS);
++                    e1->position = pushAwayFrom(e1->position, e2->position, r2 + e1->bodyRadius);
+                 }
+                 if (isTroop2 && isBuilding1 && !b2.flying) {
+-                    e2->position = pushAwayFrom(e2->position, e1->position, r1 + Entity::IMPLICIT_TROOP_RADIUS);
++                    e2->position = pushAwayFrom(e2->position, e1->position, r1 + e2->bodyRadius);
+                 }
+             }
+         }
+diff --git a/include/core/BodySizes.h b/include/core/BodySizes.h
+new file mode 100644
+index 0000000..89330df
+--- /dev/null
++++ b/include/core/BodySizes.h
+@@ -0,0 +1,129 @@
++#pragma once
++
++#include <string>
++
++// Published body radius of every troop and building. Read by
++// CardFactories::applyCardMetadata into Entity::bodyRadius, used wherever a
++// body matters: body-to-body contact (Board::resolveCollisions,
++// Board::resolvePositionAgainstBuildings), attack reach and sight
++// (CombatEntity::effectiveRadiusOf), the nearest-footprint ranking of
++// targets, area hits that are measured to the body.
++//
++// Until patch 0057 every troop was one size, Entity::IMPLICIT_TROOP_RADIUS =
++// 0.4 tiles: a Skeleton and a Golem took up the same room, two Giants walked
++// 0.8 tiles apart, and a Hog Rider placed one tile from an Ice Golem never
++// touched it. The game's unit records give each body a CollisionRadius, from
++// 400 (the spirits, Wall Breakers) to 1000 (Sparky, Skeleton King). Every
++// building was 1.0 (Building::COLLISION_RADIUS); the records give 500 (Tesla,
++// Goblin Drill), 600 (Cannon, Bomb Tower, Inferno Tower, X-Bow, Mortar) and
++// 1000 (the huts, Tombstone, Goblin Cage, Elixir Collector).
++//
++// Source: FirstLight-Zero card_specs.json, release 15.535.13, the
++// CollisionRadius of the unit record each card summons, in thousandths of a
++// tile. Range and sight are body to body in the same records (sight equals
++// range for the Musketeer, Wizard and Cannon), so reach is range + own radius
++// + target radius with these radii.
++//
++// Keyed by registry NAME, like LoadTimes.h: an Evolution inherits the row, and
++// "Hero X" with no row of its own has the body of X. Two cards hold two
++// different bodies under one name, so those rows carry the registry id of the
++// second body: the Rascal Girls (-28, 500; the Boy is 750) and Goblinstein's
++// Doctor (-40, 500; the Monster is 750).
++//
++// NO PUBLISHED RECORD in this release's pack: Golemite, Lava Pups, Elixir
++// Golemite, Elixir Blob, Goblin Brawler, Cursed Hog, Minion Giant, and the
++// units the hero abilities summon (Guardienne, Skeletrooper, Rhino, Tomb
++// Queen, Decoy, Lumberjack Ghost, Runner, Skeleton Shadow, Souldier). They
++// take DEFAULT_RADIUS = 0.5, the value of 101 of the 158 published forms.
++// The two ability buildings with no record (Trusty Turret, Snowman) take
++// DEFAULT_BUILDING_RADIUS = 0.6, the body of every published building that
++// shoots except the Tesla.
++//
++// NOT covered: the Crown Towers (Tower::getCollisionRadius, 1.5 and 2.0), for
++// which this pack has no record, and the footprint a new card must keep clear
++// of an existing building (Entity::getPlacementRadius, still 1.0).
++//
++// A troop or building built by hand with no card (the test fixtures) keeps
++// Entity::IMPLICIT_TROOP_RADIUS / Building::COLLISION_RADIUS.
++namespace BodySizes {
++
++constexpr float DEFAULT_RADIUS = 0.5f;
++constexpr float DEFAULT_BUILDING_RADIUS = 0.6f;
++
++struct Row { const char* name; int id; int radiusThousandths; };
++
++// id 0 = every card of that name; otherwise only that registry id.
++inline constexpr Row ROWS[] = {
++    { "Rascals", -28, 500 },           // RascalGirl
++    { "Goblinstein", -40, 500 },       // the Doctor
++    { "Ice Spirit", 0, 400 }, { "Fire Spirit", 0, 400 }, { "Heal Spirit", 0, 400 },
++    { "Electro Spirit", 0, 400 }, { "Wall Breakers", 0, 400 },
++    { "Mini PEKKA", 0, 450 }, { "Hero Mini P.E.K.K.A.", 0, 450 }, { "Berserker", 0, 450 },
++    { "Knight", 0, 500 }, { "Archers", 0, 500 }, { "Goblins", 0, 500 }, { "Minions", 0, 500 },
++    { "Minion Horde", 0, 500 }, { "Balloon", 0, 500 }, { "Witch", 0, 500 }, { "Barbarians", 0, 500 },
++    { "Skeletons", 0, 500 }, { "Skeleton Army", 0, 500 }, { "Valkyrie", 0, 500 }, { "Bomber", 0, 500 },
++    { "Musketeer", 0, 500 }, { "Three Musketeers", 0, 500 }, { "Baby Dragon", 0, 500 },
++    { "Wizard", 0, 500 }, { "Spear Goblins", 0, 500 }, { "Ice Wizard", 0, 500 }, { "Guards", 0, 500 },
++    { "Princess", 0, 500 }, { "Miner", 0, 500 }, { "Lumberjack", 0, 500 }, { "Inferno Dragon", 0, 500 },
++    { "Dart Goblin", 0, 500 }, { "Electro Wizard", 0, 500 }, { "Elite Barbarians", 0, 500 },
++    { "Royal Recruits", 0, 500 }, { "Night Witch", 0, 500 }, { "Bats", 0, 500 }, { "Cannon Cart", 0, 500 },
++    { "Skeleton Barrel", 0, 500 }, { "Flying Machine", 0, 500 }, { "Fisherman", 0, 500 },
++    { "Firecracker", 0, 500 }, { "Mighty Miner", 0, 500 }, { "Battle Healer", 0, 500 },
++    { "Archer Queen", 0, 500 }, { "Monk", 0, 500 }, { "Mother Witch", 0, 500 }, { "Phoenix", 0, 500 },
++    { "Little Prince", 0, 500 }, { "Spirit Empress", 0, 500 }, { "Suspicious Bush", 0, 500 },
++    { "Bush Goblins", 0, 500 }, { "Goblin Gang", 0, 500 },
++    { "Prince", 0, 600 }, { "Hog Rider", 0, 600 }, { "Dark Prince", 0, 600 }, { "Mega Minion", 0, 600 },
++    { "Hunter", 0, 600 }, { "Executioner", 0, 600 }, { "Bandit", 0, 600 }, { "Royal Ghost", 0, 600 },
++    { "Ram Rider", 0, 600 }, { "Zappies", 0, 600 }, { "Royal Hogs", 0, 600 }, { "Magic Archer", 0, 600 },
++    { "Electro Dragon", 0, 600 }, { "Elixir Golem", 0, 600 }, { "Goblin Demolisher", 0, 600 },
++    { "Kamikaze Goblin Demolisher", 0, 600 }, { "Boss Bandit", 0, 600 }, { "Ronin", 0, 600 },
++    { "Furnace", 0, 600 },
++    { "Ice Golem", 0, 700 },
++    { "Giant", 0, 750 }, { "P.E.K.K.A.", 0, 750 }, { "Golem", 0, 750 }, { "Giant Skeleton", 0, 750 },
++    { "Royal Giant", 0, 750 }, { "Lava Hound", 0, 750 }, { "Bowler", 0, 750 }, { "Battle Ram", 0, 750 },
++    { "Rascals", 0, 750 }, { "Mega Knight", 0, 750 }, { "Goblin Giant", 0, 750 },
++    { "Electro Giant", 0, 750 }, { "Goblin Machine", 0, 750 }, { "Goblinstein", 0, 750 },
++    { "Rune Giant", 0, 750 },
++    { "Golden Knight", 0, 800 },
++    { "Skeleton Dragons", 0, 900 },
++    { "Sparky", 0, 1000 }, { "Skeleton King", 0, 1000 },
++    // Buildings.
++    { "Tesla", 0, 500 }, { "Goblin Drill", 0, 500 },
++    { "Cannon", 0, 600 }, { "Bomb Tower", 0, 600 }, { "Inferno Tower", 0, 600 }, { "X-Bow", 0, 600 },
++    { "Mortar", 0, 600 },
++    { "Barbarian Hut", 0, 1000 }, { "Goblin Hut", 0, 1000 }, { "Tombstone", 0, 1000 },
++    { "Goblin Cage", 0, 1000 }, { "Elixir Collector", 0, 1000 },
++};
++
++inline const Row* findExact(const std::string& name, int id) {
++    for (const Row& r : ROWS) {
++        if (r.id != 0 && r.id == id && name == r.name) return &r;
++    }
++    for (const Row& r : ROWS) {
++        if (r.id == 0 && name == r.name) return &r;
++    }
++    return nullptr;
++}
++
++// The row of a card: its own, or the plain card's for a "Hero X".
++inline const Row* find(const std::string& name, int id) {
++    if (const Row* r = findExact(name, id)) return r;
++    static const std::string HERO = "Hero ";
++    if (name.compare(0, HERO.size(), HERO) == 0) return findExact(name.substr(HERO.size()), id);
++    return nullptr;
++}
++
++// Published CollisionRadius in thousandths of a tile; 0 = no row.
++inline int publishedRadius(const std::string& name, int id) {
++    const Row* r = find(name, id);
++    return r ? r->radiusThousandths : 0;
++}
++
++// Body radius in tiles of a card's troop or building.
++inline float radius(const std::string& name, int id, bool building = false) {
++    const Row* r = find(name, id);
++    if (r) return r->radiusThousandths / 1000.0f;
++    return building ? DEFAULT_BUILDING_RADIUS : DEFAULT_RADIUS;
++}
++
++}  // namespace BodySizes
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index 3b11226..d2cf0ce 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -3,6 +3,7 @@
+ #include "LoadTimes.h"
+ #include "SightClips.h"
+ #include "ProjectileSpeeds.h"
++#include "BodySizes.h"
+ #include "Pushback.h"
+ #include "Board.h"
+ #include "MeleeTroop.h"
+@@ -90,6 +91,9 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     // Published speed of the card's shot (ProjectileSpeeds.h, patch 0049).
+     entity->shotTilesPerTick = ProjectileSpeeds::tilesPerTick(stats.name);
+     entity->pushbackImmune = Pushback::ignores(stats.name);
++    // Published body of the card's troop or building (BodySizes.h, patch
++    // 0057).
++    entity->bodyRadius = BodySizes::radius(stats.name, stats.id, stats.archetype == Archetype::DefensiveBuilding);
+     entity->transformAtHpFraction = stats.transformAtHpFraction;
+     entity->transformCheckMaxHp = stats.hp;
+     entity->transformLifetimeTicks = stats.transformLifetimeTicks;
+diff --git a/include/core/ClashEnv.h b/include/core/ClashEnv.h
+index 2fc47a6..e284d94 100644
+--- a/include/core/ClashEnv.h
++++ b/include/core/ClashEnv.h
+@@ -994,6 +994,7 @@ public:
+         float cooldown;        // ticks until the next attack may start
+         bool awake;            // false only for a dormant King Tower
+         bool targetable;       // false while invisible (Royal Ghost, a cloak)
++        float bodyRadius;      // the body used for contact, reach and sight (BodySizes.h)
+     };
+     std::vector<UnitView> getUnits() const {
+         std::vector<UnitView> out;
+@@ -1005,7 +1006,8 @@ public:
+             out.push_back({ c->id, c->cardId, c->name, c->team, c->position.x, c->position.y, c->hp,
+                             c->shieldHp, c->isFlying, c->isBuilding(), c->isTower(), c->getCurrentTargetId(),
+                             c->deployTicksRemaining, c->freezeTicks, c->freezeSlow, c->getCurrentCooldown(),
+-                            tower ? tower->isAwake() : true, c->isTargetable() });
++                            tower ? tower->isAwake() : true, c->isTargetable(),
++                            c->getCollisionRadius() > 0.0f ? c->getCollisionRadius() : c->bodyRadius });
+         }
+         return out;
+     }
+diff --git a/include/core/GameManager.h b/include/core/GameManager.h
+index 534f25a..7106c5c 100644
+--- a/include/core/GameManager.h
++++ b/include/core/GameManager.h
+@@ -542,7 +542,7 @@ public:
+             // Nothing may be placed on an existing building: the gap is its
+             // radius plus the new card's footprint.
+             for (const auto& entity : board.getEntities()) {
+-                float r = entity->getCollisionRadius();
++                float r = entity->getPlacementRadius();
+                 if (entity->isAlive() && r > 0.0f) {
+                     float dx = x - entity->position.x;
+                     float dy = y - entity->position.y;
+diff --git a/include/entities/Building.h b/include/entities/Building.h
+index 807644d..d455129 100644
+--- a/include/entities/Building.h
++++ b/include/entities/Building.h
+@@ -9,14 +9,15 @@ protected:
+     int ticksAlive = 0;
+ 
+ public:
+-    // Every Building has the same footprint; GameManager::isValidPlacement uses
+-    // this too.
++    // The footprint a new card must keep clear of (getPlacementRadius), and
++    // the body of a Building built by hand with no card. A card's building
++    // carries its published body in bodyRadius (BodySizes.h, patch 0057).
+     static constexpr float COLLISION_RADIUS = 1.0f;
+ 
+     Building(int id, float x, float y, int hp, int team, char symbol,
+         float attackRange, int damage, int attackCooldown, int lifetime = 300)
+         : CombatEntity(id, x, y, hp, team, symbol, attackRange, damage, attackCooldown),
+-        maxHp(hp), lifetimeTicks(lifetime) {}
++        maxHp(hp), lifetimeTicks(lifetime) { bodyRadius = COLLISION_RADIUS; }
+ 
+     // Full health as constructed: the ceiling for callers that write hp from
+     // outside.
+@@ -35,7 +36,8 @@ public:
+         return true;
+     }
+ 
+-    float getCollisionRadius() const override { return COLLISION_RADIUS; }
++    float getCollisionRadius() const override { return bodyRadius; }
++    float getPlacementRadius() const override { return COLLISION_RADIUS; }
+ 
+     bool isBuilding() const override { return true; }
+ 
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index 2a666c9..f40ae11 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -1102,12 +1102,12 @@ public:
+         if (deathEffect) deathEffect->apply(board, position, team);
+     }
+ 
+-    // The radius an entity occupies for range math; a troop uses
+-    // Entity::IMPLICIT_TROOP_RADIUS. Public and static because AreaSpell's
+-    // rolling sweep needs it too.
++    // The radius an entity occupies for range math; a troop uses its
++    // published body (Entity::bodyRadius, BodySizes.h). Public and static
++    // because AreaSpell's rolling sweep needs it too.
+     static float effectiveRadiusOf(const Entity& e) {
+         const float r = e.getCollisionRadius();
+-        return (r > 0.0f) ? r : Entity::IMPLICIT_TROOP_RADIUS;
++        return (r > 0.0f) ? r : e.bodyRadius;
+     }
+ 
+ protected:
+diff --git a/include/entities/Entity.h b/include/entities/Entity.h
+index ba741e9..8a29e31 100644
+--- a/include/entities/Entity.h
++++ b/include/entities/Entity.h
+@@ -18,10 +18,17 @@ class Board;
+ 
+ class Entity {
+ public:
+-    // The radius a troop (getCollisionRadius() <= 0) occupies for attack-range
+-    // math and push-apart physics.
++    // The radius of a troop built by hand with no card (test fixtures). A
++    // card's troop carries its published radius in bodyRadius (BodySizes.h,
++    // patch 0057).
+     static constexpr float IMPLICIT_TROOP_RADIUS = 0.4f;
+ 
++    // The radius a troop (getCollisionRadius() <= 0) occupies: body-to-body
++    // contact, attack reach, sight. A plain field for the same reason as
++    // isFlying. A Building returns it from getCollisionRadius(); a Tower
++    // has its own.
++    float bodyRadius = IMPLICIT_TROOP_RADIUS;
++
+     int id;
+     Vector2D position;
+     int hp;
+@@ -82,6 +89,10 @@ public:
+ 
+     virtual float getCollisionRadius() const { return 0.0f; }
+ 
++    // The footprint GameManager::isValidPlacement keeps a new card clear of.
++    // Not the body: a Building's stays 1.0 whatever its published body.
++    virtual float getPlacementRadius() const { return getCollisionRadius(); }
++
+     // Footprint for target-selection distance only, never collision or attack
+     // range. Nothing overrides it since patch 0043: every building, Crown
+     // Towers included, competes by its body.
+diff --git a/include/entities/Tower.h b/include/entities/Tower.h
+index d3ea3f3..6e4f2b0 100644
+--- a/include/entities/Tower.h
++++ b/include/entities/Tower.h
+@@ -16,6 +16,7 @@ public:
+     float getCollisionRadius() const override {
+         return (symbol == 'R') ? 2.0f : 1.5f;
+     }
++    float getPlacementRadius() const override { return getCollisionRadius(); }
+ 
+     // How far this tower's shot flies per tick. The default is the King's
+     // cannonball (published speed 1000: 1000 / 48 / 10 = 2.08, see
+diff --git a/include/entities/Troop.h b/include/entities/Troop.h
+index f09a05e..4e86b42 100644
+--- a/include/entities/Troop.h
++++ b/include/entities/Troop.h
+@@ -53,7 +53,7 @@ protected:
+             newPos.y = position.y + (dy / distToWaypoint) * step;
+ 
+             // Flying troops pass over building footprints.
+-            position = isFlying ? newPos : board.resolvePositionAgainstBuildings(newPos, id);
++            position = isFlying ? newPos : board.resolvePositionAgainstBuildings(newPos, id, bodyRadius);
+         }
+     }
+ 
+diff --git a/python_ai/tests/test_body_sizes.py b/python_ai/tests/test_body_sizes.py
+new file mode 100644
+index 0000000..9b7f3f7
+--- /dev/null
++++ b/python_ai/tests/test_body_sizes.py
+@@ -0,0 +1,175 @@
++"""Published body radius of every troop and building (patch 0057).
++
++The game's unit table gives each body a CollisionRadius in thousandths of a
++tile (FirstLight-Zero card_specs.json, release 15.535.13): 400 for the spirits
++and Wall Breakers, 500 for most troops, 600 for the mounted and mid-sized ones,
++700 for the Ice Golem, 750 for the giants, 1000 for Sparky and the Skeleton
++King; buildings 500 (Tesla, Goblin Drill), 600 (Cannon, Bomb Tower, Inferno
++Tower, X-Bow, Mortar), 1000 (huts, Tombstone, Goblin Cage, Elixir Collector).
++Before the patch every troop was 0.4 and every building 1.0. The table itself is
++include/core/BodySizes.h; the numbers below are the published ones, not a copy
++of an engine constant. The Crown Towers have no record in the pack and keep
++their 1.5 / 2.0.
++
++One radius serves contact between bodies, attack reach and sight
++(CombatEntity::effectiveRadiusOf), so the tests check all three.
++"""
++import math
++
++import python_ai  # noqa: F401
++import clash_royale_env as E
++import pytest
++
++NOOP = 4
++DECK = [125, 168, 129, 15, 40, 72, 33, 7]
++KNIGHT, GIANT, MUSKETEER, HOG, ICE_GOLEM, ICE_SPIRIT, CANNON = 0, 2, 6, 15, 40, 72, 25
++SPELLS_AND_NO_RECORD = {"Minion Giant"}
++
++PUBLISHED = [
++    # (card id, published CollisionRadius)
++    (72, 400), (144, 400),            # Ice Spirit and its evolution
++    (5, 450), (170, 450),             # Mini P.E.K.K.A. and its hero
++    (0, 500), (135, 500),             # Knight and its evolution
++    (24, 500), (125, 500),            # Skeletons
++    (6, 500), (140, 500), (168, 500),  # Musketeer, evolution, hero
++    (17, 500), (178, 500),            # Elite Barbarians
++    (15, 600), (82, 600), (57, 600), (90, 600),   # Hog Rider, Royal Hogs, Electro Dragon, Elixir Golem
++    (40, 700),                        # Ice Golem
++    (2, 750), (19, 750), (91, 750), (81, 750), (113, 750), (121, 750),
++    (117, 1000),                      # Skeleton King
++    (26, 500), (154, 500),            # Tesla
++    (25, 600), (129, 600), (92, 600),  # Cannon, its evolution, X-Bow
++    (96, 1000), (97, 1000),           # Tombstone, Goblin Cage
++]
++
++
++def _match():
++    env = E.ClashRoyaleEnv(list(DECK), list(DECK), 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    return env
++
++
++def _bodies(env, team=None):
++    return [u for u in env.get_units() if not u["tower"] and (team is None or u["team"] == team)]
++
++
++def _dist(a, b):
++    return math.hypot(a["x"] - b["x"], a["y"] - b["y"])
++
++
++@pytest.mark.parametrize("card,thousandths", PUBLISHED)
++def test_a_card_carries_its_published_body(card, thousandths):
++    base = E.get_card_stats(card)["base"]
++    assert base["published_collision_radius"] == thousandths
++    assert base["body_radius"] == pytest.approx(thousandths / 1000.0)
++    if E.get_card_info(card)["is_evolution"]:
++        return                                   # inject() places base forms only
++    env = _match()
++    env.inject(card, 9.0, 8.0, 0, -1.0, -1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 2)
++    spawned = [u for u in _bodies(env, 0) if u["card_id"] == card]
++    assert spawned
++    assert {round(u["body_radius"], 3) for u in spawned} == {thousandths / 1000.0}
++
++
++def test_every_troop_and_building_card_has_a_published_row_but_one():
++    missing = set()
++    for card in range(0, 220):
++        try:
++            stats = E.get_card_stats(card)
++        except Exception:
++            continue
++        if not stats or E.get_card_info(card)["is_spell"]:
++            continue
++        if stats["base"]["published_collision_radius"] == 0:
++            missing.add(stats["base"]["name"])
++    assert missing == SPELLS_AND_NO_RECORD
++
++
++def test_the_second_body_of_a_two_body_card_has_its_own_radius():
++    # Rascals: the Boy 750, the Girls 500. Goblinstein: the Monster 750, the
++    # Doctor 500. Both pairs share one registry name.
++    for card in (113, 121):
++        env = _match()
++        env.inject(card, 9.0, 8.0, 0, -1.0, -1)
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 2)
++        radii = {u["card_id"] == card: round(u["body_radius"], 3) for u in _bodies(env, 0)}
++        assert radii == {True: 0.75, False: 0.5}
++
++
++def test_a_body_with_no_published_record_takes_the_common_half_tile():
++    # Golemites have no record in the pack; 0.5 is the value of 101 of its 158
++    # published forms.
++    env = _match()
++    env.inject(19, 9.0, 16.0, 1, 1.0, -1)          # a Golem on 1 HP
++    env.inject(MUSKETEER, 9.0, 12.0, 0, -1.0, 0)
++    seen = {}
++    for _ in range(80):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        for u in _bodies(env, 1):
++            seen[u["name"]] = round(u["body_radius"], 3)
++    assert seen == {"Golem": 0.75, "Golemite": 0.5}
++
++
++def test_the_crown_towers_keep_their_own_bodies():
++    env = _match()
++    radii = {(u["name"], round(u["body_radius"], 3)) for u in env.get_units() if u["tower"]}
++    assert radii == {("King Tower", 2.0), ("Princess Tower", 1.5)}
++
++
++def test_two_bodies_rest_at_the_sum_of_their_radii():
++    # A Hog Rider (0.6) catching an Ice Golem (0.7) in the same lane: 1.3
++    # between centres, where the old 0.4 + 0.4 let them close to 0.8.
++    env = _match()
++    env.inject(ICE_GOLEM, 15.0, 15.0, 0, -1.0, -1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 11)
++    env.inject(HOG, 15.0, 13.0, 0, -1.0, -1)
++    gaps = []
++    for _ in range(60):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        golem = [u for u in _bodies(env, 0) if u["card_id"] == ICE_GOLEM]
++        hog = [u for u in _bodies(env, 0) if u["card_id"] == HOG]
++        gaps.append(_dist(golem[0], hog[0]))
++    assert min(gaps) == pytest.approx(1.3, abs=1e-3)
++    assert sum(1 for g in gaps if g < 1.31) >= 20       # in contact, not a glancing touch
++
++
++def test_reach_on_a_tower_is_range_plus_both_bodies():
++    # Hog Rider: 0.8 range + 0.6 body + the Princess Tower's 1.5.
++    env = _match()
++    env.inject(HOG, 16.0, 15.0, 0, -1.0, -1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 70)
++    hog = [u for u in _bodies(env, 0) if u["card_id"] == HOG][0]
++    tower = min((u for u in env.get_units() if u["tower"] and u["team"] == 1), key=lambda u: _dist(u, hog))
++    reach = E.get_card_stats(HOG)["base"]["attack_range"] + 0.6 + 1.5
++    step = 0.27                                          # one tick of a Hog Rider
++    assert reach - step <= _dist(hog, tower) <= reach + 1e-3
++
++
++def test_reach_on_a_building_uses_the_buildings_published_body():
++    # Knight: 1.2 range + 0.5 body + the Cannon's 0.6 = 2.3 (2.6 with the old
++    # 0.4 and 1.0).
++    env = _match()
++    env.inject(CANNON, 9.0, 10.0, 1, -1.0, -1)
++    env.inject(KNIGHT, 9.0, 6.0, 0, -1.0, 0)
++    closest, targeted = 99.0, False
++    for _ in range(40):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        knight = [u for u in _bodies(env, 0) if u["card_id"] == KNIGHT]
++        cannon = [u for u in _bodies(env, 1) if u["card_id"] == CANNON]
++        if not cannon:
++            break                                        # our towers shoot it too
++        targeted = targeted or knight[0]["target_id"] == cannon[0]["id"]
++        closest = min(closest, _dist(knight[0], cannon[0]))
++    assert targeted
++    reach = E.get_card_stats(KNIGHT)["base"]["attack_range"] + 0.5 + 0.6
++    assert reach - 0.14 <= closest <= reach + 1e-3       # one tick of a Knight is 0.13
++
++
++def test_placement_still_keeps_a_whole_tile_clear_of_a_building():
++    # The placement footprint is not the body: Building::COLLISION_RADIUS (1.0)
++    # for every building, as before the patch.
++    base = E.get_card_stats(CANNON)["base"]
++    assert base["body_radius"] == pytest.approx(0.6)
++    assert E.get_card_info(CANNON)["placement_radius"] == pytest.approx(1.0)
+diff --git a/python_ai/tests/test_hog_26_offence_timeline.py b/python_ai/tests/test_hog_26_offence_timeline.py
+index 67625c8..cff1aa0 100644
+--- a/python_ai/tests/test_hog_26_offence_timeline.py
++++ b/python_ai/tests/test_hog_26_offence_timeline.py
+@@ -76,17 +76,21 @@ def test_an_ice_spirit_costs_the_tower_its_published_1_1_s_and_takes_full_damage
+     alone, t0 = _match()
+     _, plain = _run(alone, {0: [(HOG, 16.0, 15.0)]}, 130)
+     env, t0 = _match()
+-    _, frozen = _run(env, {0: [(HOG, 16.0, 15.0)], 5: [(ICE_SPIRIT, 16.0, 15.0)]}, 130)
++    # The spirit two tiles to the side: on the Hog's own tile the two bodies
++    # (0.6 and 0.4, patch 0057) overlap and the Hog is pushed off its line.
++    _, frozen = _run(env, {0: [(HOG, 16.0, 15.0)], 5: [(ICE_SPIRIT, 14.0, 15.0)]}, 130)
+     spirit = _hits(env, t0, ICE_SPIRIT)
+     freeze = E.get_card_stats(ICE_SPIRIT)["base"]["on_hit"]
+     assert freeze["type"] == "freeze" and freeze["ticks"] == 11
+     assert [amount for _, amount in spirit] == [110]
+     landed = spirit[0][0]
+-    before = [t for t in plain if t <= landed]
+-    assert frozen[:len(before)] == before
+-    after_plain = [t for t in plain if t > landed]
+-    after_frozen = frozen[len(before):]
+-    assert after_frozen[:5] == [t + freeze["ticks"] for t in after_plain[:5]]
++    # Every arrow lands when it would have, or the freeze later; the only
++    # arrow after the spirit that is on time is one already in the air.
++    late = [f - p for f, p in zip(frozen, plain)]
++    assert len(late) >= 8 and set(late) == {0, freeze["ticks"]} and late == sorted(late)
++    first_late = late.index(freeze["ticks"])
++    assert plain[first_late] > landed
++    assert sum(1 for t in plain[:first_late] if t > landed) <= 1
+ 
+ 
+ def test_fireball_and_log_chip_a_princess_tower_for_159_and_35():
+diff --git a/python_ai/tests/test_sight_clip_of_building_targeters.py b/python_ai/tests/test_sight_clip_of_building_targeters.py
+index 1f3208c..b451647 100644
+--- a/python_ai/tests/test_sight_clip_of_building_targeters.py
++++ b/python_ai/tests/test_sight_clip_of_building_targeters.py
+@@ -49,6 +49,9 @@ def _first_target(attacker, cannon_x, cannon_y=12.0, ticks=420):
+                 first = "tower"
+             elif cannon and cannon_max - hp > 150:
+                 first = "cannon"
++            elif not cannon and cannon_max is not None and cannon_max > 150:
++                # gone in one hit with far more HP than a tick of decay takes
++                first = "cannon"
+             if cannon:
+                 cannon_max = hp
+         if first is not None:
+diff --git a/python_ai/tests/test_teacher_combos.py b/python_ai/tests/test_teacher_combos.py
+index c6e7f0d..a772891 100644
+--- a/python_ai/tests/test_teacher_combos.py
++++ b/python_ai/tests/test_teacher_combos.py
+@@ -249,12 +249,15 @@ def test_both_cards_of_a_combo_get_their_OWN_deploy_time():
+     _stage_hand(env, 0, [ICE_GOLEM, HOG, CANNON, SKELETONS], 10.0)
+     env.step_self_play(0, 14.0, 15.0, -1, 0, 0, 1)     # tank at the bridge
+     env.step_self_play(-1, 0, 0, -1, 0, 0, 9)
+-    env.step_self_play(1, 14.0, 14.0, -1, 0, 0, 1)     # win condition behind it
++    # Two tiles behind it: the Ice Golem's 0.7 body and the Hog Rider's 0.6
++    # (BodySizes.h, patch 0057) overlap one tile apart and push each other,
++    # which is not what this test is about.
++    env.step_self_play(1, 14.0, 13.0, -1, 0, 0, 1)     # win condition behind it
+     at_landing = dict.fromkeys(_occupied_cells(env))
+-    assert (14, 14) in at_landing and (15, 14) in at_landing
++    assert (13, 14) in at_landing and (15, 14) in at_landing
+ 
+     env.step_self_play(-1, 0, 0, -1, 0, 0, 9)          # still inside its deploy
+-    assert (14, 14) in dict.fromkeys(_occupied_cells(env)), (
++    assert (13, 14) in dict.fromkeys(_occupied_cells(env)), (
+         "the second card moved during its own deploy time")
+ 
+     env.step_self_play(-1, 0, 0, -1, 0, 0, 30)
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index 9a2b130..8b1470f 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -81,6 +81,10 @@ py::dict statsDict(const CardStats& s, int depth = 0) {
+     // Published speed of the card's shot (ProjectileSpeeds.h); 0 = no row.
+     d["projectile_speed"] = ProjectileSpeeds::forName(s.name);
+     d["projectile_tiles_per_tick"] = ProjectileSpeeds::tilesPerTick(s.name);
++    // Published body radius of the card's troop or building (BodySizes.h): thousandths of
++    // a tile, 0 = no row; and the radius the engine gives it, in tiles.
++    d["published_collision_radius"] = BodySizes::publishedRadius(s.name, s.id);
++    d["body_radius"] = BodySizes::radius(s.name, s.id, s.archetype == Archetype::DefensiveBuilding);
+     d["deploy_ticks"] = s.deployTicks;
+     d["count"] = static_cast<int>(s.spawnOffsets.size());
+     py::list offs;
+@@ -475,6 +479,7 @@ PYBIND11_MODULE(clash_royale_env, m) {
+                     d["cooldown"] = u.cooldown;
+                     d["awake"] = u.awake;
+                     d["targetable"] = u.targetable;
++                    d["body_radius"] = u.bodyRadius;
+                     out.append(d);
+                 }
+                 return out;
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index 9f7a84f..2604f6b 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -472,7 +472,10 @@ TEST_CASE("DefensiveBuilding archetype (Cannon)", "[card_registry][archetype]")
+ 
+     auto building = std::dynamic_pointer_cast<Building>(board.getEntities()[0]);
+     REQUIRE(building != nullptr);
+-    REQUIRE(building->getCollisionRadius() == Catch::Approx(1.0f));
++    // The Cannon's published body (BodySizes.h, patch 0057); the footprint a
++    // new card must keep clear of is still Building::COLLISION_RADIUS.
++    REQUIRE(building->getCollisionRadius() == Catch::Approx(0.6f));
++    REQUIRE(building->getPlacementRadius() == Catch::Approx(Building::COLLISION_RADIUS));
+ }
+ 
+ TEST_CASE("DefensiveBuilding archetype: targetsAir matches real-game data per card", "[card_registry][archetype][flying]") {
+@@ -2377,3 +2380,83 @@ TEST_CASE("An Evolution winds up like its base card, and every load-time row nam
+         REQUIRE(rows[i].ticks > 0);
+     }
+ }
++
++// Patch 0057: published body radii (BodySizes.h; FirstLight-Zero
++// card_specs.json, release 15.535.13).
++TEST_CASE("A card's troop or building carries its published body radius",
++          "[card_registry][body][patch0057]") {
++    auto& reg = CardRegistry::getInstance();
++
++    // The table: published thousandths of a tile, 0 where the pack has no
++    // record.
++    REQUIRE(BodySizes::publishedRadius("Ice Spirit", 72) == 400);
++    REQUIRE(BodySizes::publishedRadius("Knight", 0) == 500);
++    REQUIRE(BodySizes::publishedRadius("Hog Rider", 15) == 600);
++    REQUIRE(BodySizes::publishedRadius("Ice Golem", 40) == 700);
++    REQUIRE(BodySizes::publishedRadius("Giant", 2) == 750);
++    REQUIRE(BodySizes::publishedRadius("Skeleton King", 117) == 1000);
++    REQUIRE(BodySizes::publishedRadius("Cannon", 25) == 600);
++    REQUIRE(BodySizes::publishedRadius("Tesla", 26) == 500);
++    REQUIRE(BodySizes::publishedRadius("Tombstone", 96) == 1000);
++    // Two bodies under one registry name: the row with the id wins.
++    REQUIRE(BodySizes::publishedRadius("Rascals", 113) == 750);
++    REQUIRE(BodySizes::publishedRadius("Rascals", -28) == 500);
++    REQUIRE(BodySizes::publishedRadius("Goblinstein", 121) == 750);
++    REQUIRE(BodySizes::publishedRadius("Goblinstein", -40) == 500);
++    // "Hero X" without a row is X; one with a row keeps its own.
++    REQUIRE(BodySizes::publishedRadius("Hero Musketeer", 168) == 500);
++    REQUIRE(BodySizes::publishedRadius("Hero Giant", 0) == 750);
++    REQUIRE(BodySizes::publishedRadius("Hero Mini P.E.K.K.A.", 170) == 450);
++    // No record: the common half tile for a troop, 0.6 for a building.
++    REQUIRE(BodySizes::publishedRadius("Golemite", -1) == 0);
++    REQUIRE(BodySizes::radius("Golemite", -1) == Catch::Approx(0.5f));
++    REQUIRE(BodySizes::radius("Snowman", -51, true) == Catch::Approx(0.6f));
++
++    // A typo'd row would silently leave its card on the default. Two rows are
++    // spawned bodies that are not cards.
++    std::vector<std::string> names = { "Bush Goblins", "Kamikaze Goblin Demolisher" };
++    for (int id = 0; id <= 200; ++id) {
++        if (const CardDefinition* c = reg.getCard(id)) names.push_back(c->name);
++    }
++    int rows = 0;
++    for (const auto& row : BodySizes::ROWS) {
++        INFO(row.name);
++        REQUIRE(std::find(names.begin(), names.end(), std::string(row.name)) != names.end());
++        REQUIRE(row.radiusThousandths >= 400);
++        REQUIRE(row.radiusThousandths <= 1000);
++        ++rows;
++    }
++    REQUIRE(rows > 100);
++
++    // What is spawned carries it, and a building answers with it.
++    Board board;
++    reg.getCard(15)->spawnEntity(5.0f, 5.0f, 0, board);   // Hog Rider
++    reg.getCard(40)->spawnEntity(9.0f, 5.0f, 0, board);   // Ice Golem
++    reg.getCard(26)->spawnEntity(13.0f, 5.0f, 0, board);  // Tesla
++    board.commitPendingEntities();
++    REQUIRE(board.getEntities()[0]->bodyRadius == Catch::Approx(0.6f));
++    REQUIRE(board.getEntities()[0]->getCollisionRadius() == 0.0f);      // still "a troop"
++    REQUIRE(board.getEntities()[1]->bodyRadius == Catch::Approx(0.7f));
++    REQUIRE(board.getEntities()[2]->getCollisionRadius() == Catch::Approx(0.5f));
++    REQUIRE(board.getEntities()[2]->getPlacementRadius() == Catch::Approx(Building::COLLISION_RADIUS));
++    REQUIRE(CombatEntity::effectiveRadiusOf(*board.getEntities()[0]) == Catch::Approx(0.6f));
++    REQUIRE(CombatEntity::effectiveRadiusOf(*board.getEntities()[2]) == Catch::Approx(0.5f));
++
++    // A troop and a building built by hand, with no card, keep the old bodies.
++    MeleeTroop bare(900, 1.0f, 1.0f, 100, 0, 0.1f, 1.0f, 10, 10, 'k');
++    REQUIRE(bare.bodyRadius == Catch::Approx(Entity::IMPLICIT_TROOP_RADIUS));
++    REQUIRE(CombatEntity::effectiveRadiusOf(bare) == Catch::Approx(0.4f));
++}
++
++TEST_CASE("Two troops are pushed apart to the sum of their published bodies",
++          "[card_registry][body][patch0057]") {
++    auto& reg = CardRegistry::getInstance();
++    Board board;
++    reg.getCard(15)->spawnEntity(5.0f, 5.0f, 0, board);   // Hog Rider, 0.6
++    reg.getCard(40)->spawnEntity(5.5f, 5.0f, 0, board);   // Ice Golem, 0.7
++    board.commitPendingEntities();
++    board.resolveCollisions();
++    const auto& hog = board.getEntities()[0];
++    const auto& golem = board.getEntities()[1];
++    REQUIRE(hog->position.distanceTo(golem->position) == Catch::Approx(1.3f).margin(1e-3));
++}
+diff --git a/tests/core/test_lane_pathing.cpp b/tests/core/test_lane_pathing.cpp
+index 75cc370..df1c572 100644
+--- a/tests/core/test_lane_pathing.cpp
++++ b/tests/core/test_lane_pathing.cpp
+@@ -300,7 +300,10 @@ TEST_CASE("an Ice Golem walking to the King never stalls en route",
+ 
+     // Stalls are measured only during the approach: a unit standing still to
+     // fight at the King has arrived, not stalled.
+-    const float arrived = 3.2f;
++    // "Arrived" is the Golem's own reach on the King, body to body: its 0.75
++    // range, its published 0.7 body (BodySizes.h, patch 0057) and the King's
++    // 2.0. The 3.2 this used to be was the same sum with the old 0.4 body.
++    const float arrived = 0.75f + golem->bodyRadius + king->getCollisionRadius() + 0.05f;
+     Vector2D last = golem->position;
+     int stillFor = 0, longestStall = 0, ticksToArrive = -1;
+ 
+diff --git a/tests/core/test_sight_range.cpp b/tests/core/test_sight_range.cpp
+index 34d015b..d7d1695 100644
+--- a/tests/core/test_sight_range.cpp
++++ b/tests/core/test_sight_range.cpp
+@@ -514,8 +514,10 @@ TEST_CASE("sight still bounds acquisition at the raw catalogued range",
+           "[targeting][sight][body_to_body]") {
+     // Rule 1 alone. At y = 20 the tower is 14.0 away, so the Cannon is always
+     // the nearest building and only sight can refuse it. The Battle Ram
+-    // publishes no sight clip, so its 6.5 is a plain disc. Body to body, a
+-    // Cannon (radius 1.0) is refused past 6.5 + 0.4 + 1.0 = 7.9 centre.
++    // publishes no sight clip, so its 6.5 is a plain disc. Body to body with
++    // the published bodies (Battle Ram 0.75, Cannon 0.6; patch 0057) a Cannon
++    // is refused past 6.5 + 0.75 + 0.6 = 7.85 centre (7.9 with the old 0.4 and
++    // 1.0).
+     REQUIRE(driftAt(81, 20.0f, 8.0f) > -0.05f);   // never towards the Cannon
+     REQUIRE(driftAt(81, 20.0f, 7.0f) < -0.3f);
+ }
+@@ -523,8 +525,9 @@ TEST_CASE("sight still bounds acquisition at the raw catalogued range",
+ TEST_CASE("a published sight clip cuts the sideways reach of a building-targeter",
+           "[targeting][sight][sight_clip]") {
+     // SightClips.h: Hog Rider 9.5 sight, side clip 4.0, so a building pulls it
+-    // from at most 5.5 to the side (body to body; 6.9 centre for a Cannon). The
+-    // Giant's 7.5 with a 2.0 clip gives the same 5.5.
++    // from at most 5.5 to the side (body to body; with the published bodies of
++    // patch 0057, 0.6 + 0.6, that is 6.7 centre for a Cannon). The Giant's 7.5
++    // with a 2.0 clip gives the same 5.5 (6.85 centre with its 0.75 body).
+     const int card = GENERATE(15, 2);
+     INFO("card id " << card);
+     REQUIRE(driftAt(card, 20.0f, 7.0f) > -0.05f);    // never towards the Cannon

@@ -1,0 +1,370 @@
+diff --git a/include/core/GameManager.h b/include/core/GameManager.h
+index 2743072..9af86cd 100644
+--- a/include/core/GameManager.h
++++ b/include/core/GameManager.h
+@@ -5,6 +5,7 @@
+ #include "Tower.h"
+ #include "CombatEntity.h"
+ #include "MatchRules.h"
++#include "TimeoutRules.h"
+ #include "MatchStatistics.h"
+ #include "TowerTroops.h"
+ #include "CardFactories.h"
+@@ -52,7 +53,6 @@ private:
+     // observation. A plain value, so snapshot() copies it and a rollout
+     // inherits the cycle.
+     CycleTable lastPlayedTick = neverPlayed();
+-    const float ELIXIR_REGEN_RATE = 0.035f;
+     // Curriculum hook: scales the opponent's regen. 1.0 is a normal opponent.
+     float oppElixirMultiplier = 1.0f;
+ 
+@@ -178,22 +178,30 @@ private:
+ 
+ public:
+     // --- elixir phases ---
+-    // The real schedule: 3:00 of regular time with double elixir from 2:00,
+-    // then overtime at triple.
++    // The real schedule (FirstLight-Zero battle_env.py; IL_Replay match ends):
++    // 3:00 of regulation, double elixir from 2:00, then 2:00 of overtime whose
++    // first minute stays double and whose last minute is triple.
+     //
+-    //   0:00 - 2:00   1x   one elixir per 2.857 s
+-    //   2:00 - 3:00   2x   one per 1.429 s
+-    //   3:00 +        3x   one per 0.952 s
++    //   0:00 - 2:00   1x   one elixir per 2.8 s
++    //   2:00 - 4:00   2x   one per 1.4 s
++    //   4:00 - 5:00   3x   one per 0.933 s
+     //
+     // In ticks (10 ticks = 1 s, perception/timebase.py). Public because
+     // ClashEnv, the bindings and GameLogger all need it.
++    // One elixir per 2.8 s at 1x (28 ticks). Measured: in 2,085 Ranked/Ladder
++    // replays that ran to ~5:00, spend + leaked never exceeds 5 + 197.86 (the
++    // 2.8 s schedule's ceiling) and 667 sides exceed 194.0, which 2.857 s
++    // (the old 0.035) cannot produce (perception/UPSTREAM_REQUESTS.md item 38).
++    // Static and bound, so Python reads it instead of restating it.
++    static constexpr float ELIXIR_REGEN_RATE = 1.0f / 28.0f;
+     static constexpr int DOUBLE_ELIXIR_TICK = 1200;   // 2:00
+-    static constexpr int TRIPLE_ELIXIR_TICK = 1800;   // 3:00
+-    // Triple elixir and the end of regulation are one instant, which MatchRules
+-    // owns. Asserted rather than derived, since MatchRules knows nothing about
++    static constexpr int TRIPLE_ELIXIR_TICK = 2400;   // 4:00, one minute into overtime
++    // Triple elixir is the last minute of overtime, which MatchRules owns.
++    // Asserted rather than derived, since MatchRules knows nothing about
+     // elixir.
+-    static_assert(TRIPLE_ELIXIR_TICK == MatchRules::REGULATION_END_TICK,
+-                  "overtime and triple elixir both begin when regulation ends");
++    static_assert(TRIPLE_ELIXIR_TICK > MatchRules::REGULATION_END_TICK &&
++                  TRIPLE_ELIXIR_TICK < MatchRules::MATCH_END_TICK,
++                  "triple elixir starts inside overtime");
+ 
+     // The largest multiplier, and the normaliser of the observation scalar;
+     // bound so perception's encoder divides by the same number.
+@@ -716,6 +724,11 @@ public:
+         // evaluateAtTick: from 3:00 a crown lead, or the first crown in
+         // overtime, ends the match.
+         MatchRules::Outcome outcome = MatchRules::evaluateAtTick(board, currentTick);
++        // 5:00: overtime expires and the tower tiebreak decides, whatever the
++        // caller's maxTicks. loserTeam -1 is the exact-tie draw.
++        if (!outcome.over && currentTick >= MatchRules::MATCH_END_TICK) {
++            outcome = TimeoutRules::resolve(board);
++        }
+         if (outcome.over) {
+             gameOver = true;
+             loserTeam = outcome.loserTeam;
+diff --git a/include/core/MatchRules.h b/include/core/MatchRules.h
+index 85aef2f..2d6093c 100644
+--- a/include/core/MatchRules.h
++++ b/include/core/MatchRules.h
+@@ -12,11 +12,13 @@ public:
+         int loserTeam;
+     };
+ 
+-    // The end of regulation: 1800 ticks = 3:00, the real schedule. The same
+-    // instant as GameManager::TRIPLE_ELIXIR_TICK, one fact with two
+-    // consequences; GameManager static_asserts they agree, since this header
+-    // knows nothing about elixir.
++    // The end of regulation: 1800 ticks = 3:00, the real schedule.
+     static constexpr int REGULATION_END_TICK = 1800;
++    // The end of overtime: 3000 ticks = 5:00. Real matches never run past it:
++    // the latest play in 14,305 IL_Replay matches is at 298.95 s. The match
++    // ends here whatever ClashEnv's maxTicks (GameManager::step applies
++    // TimeoutRules), so a caller passing 3600 still gets a real-length match.
++    static constexpr int MATCH_END_TICK = 3000;
+ 
+     // Surviving towers per side, and the weakest one's hp. Uses isTower(),
+     // never the 'R' symbol, which Mortar (card 93) shares.
+@@ -67,8 +69,9 @@ public:
+     //   4. overtime expires                     -> tower-hp tiebreak
+     //
+     // 2 and 3 are one predicate: from REGULATION_END_TICK on, any difference in
+-    // surviving tower count ends the match. Rule 4 is TimeoutRules, called once
+-    // at maxTicks from ClashEnv::calculateReward.
++    // surviving tower count ends the match. Rule 4 is TimeoutRules, applied by
++    // GameManager::step at MATCH_END_TICK (and by ClashEnv::calculateReward at
++    // a shorter maxTicks).
+     static Outcome evaluateAtTick(const Board& board, int tick) {
+         const Outcome king = evaluate(board);
+         if (king.over) return king;
+diff --git a/perception/tests/test_timebase.py b/perception/tests/test_timebase.py
+index 038f49e..5685ccd 100644
+--- a/perception/tests/test_timebase.py
++++ b/perception/tests/test_timebase.py
+@@ -32,7 +32,7 @@ def test_frame_index_conversion():
+ 
+ 
+ def test_elixir_regen_matches_engine(engine):
+-    """ELIXIR_REGEN_RATE is 0.035/tick, measured."""
++    """ELIXIR_REGEN_RATE is 1/28 per tick, measured."""
+     deck = [15, 25, 6, 1, 0, 41, 7, 10]
+     env = engine.ClashRoyaleEnv(deck, deck, 3600)
+     env.reset()
+@@ -56,16 +56,15 @@ def test_starting_elixir_matches_engine(engine):
+ 
+ 
+ def test_simulator_elixir_runs_slow_relative_to_real_game():
+-    """The 2% gap as an asserted fact: "fixing" ELIXIR_REGEN_RATE to match the
+-    real game fails here and forces the opponent-elixir model to be revisited
+-    too.
++    """Since item 38 the engine runs at the real 2.8 s; a drift either way fails
++    here and forces the opponent-elixir model to be revisited too.
+     """
+     sim_seconds_per_elixir = 1.0 / (
+         timebase.SIM_ELIXIR_REGEN_PER_TICK * timebase.TICKS_PER_SECOND
+     )
+-    assert sim_seconds_per_elixir == pytest.approx(2.857, abs=0.001)
++    assert sim_seconds_per_elixir == pytest.approx(2.8, abs=0.001)
+     assert timebase.REAL_SECONDS_PER_ELIXIR_1X == 2.8
+-    assert timebase.SIM_ELIXIR_RATE_ERROR == pytest.approx(0.98, abs=0.001)
++    assert timebase.SIM_ELIXIR_RATE_ERROR == pytest.approx(1.0, abs=0.001)
+ 
+ 
+ def test_phase_multipliers_only_scale_real_rate():
+diff --git a/perception/tests/test_track.py b/perception/tests/test_track.py
+index 3f06895..3c5c947 100644
+--- a/perception/tests/test_track.py
++++ b/perception/tests/test_track.py
+@@ -141,14 +141,12 @@ def test_opponent_elixir_regenerates_at_the_real_rate():
+ 
+ 
+ def test_opponent_elixir_uses_the_real_rate_not_the_simulators():
+-    """At the simulator's rate the balance would be ~1.3 elixir low by three
+-    minutes, firing the negative-balance alarm on good input. See timebase.py.
++    """The tracker models the real 2.8 s rate (which the engine also runs at
++    since UPSTREAM item 38). See timebase.py.
+     """
+     tracker = OpponentElixirTracker()
+     tracker.advance_to(1800)  # 180 s
+     at_real_rate = STARTING_ELIXIR + 180 / 2.8
+-    at_sim_rate = STARTING_ELIXIR + 1800 * 0.035
+-    assert at_real_rate - at_sim_rate == pytest.approx(1.3, abs=0.1)
+     assert tracker.value == pytest.approx(min(10.0, at_real_rate))
+ 
+ 
+diff --git a/perception/timebase.py b/perception/timebase.py
+index c3cab5f..0cc9bd6 100644
+--- a/perception/timebase.py
++++ b/perception/timebase.py
+@@ -15,18 +15,14 @@ seconds, and across the registry it is the real hit speed times ten:
+ 132 rows agreeing on one ratio define the tick more reliably than any single
+ constant.
+ 
+-The engine regenerates 0.035 elixir per tick: 2.857 s per elixir against the
+-real game's 2.8, about 2% slow. Over a match that would put a derived opponent
+-elixir ~1.3 low by three minutes, turning the "opponent elixir went negative =>
+-a placement was missed" alarm into false positives. So the two rates are kept
+-separate:
++The engine regenerates 1/28 elixir per tick: 2.8 s per elixir, the real
++game's rate (UPSTREAM_REQUESTS.md item 38; it was 0.035 = 2.857 s, 2% slow, and
++this module used to keep the two rates apart for that reason). They now agree,
++and both names are kept so callers that state which rate they mean still read:
+ 
+   * REAL_SECONDS_PER_ELIXIR_1X drives the opponent elixir model (the real
+     opponent).
+   * SIM_ELIXIR_REGEN_PER_TICK describes the engine.
+-
+-Neither is corrected to match the other; that would be a gameplay change to the
+-simulator.
+ """
+ 
+ from __future__ import annotations
+@@ -36,7 +32,7 @@ TICKS_PER_SECOND = 10
+ 
+ # GameManager.h ELIXIR_REGEN_RATE, applied once per tick in step(). Asserted
+ # against the live engine in tests/test_timebase.py.
+-SIM_ELIXIR_REGEN_PER_TICK = 0.035
++SIM_ELIXIR_REGEN_PER_TICK = 1.0 / 28.0
+ 
+ # Real-game single-elixir rate.
+ REAL_SECONDS_PER_ELIXIR_1X = 2.8
+@@ -51,7 +47,7 @@ MAX_ELIXIR = 10.0
+ # the real game), exported so a comparison can state its correction.
+ SIM_ELIXIR_RATE_ERROR = (
+     REAL_SECONDS_PER_ELIXIR_1X * SIM_ELIXIR_REGEN_PER_TICK * TICKS_PER_SECOND
+-)  # == 0.98: the simulator produces 98% of the real elixir per unit time.
++)  # == 1.0 since item 38 (0.98 before: the engine ran 2% slow).
+ 
+ 
+ def seconds_to_ticks(seconds: float) -> int:
+diff --git a/python_ai/advisors/tactics.py b/python_ai/advisors/tactics.py
+index 373504e..78575ae 100644
+--- a/python_ai/advisors/tactics.py
++++ b/python_ai/advisors/tactics.py
+@@ -233,8 +233,8 @@ HOG_MAX_THREAT = 800.0
+ # and counter-push.
+ HOG_MAX_OPP_ELIXIR = 7.0
+ 
+-# ClashEnv.h values, not bound.
+-ELIXIR_REGEN_RATE = 0.035
++# GameManager::ELIXIR_REGEN_RATE, bound; the rest are ClashEnv.h values, not bound.
++ELIXIR_REGEN_RATE = E.ClashRoyaleEnv.ELIXIR_REGEN_RATE
+ STARTING_ELIXIR = 5.0
+ MAX_ELIXIR = 10.0
+ TRAINING_MAX_TICKS = 3600.0
+diff --git a/python_ai/tests/test_aux_task_is_not_a_memory_probe.py b/python_ai/tests/test_aux_task_is_not_a_memory_probe.py
+index ff37c72..464cc32 100644
+--- a/python_ai/tests/test_aux_task_is_not_a_memory_probe.py
++++ b/python_ai/tests/test_aux_task_is_not_a_memory_probe.py
+@@ -55,9 +55,8 @@ def test_the_extra_scalar_offsets_still_point_at_the_extra_scalars():
+         "pointing at the time fraction")
+ 
+ 
+-#: ELIXIR_REGEN_RATE is private to GameManager and not bound, so it is restated
+-#: here and measured below.
+-_REGEN_PER_TICK = 0.035     # GameManager.h: `const float ELIXIR_REGEN_RATE`
++#: GameManager::ELIXIR_REGEN_RATE, read from the binding and measured below.
++_REGEN_PER_TICK = _CE.ELIXIR_REGEN_RATE
+ 
+ #: The bar's ceiling (PlayerState clamps to it) and the env's default
+ #: max_ticks, which normalises the time scalar. Neither is bound.
+diff --git a/python_ai/tests/test_bptt_credit_horizon.py b/python_ai/tests/test_bptt_credit_horizon.py
+index ce1ff17..458a3b1 100644
+--- a/python_ai/tests/test_bptt_credit_horizon.py
++++ b/python_ai/tests/test_bptt_credit_horizon.py
+@@ -65,11 +65,11 @@ def test_the_bptt_gradient_horizon_covers_a_full_card_rotation():
+ 
+ 
+ def test_the_rotation_is_derived_from_the_engine_not_from_a_constant():
+-    """The instrument, checked against the documented 0.035 rate: two independent
+-    derivations agreeing.
++    """The instrument, checked against the bound ELIXIR_REGEN_RATE: two
++    independent derivations agreeing.
+     """
+-    assert measured_ticks_per_elixir() == torch.tensor(1 / 0.035).item() or \
+-        abs(measured_ticks_per_elixir() - 1 / 0.035) < 0.01
++    rate = clash_royale_env.ClashRoyaleEnv.ELIXIR_REGEN_RATE
++    assert abs(measured_ticks_per_elixir() - 1 / rate) < 0.01
+     assert 25 < card_rotation_decisions() < 40, (
+         "the derived rotation left the plausible range; the deck, the elixir "
+         "rate or skip_frames changed and this bottleneck needs re-deriving")
+diff --git a/python_ai/tests/test_search_opponent_model.py b/python_ai/tests/test_search_opponent_model.py
+index c3db1ba..3a8c660 100644
+--- a/python_ai/tests/test_search_opponent_model.py
++++ b/python_ai/tests/test_search_opponent_model.py
+@@ -99,6 +99,6 @@ def test_the_teacher_is_usable_as_the_model_and_actually_plays():
+     # Elixir is not a perfect play detector (income accrues): require that the
+     # bar did not simply run up untouched.
+     after = sim.get_elixir_for_team(1)
+-    assert after < before + 20 * 10 * 0.035, (
++    assert after < before + 20 * 10 * CE.ELIXIR_REGEN_RATE, (
+         f"team 1 elixir went {before:.2f} -> {after:.2f}, i.e. it banked its "
+         f"whole income and never played")
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index 426c7e7..5e86e5c 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -349,7 +349,12 @@ PYBIND11_MODULE(clash_royale_env, m) {
+         .def_readonly_static("MAX_MATCH_ELIXIR", &ClashEnv::MAX_MATCH_ELIXIR)
+         // Elixir phase boundaries in ticks, from GameManager.
+         .def_readonly_static("DOUBLE_ELIXIR_TICK", &GameManager::DOUBLE_ELIXIR_TICK)
+-        .def_readonly_static("TRIPLE_ELIXIR_TICK", &GameManager::TRIPLE_ELIXIR_TICK);
++        .def_readonly_static("TRIPLE_ELIXIR_TICK", &GameManager::TRIPLE_ELIXIR_TICK)
++        // Regen per tick at 1x, and the match clock, so Python reads them
++        // instead of restating them.
++        .def_readonly_static("ELIXIR_REGEN_RATE", &GameManager::ELIXIR_REGEN_RATE)
++        .def_readonly_static("REGULATION_END_TICK", &MatchRules::REGULATION_END_TICK)
++        .def_readonly_static("MATCH_END_TICK", &MatchRules::MATCH_END_TICK);
+ 
+     m.def("get_all_card_ids", &getAllCardIds,
+         "All ids CardRegistry currently has registered (real, playable cards only).");
+diff --git a/tests/core/test_game_manager.cpp b/tests/core/test_game_manager.cpp
+index cb27be1..36d2154 100644
+--- a/tests/core/test_game_manager.cpp
++++ b/tests/core/test_game_manager.cpp
+@@ -158,7 +158,7 @@ TEST_CASE("Elixir Collector passively grants its owner extra elixir beyond norma
+     // 80 ticks of interval plus the 10-tick deploy time before its first cycle.
+     for (int i = 0; i < 80 + DEPLOY_TIME_TICKS; ++i) game.step();
+ 
+-    float pureRegenOnly = 0.035f * (80 + DEPLOY_TIME_TICKS); // regen alone, same window
++    float pureRegenOnly = GameManager::ELIXIR_REGEN_RATE * (80 + DEPLOY_TIME_TICKS); // regen alone, same window
+     REQUIRE(game.getElixirAI() > pureRegenOnly + 0.5f); // meaningfully more than regen alone
+ }
+ 
+@@ -294,7 +294,7 @@ TEST_CASE("step() regenerates elixir at the fixed rate, capped at 10.0", "[game_
+     REQUIRE(game.getElixirAI() == Catch::Approx(5.0f));
+ 
+     game.step();
+-    REQUIRE(game.getElixirAI() == Catch::Approx(5.035f));
++    REQUIRE(game.getElixirAI() == Catch::Approx(5.0f + GameManager::ELIXIR_REGEN_RATE));
+ 
+     for (int i = 0; i < 1000; ++i) game.step();
+     REQUIRE(game.getElixirAI() == Catch::Approx(10.0f));
+@@ -825,7 +825,8 @@ TEST_CASE("elixir regen follows the real-game 1x/2x/3x phase schedule",
+ 
+     // The boundaries against the 10-ticks-per-second conversion.
+     REQUIRE(GameManager::DOUBLE_ELIXIR_TICK == 120 * 10);   // 2:00
+-    REQUIRE(GameManager::TRIPLE_ELIXIR_TICK == 180 * 10);   // 3:00
++    REQUIRE(GameManager::TRIPLE_ELIXIR_TICK == 240 * 10);   // 4:00
++    REQUIRE(MatchRules::MATCH_END_TICK == 300 * 10);         // 5:00
+     REQUIRE(GameManager::MAX_ELIXIR_MULTIPLIER
+             == GameManager::elixirMultiplierAtTick(GameManager::TRIPLE_ELIXIR_TICK));
+ }
+@@ -847,16 +848,16 @@ TEST_CASE("elixir income is actually multiplied, measured off the bar",
+ 
+     // 20 ticks: the bar clamps at 10.0, so a long window would saturate and
+     // every phase would read the same.
+-    REQUIRE(incomeOver(0, 20) == Catch::Approx(0.7f).margin(0.01f));
+-    REQUIRE(incomeOver(GameManager::DOUBLE_ELIXIR_TICK, 20) == Catch::Approx(1.4f).margin(0.01f));
+-    REQUIRE(incomeOver(GameManager::TRIPLE_ELIXIR_TICK, 20) == Catch::Approx(2.1f).margin(0.01f));
++    REQUIRE(incomeOver(0, 28) == Catch::Approx(1.0f).margin(0.01f));     // 2.8 s per elixir
++    REQUIRE(incomeOver(GameManager::DOUBLE_ELIXIR_TICK, 28) == Catch::Approx(2.0f).margin(0.01f));
++    REQUIRE(incomeOver(GameManager::TRIPLE_ELIXIR_TICK, 28) == Catch::Approx(3.0f).margin(0.01f));
+ 
+     // Crossing a boundary mid-window. step() increments the tick before reading
+     // the phase, so stepping N from T covers T+1..T+N: from 1190, 9 ticks at 1x
+-    // (1191..1199) and 11 at 2x (1200..1210), 0.315 + 0.770. Pins per-tick
++    // (1191..1199) and 11 at 2x (1200..1210), (9 + 22) / 28. Pins per-tick
+     // evaluation, which a schedule sampled once per step() would fail.
+     REQUIRE(incomeOver(GameManager::DOUBLE_ELIXIR_TICK - 10, 20)
+-            == Catch::Approx(1.085f).margin(0.01f));
++            == Catch::Approx(31.0f / 28.0f).margin(0.01f));
+ }
+ 
+ TEST_CASE("the elixir phase composes with the curriculum's opponent multiplier",
+@@ -877,11 +878,24 @@ TEST_CASE("the elixir phase composes with the curriculum's opponent multiplier",
+ 
+     // The phase scales the base rate and oppElixirMultiplier scales that: a
+     // 1.5x opponent in double elixir gets 3.0x, as intended.
+-    REQUIRE(oppIncomeOver(0, 20, 1.5f).first == Catch::Approx(1.05f).margin(0.01f));
++    const float r = GameManager::ELIXIR_REGEN_RATE;
++    REQUIRE(oppIncomeOver(0, 20, 1.5f).first == Catch::Approx(20 * r * 1.5f).margin(0.01f));
+     REQUIRE(oppIncomeOver(GameManager::DOUBLE_ELIXIR_TICK, 20, 1.5f).first
+-            == Catch::Approx(2.10f).margin(0.01f));
++            == Catch::Approx(20 * r * 3.0f).margin(0.01f));
+ 
+     // ...and the handicap never reaches the AI's own bar.
+     REQUIRE(oppIncomeOver(GameManager::DOUBLE_ELIXIR_TICK, 20, 1.5f).second
+-            == Catch::Approx(1.40f).margin(0.01f));
++            == Catch::Approx(20 * r * 2.0f).margin(0.01f));
++}
++
++TEST_CASE("the match ends at 5:00 on the tower tiebreak, whatever maxTicks",
++          "[game_manager][match_end]") {
++    std::vector<int> deck = { 15, 6, 25, 40, 24, 72, 33, 7 };
++    GameManager game(deck, deck);
++    game.setCurrentTick(MatchRules::MATCH_END_TICK - 2);
++    game.step();
++    REQUIRE_FALSE(game.isGameOver());
++    game.step();                       // tick MATCH_END_TICK
++    REQUIRE(game.isGameOver());
++    REQUIRE(game.getLoserTeam() == -1); // untouched towers: exact tie, a draw
+ }

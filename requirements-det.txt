@@ -1,0 +1,7 @@
+# Detector side-car environment (.venv-det, Python 3.11). Only needed for live play
+# and for training/running the unit detector. ultralytics 8.1 wants numpy 1.x.
+ultralytics==8.1.24
+torch==2.5.1
+numpy==1.26.4
+opencv-python==4.9.0.80
+pillow>=10

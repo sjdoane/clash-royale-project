@@ -1,0 +1,843 @@
+{
+ "_note": "Hand truth for data/det/verify/uVf1EUszTIM renders (held-out video). units = every unit on the arena as cls:side (0 ours, 1 enemy); 'unknown:<side>' = a unit seen but not identifiable by eye (counts toward recall only). Towers: shown HP numbers, null = not shown (full king / destroyed). hand: null = empty slot. Next omitted when the preview is greyed/hidden.",
+ "00": {
+  "units": [
+   "ice-spirit:0",
+   "musketeer-hero:0"
+  ],
+  "towers": {
+   "enemy_left": 2993,
+   "enemy_right": null,
+   "enemy_king": 7221,
+   "our_left": 3362,
+   "our_right": 2415,
+   "our_king": 7399
+  },
+  "timer": 33,
+  "mult": 2,
+  "overtime": false,
+  "hero": "ready",
+  "elixir": 4,
+  "hand": [
+   "musketeer-hero",
+   null,
+   "cannon",
+   "hog-rider"
+  ],
+  "next": "ice-golem"
+ },
+ "01": {
+  "units": [
+   "cannon:0",
+   "ice-golem:0",
+   "skeleton:0",
+   "electro-dragon:1",
+   "golden-knight:1"
+  ],
+  "towers": {
+   "enemy_left": 4302,
+   "enemy_right": 4049,
+   "enemy_king": null,
+   "our_left": 4738,
+   "our_right": 4858,
+   "our_king": null
+  },
+  "timer": 117,
+  "mult": 1,
+  "overtime": false,
+  "hero": "absent",
+  "elixir": 5,
+  "hand": [
+   "the-log",
+   null,
+   "ice-spirit",
+   "hog-rider"
+  ],
+  "next": "musketeer-hero"
+ },
+ "02": {
+  "units": [
+   "cannon:0",
+   "skeleton:0",
+   "skeleton:0",
+   "skeleton:0",
+   "elixir-golem-big:1",
+   "musketeer-hero:0"
+  ],
+  "towers": {
+   "enemy_left": 4302,
+   "enemy_right": 409,
+   "enemy_king": 5700,
+   "our_left": 4738,
+   "our_right": 4698,
+   "our_king": null
+  },
+  "timer": 16,
+  "mult": 2,
+  "overtime": false,
+  "hero": "ready",
+  "elixir": 8,
+  "hand": [
+   "hog-rider",
+   "the-log",
+   "ice-golem",
+   "fireball"
+  ],
+  "next": "ice-spirit"
+ },
+ "03": {
+  "units": [
+   "cannon:0",
+   "cannon:0",
+   "skeleton-ev1:0",
+   "skeleton-ev1:0",
+   "goblin:1",
+   "goblin:1",
+   "spear-goblin:1",
+   "spear-goblin:1",
+   "unknown:1",
+   "unknown:1"
+  ],
+  "towers": {
+   "enemy_left": 2831,
+   "enemy_right": 4858,
+   "enemy_king": null,
+   "our_left": 4303,
+   "our_right": 3808,
+   "our_king": null
+  },
+  "timer": 3,
+  "mult": 2,
+  "overtime": false,
+  "hero": "absent",
+  "elixir": 6,
+  "hand": [
+   "fireball",
+   "skeletons",
+   null,
+   "musketeer-hero"
+  ],
+  "next": "hog-rider"
+ },
+ "04": {
+  "units": [
+   "skeleton:0",
+   "skeleton:0",
+   "goblin:1",
+   "musketeer-hero:0"
+  ],
+  "towers": {
+   "enemy_left": 2701,
+   "enemy_right": 4858,
+   "enemy_king": null,
+   "our_left": 4173,
+   "our_right": 3808,
+   "our_king": null
+  },
+  "timer": 110,
+  "mult": 2,
+  "overtime": true,
+  "hero": "ready",
+  "elixir": 5,
+  "hand": [
+   "fireball",
+   null,
+   "hog-rider",
+   "ice-golem"
+  ],
+  "next": "cannon-ev1"
+ },
+ "05": {
+  "units": [
+   "tombstone:1",
+   "skeleton:1",
+   "musketeer-hero:0"
+  ],
+  "towers": {
+   "enemy_left": 4858,
+   "enemy_right": 4858,
+   "enemy_king": null,
+   "our_left": 4858,
+   "our_right": 4858,
+   "our_king": null
+  },
+  "timer": 157,
+  "mult": 1,
+  "overtime": false,
+  "hero": "ready",
+  "elixir": 8,
+  "hand": [
+   "hog-rider",
+   "ice-golem",
+   "cannon",
+   "the-log"
+  ],
+  "next": "fireball"
+ },
+ "06": {
+  "units": [
+   "cannon:0",
+   "ice-golem:0",
+   "tombstone:1",
+   "skeleton:1",
+   "skeleton:1",
+   "unknown:1"
+  ],
+  "towers": {
+   "enemy_left": 4858,
+   "enemy_right": 4858,
+   "enemy_king": null,
+   "our_left": 4858,
+   "our_right": 4858,
+   "our_king": null
+  },
+  "timer": 145,
+  "mult": 1,
+  "overtime": false,
+  "hero": "absent",
+  "elixir": 7,
+  "hand": [
+   "hog-rider",
+   "fireball",
+   "skeletons",
+   "the-log"
+  ]
+ },
+ "07": {
+  "units": [
+   "cannon:0",
+   "skeleton:0",
+   "skeleton:0",
+   "hog-rider:0",
+   "earthquake:1",
+   "unknown:1",
+   "unknown:1"
+  ],
+  "towers": {
+   "enemy_left": 4858,
+   "enemy_right": 4802,
+   "enemy_king": null,
+   "our_left": 4858,
+   "our_right": 4858,
+   "our_king": null
+  },
+  "timer": 89,
+  "mult": 1,
+  "overtime": false,
+  "hero": "absent",
+  "elixir": 1,
+  "hand": [
+   "musketeer-hero",
+   "fireball",
+   null,
+   "the-log"
+  ],
+  "next": "ice-spirit"
+ },
+ "08": {
+  "units": [
+   "tesla-ev1:1",
+   "cannon-ev1:0",
+   "the-log:0",
+   "unknown:1",
+   "unknown:1"
+  ],
+  "towers": {
+   "enemy_left": 4683,
+   "enemy_right": 955,
+   "enemy_king": null,
+   "our_left": 4351,
+   "our_right": 4798,
+   "our_king": 7464
+  },
+  "timer": 95,
+  "mult": 2,
+  "overtime": true,
+  "hero": "absent",
+  "elixir": 8,
+  "hand": [
+   "the-log",
+   "hog-rider",
+   "ice-golem",
+   "skeletons"
+  ],
+  "next": "musketeer-hero"
+ },
+ "09": {
+  "units": [
+   "the-log:0",
+   "tesla-ev1:1",
+   "mighty-miner:1",
+   "ice-golem:0",
+   "musketeer-hero:0"
+  ],
+  "towers": {
+   "enemy_left": 4683,
+   "enemy_right": 955,
+   "enemy_king": null,
+   "our_left": 4117,
+   "our_right": 4798,
+   "our_king": 7464
+  },
+  "timer": 86,
+  "mult": 2,
+  "overtime": true,
+  "hero": "ready",
+  "elixir": 4,
+  "hand": [
+   null,
+   "hog-rider",
+   "cannon",
+   "fireball"
+  ]
+ },
+ "10": {
+  "units": [
+   "inferno-dragon:1"
+  ],
+  "towers": {
+   "enemy_left": 4858,
+   "enemy_right": 2323,
+   "enemy_king": null,
+   "our_left": 4288,
+   "our_right": 4858,
+   "our_king": null
+  },
+  "timer": 99,
+  "mult": 1,
+  "overtime": false,
+  "hero": "ready",
+  "elixir": 5,
+  "hand": [
+   "the-log",
+   "hog-rider",
+   "fireball",
+   "ice-spirit"
+  ]
+ },
+ "11": {
+  "units": [
+   "inferno-dragon:1",
+   "musketeer-hero:0"
+  ],
+  "towers": {
+   "enemy_left": 4858,
+   "enemy_right": 2323,
+   "enemy_king": null,
+   "our_left": 4288,
+   "our_right": 4858,
+   "our_king": null
+  },
+  "timer": 95,
+  "mult": 1,
+  "overtime": false,
+  "hero": "ready",
+  "elixir": 7,
+  "hand": [
+   "the-log",
+   "hog-rider",
+   "fireball",
+   "ice-spirit"
+  ],
+  "next": "skeletons-ev1"
+ },
+ "12": {
+  "units": [
+   "ice-golem:0",
+   "barbarian:1",
+   "barbarian:1",
+   "barbarian:1"
+  ],
+  "towers": {
+   "enemy_left": 4858,
+   "enemy_right": 1760,
+   "enemy_king": null,
+   "our_left": 4288,
+   "our_right": 4781,
+   "our_king": null
+  },
+  "timer": 66,
+  "mult": 1,
+  "overtime": false,
+  "hero": "absent",
+  "elixir": 7,
+  "hand": [
+   "musketeer-hero",
+   "cannon",
+   "fireball",
+   "hog-rider"
+  ]
+ },
+ "13": {
+  "units": [],
+  "towers": {
+   "enemy_left": 4802,
+   "enemy_right": 4858,
+   "enemy_king": null,
+   "our_left": 4858,
+   "our_right": 4858,
+   "our_king": 7418
+  },
+  "timer": 123,
+  "mult": 1,
+  "overtime": false,
+  "hero": "absent",
+  "elixir": 9,
+  "hand": [
+   "hog-rider",
+   "cannon",
+   "musketeer-hero",
+   "ice-golem"
+  ],
+  "next": "ice-spirit"
+ },
+ "15": {
+  "units": [
+   "bandit:1",
+   "musketeer-hero:0",
+   "unknown:1"
+  ],
+  "towers": {
+   "enemy_left": 4802,
+   "enemy_right": 4858,
+   "enemy_king": null,
+   "our_left": 4858,
+   "our_right": 4858,
+   "our_king": 7418
+  },
+  "timer": 101,
+  "mult": 1,
+  "overtime": false,
+  "hero": "ready",
+  "elixir": 9,
+  "hand": [
+   "hog-rider",
+   "cannon",
+   "the-log",
+   "fireball"
+  ],
+  "next": "skeletons-ev1"
+ },
+ "14": {
+  "units": [
+   "unknown:1",
+   "musketeer-hero:0"
+  ],
+  "towers": {
+   "enemy_left": 4802,
+   "enemy_right": 4858,
+   "enemy_king": null,
+   "our_left": 4858,
+   "our_right": 4858,
+   "our_king": 7418
+  },
+  "timer": 116,
+  "mult": 1,
+  "overtime": false,
+  "hero": "ready",
+  "elixir": 7,
+  "hand": [
+   "hog-rider",
+   "cannon",
+   "ice-spirit",
+   "ice-golem"
+  ],
+  "next": "fireball"
+ },
+ "16": {
+  "units": [
+   "cannon:1",
+   "hog-rider:0",
+   "unknown:1"
+  ],
+  "towers": {
+   "enemy_left": 4858,
+   "enemy_right": 4802,
+   "enemy_king": null,
+   "our_left": 4858,
+   "our_right": 4858,
+   "our_king": null
+  },
+  "timer": 158,
+  "mult": 1,
+  "overtime": false,
+  "hero": "absent",
+  "elixir": 6,
+  "hand": [
+   "ice-golem",
+   "cannon",
+   "musketeer-hero",
+   "fireball"
+  ],
+  "next": "skeletons"
+ },
+ "17": {
+  "units": [
+   "knight:1",
+   "unknown:1",
+   "musketeer-hero:0"
+  ],
+  "towers": {
+   "enemy_left": 4858,
+   "enemy_right": 4802,
+   "enemy_king": null,
+   "our_left": 4858,
+   "our_right": 4858,
+   "our_king": null
+  },
+  "timer": 140,
+  "mult": 1,
+  "overtime": false,
+  "hero": "ready",
+  "elixir": 5,
+  "hand": [
+   "ice-golem",
+   "skeletons",
+   "ice-spirit",
+   "fireball"
+  ],
+  "next": "the-log"
+ },
+ "18": {
+  "units": [
+   "cannon:0",
+   "ice-golem:0",
+   "musketeer-hero:0",
+   "unknown:1",
+   "electro-dragon:1",
+   "bat:1",
+   "bat:1",
+   "bat:1"
+  ],
+  "towers": {
+   "enemy_left": 4605,
+   "enemy_right": 3155,
+   "enemy_king": null,
+   "our_left": 3277,
+   "our_right": 4858,
+   "our_king": null
+  },
+  "timer": 18,
+  "mult": 2,
+  "overtime": false,
+  "hero": "ready",
+  "elixir": 4,
+  "hand": [
+   "ice-spirit",
+   "the-log",
+   "fireball",
+   "hog-rider"
+  ],
+  "next": "skeletons"
+ },
+ "19": {
+  "units": [
+   "fireball:0",
+   "skeleton:1",
+   "skeleton:1",
+   "skeleton:1",
+   "unknown:1",
+   "unknown:1"
+  ],
+  "towers": {
+   "enemy_left": 4858,
+   "enemy_right": 4746,
+   "enemy_king": null,
+   "our_left": 4858,
+   "our_right": 4858,
+   "our_king": null
+  },
+  "timer": 124,
+  "mult": 1,
+  "overtime": false,
+  "hero": "absent",
+  "elixir": 2,
+  "hand": [
+   "cannon",
+   "skeletons",
+   "musketeer-hero",
+   "ice-golem"
+  ]
+ },
+ "20": {
+  "units": [
+   "ice-spirit:0",
+   "cannon:0",
+   "musketeer-hero:0"
+  ],
+  "towers": {
+   "enemy_left": 4295,
+   "enemy_right": 3226,
+   "enemy_king": null,
+   "our_left": 3746,
+   "our_right": 3324,
+   "our_king": null
+  },
+  "timer": 108,
+  "mult": 2,
+  "overtime": true,
+  "hero": "not_ready",
+  "elixir": 1,
+  "hand": [
+   "ice-golem",
+   "skeletons",
+   "musketeer-hero",
+   "fireball"
+  ]
+ },
+ "21": {
+  "units": [
+   "zappy:1",
+   "zappy:1",
+   "unknown:1",
+   "unknown:1",
+   "unknown:1",
+   "unknown:1",
+   "ice-golem:0",
+   "cannon-ev1:0",
+   "musketeer-hero:0",
+   "skeleton:0"
+  ],
+  "towers": {
+   "enemy_left": 4295,
+   "enemy_right": 1848,
+   "enemy_king": null,
+   "our_left": 3746,
+   "our_right": 2482,
+   "our_king": null
+  },
+  "timer": 22,
+  "mult": 3,
+  "overtime": true,
+  "hero": "ready",
+  "elixir": 4,
+  "hand": [
+   null,
+   null,
+   "fireball",
+   "hog-rider"
+  ]
+ },
+ "22": {
+  "units": [
+   "ice-golem:0",
+   "cannon-ev1:0",
+   "skeleton-ev1:0",
+   "skeleton-ev1:0",
+   "unknown:1"
+  ],
+  "towers": {
+   "enemy_left": null,
+   "enemy_right": 4858,
+   "enemy_king": 6714,
+   "our_left": 4646,
+   "our_right": 2990,
+   "our_king": null
+  },
+  "timer": 95,
+  "mult": 1,
+  "overtime": false,
+  "hero": "absent",
+  "elixir": 2,
+  "hand": [
+   "fireball",
+   "hog-rider",
+   null,
+   "musketeer-hero"
+  ],
+  "next": "ice-spirit"
+ },
+ "23": {
+  "units": [
+   "skeleton-ev1:0",
+   "skeleton-ev1:0",
+   "skeleton-ev1:0",
+   "unknown:1",
+   "cannon-ev1:0"
+  ],
+  "towers": {
+   "enemy_left": null,
+   "enemy_right": 4858,
+   "enemy_king": 6446,
+   "our_left": 4646,
+   "our_right": 2990,
+   "our_king": null
+  },
+  "timer": 94,
+  "mult": 1,
+  "overtime": false,
+  "hero": "absent",
+  "elixir": 2,
+  "hand": [
+   "fireball",
+   "hog-rider",
+   "ice-spirit",
+   "musketeer-hero"
+  ],
+  "next": "the-log"
+ },
+ "24": {
+  "units": [],
+  "towers": {
+   "enemy_left": null,
+   "enemy_right": 4858,
+   "enemy_king": 6446,
+   "our_left": 4646,
+   "our_right": 2990,
+   "our_king": null
+  },
+  "timer": 87,
+  "mult": 1,
+  "overtime": false,
+  "hero": "absent",
+  "elixir": 5,
+  "hand": [
+   "fireball",
+   "hog-rider",
+   "ice-spirit",
+   "musketeer-hero"
+  ],
+  "next": "the-log"
+ },
+ "25": {
+  "units": [
+   "skeleton:0",
+   "skeleton:0",
+   "musketeer-hero:0",
+   "unknown:1"
+  ],
+  "towers": {
+   "enemy_left": 4858,
+   "enemy_right": 4042,
+   "enemy_king": null,
+   "our_left": 3072,
+   "our_right": 4212,
+   "our_king": null
+  },
+  "timer": 106,
+  "mult": 1,
+  "overtime": false,
+  "hero": "not_ready",
+  "elixir": 0,
+  "hand": [
+   "ice-golem",
+   "ice-spirit",
+   null,
+   "the-log"
+  ]
+ },
+ "26": {
+  "units": [
+   "hog-rider:0",
+   "ice-spirit:0",
+   "goblin-hut:1",
+   "spear-goblin:1",
+   "unknown:1",
+   "unknown:1"
+  ],
+  "towers": {
+   "enemy_left": 4858,
+   "enemy_right": 2972,
+   "enemy_king": null,
+   "our_left": 3072,
+   "our_right": 3567,
+   "our_king": null
+  },
+  "timer": 33,
+  "mult": 2,
+  "overtime": false,
+  "hero": "absent",
+  "elixir": 7,
+  "hand": [
+   "ice-golem",
+   "fireball",
+   "musketeer-hero",
+   "cannon"
+  ],
+  "next": "the-log"
+ },
+ "27": {
+  "units": [
+   "cannon:0",
+   "ice-golem:0",
+   "goblin-hut:1",
+   "unknown:1",
+   "unknown:1",
+   "unknown:1",
+   "unknown:1"
+  ],
+  "towers": {
+   "enemy_left": 4724,
+   "enemy_right": 1452,
+   "enemy_king": null,
+   "our_left": 2352,
+   "our_right": 3567,
+   "our_king": null
+  },
+  "timer": 43,
+  "mult": 3,
+  "overtime": true,
+  "hero": "ready",
+  "elixir": 6,
+  "hand": [
+   null,
+   "fireball",
+   "musketeer-hero",
+   "the-log"
+  ],
+  "next": "ice-spirit"
+ },
+ "28": {
+  "units": [
+   "giant:1",
+   "musketeer-hero:0"
+  ],
+  "towers": {
+   "enemy_left": 4858,
+   "enemy_right": 3844,
+   "enemy_king": null,
+   "our_left": 4858,
+   "our_right": 4781,
+   "our_king": null
+  },
+  "timer": 131,
+  "mult": 1,
+  "overtime": false,
+  "hero": "ready",
+  "elixir": 9,
+  "hand": [
+   "fireball",
+   "the-log",
+   "hog-rider",
+   "cannon"
+  ],
+  "next": "musketeer-hero"
+ },
+ "29": {
+  "units": [
+   "cannon:0",
+   "unknown:1",
+   "musketeer-hero:0"
+  ],
+  "towers": {
+   "enemy_left": 4858,
+   "enemy_right": 2804,
+   "enemy_king": null,
+   "our_left": 4858,
+   "our_right": 2973,
+   "our_king": null
+  },
+  "timer": 104,
+  "mult": 2,
+  "overtime": true,
+  "hero": "ready",
+  "elixir": 5,
+  "hand": [
+   null,
+   "musketeer-hero",
+   "fireball",
+   "ice-golem"
+  ],
+  "next": "hog-rider"
+ }
+}

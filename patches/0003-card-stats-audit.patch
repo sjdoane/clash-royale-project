@@ -1,0 +1,1737 @@
+diff --git a/include/core/AreaDamageOnDeath.h b/include/core/AreaDamageOnDeath.h
+index 452c825..bd4e56d 100644
+--- a/include/core/AreaDamageOnDeath.h
++++ b/include/core/AreaDamageOnDeath.h
+@@ -19,6 +19,10 @@ class AreaDamageOnDeath : public IDeathEffect {
+ public:
+     AreaDamageOnDeath(float radius, int damage, std::shared_ptr<IOnHitEffect> onHit = nullptr)
+         : radius(radius), damage(damage), onHit(std::move(onHit)) {}
++    // Read-only, for get_card_stats (card-stats audit, patch 0003).
++    float getRadius() const { return radius; }
++    int getDamage() const { return damage; }
++    const std::shared_ptr<IOnHitEffect>& getOnHit() const { return onHit; }
+ 
+     void apply(Board& board, const Vector2D& position, int team) const override {
+         for (const auto& entity : board.getEntities()) {
+diff --git a/include/core/CappedSpawnOnHitEffect.h b/include/core/CappedSpawnOnHitEffect.h
+index 19801fb..31c028e 100644
+--- a/include/core/CappedSpawnOnHitEffect.h
++++ b/include/core/CappedSpawnOnHitEffect.h
+@@ -3,18 +3,27 @@
+ #include "CardStats.h"
+ #include "CardFactories.h"
+ #include "Board.h"
++#include "CombatEntity.h"
++#include <memory>
+ 
+ // Evolved Skeletons' "Never-ending Horde": spawns another copy on each landed
+ // attack, unless maxAlive with that id are already alive on the team. Has
+ // IPeriodicEffect's shape because CombatEntity::onHitSpawnEffect fires it from
+ // the same call site.
+-class CappedSpawnOnHitEffect : public IPeriodicEffect {
++class CappedSpawnOnHitEffect : public IPeriodicEffect,
++        public std::enable_shared_from_this<CappedSpawnOnHitEffect> {
+     CardStats childStats;
+     int maxAlive;
++    // Card-stats audit (patch 0003): children get this same effect, so every
++    // Evolved Skeleton multiplies (the population cap still applies).
++    bool childrenMultiply;
+ 
+ public:
+-    CappedSpawnOnHitEffect(CardStats childStats, int maxAlive)
+-        : childStats(std::move(childStats)), maxAlive(maxAlive) {}
++    CappedSpawnOnHitEffect(CardStats childStats, int maxAlive, bool childrenMultiply = false)
++        : childStats(std::move(childStats)), maxAlive(maxAlive), childrenMultiply(childrenMultiply) {}
++    // Read-only, for get_card_stats (card-stats audit, patch 0003).
++    const CardStats& child() const { return childStats; }
++    int getMaxAlive() const { return maxAlive; }
+ 
+     void apply(Board& board, const Vector2D& position, int team) const override {
+         int aliveCount = 0;
+@@ -22,6 +31,14 @@ public:
+             if (e->isAlive() && e->team == team && e->cardId == childStats.id) aliveCount++;
+         }
+         if (aliveCount >= maxAlive) return;
++        const size_t before = board.pendingEntityCount();
+         CardFactories::spawn(childStats, position.x, position.y, team, board);
++        if (!childrenMultiply) return;
++        auto self = std::const_pointer_cast<CappedSpawnOnHitEffect>(shared_from_this());
++        for (size_t i = before; i < board.pendingEntityCount(); ++i) {
++            if (auto c = std::dynamic_pointer_cast<CombatEntity>(board.getPendingEntity(i))) {
++                c->onHitSpawnEffect = self;
++            }
++        }
+     }
+ };
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index c76f8c2..39a7b86 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -7,6 +7,8 @@
+ #include "RangedBuildingTargeter.h"
+ #include "Building.h"
+ #include "AreaSpell.h"
++#include "ArenaLayout.h"
++#include <algorithm>
+ #include <stdexcept>
+ 
+ // One factory per Archetype (CardStats.h). Nothing here is specific to a card.
+@@ -105,6 +107,7 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     entity->healOnHitMaxHp = stats.healOnHitMaxHp;
+     entity->healOnHitSecondPulseDelayTicks = stats.healOnHitSecondPulseDelayTicks;
+     entity->onHitSpawnEffect = stats.onHitSpawnEffect;
++    entity->splashAppliesOnHit = stats.splashAppliesOnHit;
+     entity->onHitPullRadius = stats.onHitPullRadius;
+     entity->onHitPullDistance = stats.onHitPullDistance;
+     entity->onHitPullDamage = stats.onHitPullDamage;
+@@ -136,12 +139,22 @@ inline float placementRadius(Archetype archetype) {
+ // point, once per card rather than per squad member. Most cards set none.
+ inline void spawnDeployEffect(const CardStats& stats, float x, float y, int team, Board& board) {
+     if (stats.spawnEffectRadius <= 0.0f) return;
+-    auto effect = std::make_shared<AreaSpell>(
+-        board.allocateId(), x, y, team, stats.spawnEffectRadius, stats.spawnEffectDamage,
+-        0, stats.symbol, stats.spawnEffectOnHit);
+-    effect->name = stats.name;
+-    effect->cardId = stats.id;
+-    board.addEntity(effect);
++    // Card-stats audit (patch 0003): one impact per offset (Evolved Cannon's
++    // barrage), with optional knockback and reduced Crown Tower damage.
++    std::vector<Vector2D> offsets = stats.spawnEffectOffsets;
++    if (offsets.empty()) offsets.push_back(Vector2D{ 0.0f, 0.0f });
++    const float forward = (team == 0) ? 1.0f : -1.0f;
++    for (const auto& o : offsets) {
++        const float ex = std::clamp(x + o.x, 0.0f, static_cast<float>(ArenaLayout::WIDTH - 1));
++        const float ey = std::clamp(y + forward * o.y, 0.0f, static_cast<float>(ArenaLayout::HEIGHT - 1));
++        auto effect = std::make_shared<AreaSpell>(
++            board.allocateId(), ex, ey, team, stats.spawnEffectRadius, stats.spawnEffectDamage,
++            0, stats.symbol, stats.spawnEffectOnHit, false, 1, 0, false, 1.0f, 0, stats.spawnEffectKnockback);
++        effect->name = stats.name;
++        effect->cardId = stats.id;
++        effect->crownTowerDamage = stats.spawnEffectCrownTowerDamage;
++        board.addEntity(effect);
++    }
+ }
+ 
+ inline void spawnMeleeSquad(const CardStats& stats, float x, float y, int team, Board& board) {
+@@ -198,9 +211,12 @@ inline void spawnRangedBuildingTargeter(const CardStats& stats, float x, float y
+ inline void spawnDefensiveBuilding(const CardStats& stats, float x, float y, int team, Board& board) {
+     auto building = std::make_shared<Building>(
+         board.allocateId(), x, y, stats.hp, team, stats.symbol,
+-        stats.attackRange, stats.damage, stats.attackCooldown);
++        stats.attackRange, stats.damage, stats.attackCooldown, stats.lifetimeTicks);
+     applyCardMetadata(building, stats);
+     board.addEntity(building);
++    // Card-stats audit (patch 0003): buildings never fired their deploy burst,
++    // so Evolved Cannon's barrage was silently dropped.
++    spawnDeployEffect(stats, x, y, team, board);
+ }
+ 
+ inline void spawnSpell(const CardStats& stats, float x, float y, int team, Board& board) {
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index ed0b7e6..9d15a1d 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -92,6 +92,13 @@ struct CardDefinition {
+     int evolutionCycleThreshold = 0;
+     int evolvedUsesGranted = 0;
+     std::function<void(float x, float y, int team, Board& board)> spawnEvolvedEntity;
++
++    // Card-stats audit (patch 0003): the CardStats the spawn lambdas capture,
++    // kept so get_card_stats can report them. Read-only; gameplay still goes
++    // through spawnEntity / spawnEvolvedEntity. evolvedStats is null unless
++    // isEvolution.
++    std::shared_ptr<const CardStats> stats;
++    std::shared_ptr<const CardStats> evolvedStats;
+ };
+ 
+ // Exclusive upper bound on card ids: [0, CARD_ID_COUNT). Kept a few ids above
+@@ -348,9 +355,15 @@ private:
+     // that branch's freeze would silence the turret. hp and damage are not
+     // sourced.
+     static CardStats heroMusketeerTurretStats() {
+-        return building(-45, "Trusty Turret", 0.0f, 200, 't', 4.0f, 90, 5)
++        // Card-stats audit (patch 0003), wiki Musketeer/Hero, level 11: 1536 hp
++        // (the table prints 721, a typo: 153.6 hp lost/s x 10 s), 140 damage
++        // every 0.5 s (280 DPS), range 4.0, air and ground, 10 s lifetime
++        // (Building decay, replacing the hp-transform timer), 2 s deploy
++        // (History 12/1/2026). The lifetime clock runs through the deploy.
++        return building(-45, "Trusty Turret", 0.0f, 1536, 't', 4.0f, 140, 5)
+             .withTargetsAir()
+-            .withHpTransform(1.0f, 100, false);
++            .withDeployTime(20)
++            .withLifetime(100);
+     }
+     // Hero Magic Archer's decoy: soaks hits and draws aggro but deals no
+     // damage; a zero-damage, stationary unit. hp and lifetime are not sourced.
+@@ -418,6 +431,7 @@ private:
+         def.spawnEntity = [stats](float x, float y, int team, Board& board) {
+             CardFactories::spawn(stats, x, y, team, board);
+         };
++        def.stats = std::make_shared<const CardStats>(stats);
+         cards[stats.id] = std::move(def);
+     }
+ 
+@@ -457,6 +471,8 @@ private:
+         def.spawnEvolvedEntity = [evolvedStats](float x, float y, int team, Board& board) {
+             CardFactories::spawn(evolvedStats, x, y, team, board);
+         };
++        def.stats = std::make_shared<const CardStats>(baseStats);
++        def.evolvedStats = std::make_shared<const CardStats>(evolvedStats);
+         cards[evolutionId] = std::move(def);
+     }
+ 
+@@ -467,8 +483,8 @@ private:
+         // === Melee troops ===
+         add(troop(0, "Knight", 3.0f, Archetype::MeleeSquad, 1766, SPEED_MEDIUM, 1.2f, 202, 12, 'K'));
+ 
+-        add(troop(4, "Goblins", 2.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 120, 11, 'g')
+-            .withOffsets({ {-0.5f, -0.5f}, {0.5f, -0.5f}, {-0.5f, 0.5f}, {0.5f, 0.5f} }));
++        add(troop(4, "Goblins", 2.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 125, 11, 'g')
++            .withOffsets({ {-0.5f, -0.5f}, {0.5f, -0.5f}, {-0.5f, 0.5f}, {0.5f, 0.5f} }) /* audit 0003: wiki Goblins, level 11 */);
+ 
+         add(troop(5, "Mini PEKKA", 4.0f, Archetype::MeleeSquad, 1390, SPEED_FAST, 0.8f, 755, 16, 'M'));
+ 
+@@ -476,7 +492,7 @@ private:
+             .withOffsets({ {0.0f, 0.0f}, {-0.5f, -0.5f}, {0.5f, -0.5f}, {-0.5f, 0.5f}, {0.5f, 0.5f} }));
+ 
+         add(troop(10, "Valkyrie", 4.0f, Archetype::MeleeSquad, 1907, SPEED_MEDIUM, 1.2f, 266, 15, 'V')
+-            .withSplash(1.5f)); // 360-degree swing
++            .withSplash(2.0f) /* audit 0003: wiki Valkyrie, level 11 */); // 360-degree swing
+ 
+         add(troop(12, "Skeleton Army", 3.0f, Archetype::MeleeSquad, 81, SPEED_FAST, 0.5f, 81, 11, 's')
+             .withOffsets(skeletonArmyOffsets()));
+@@ -515,11 +531,11 @@ private:
+         // Splits to the 2 closest enemies (each takes damage/2; full damage if
+         // only one is in range). Each hit and the deploy zap (radius 3) stun
+         // for 0.5 s.
+-        add(troop(35, "Electro Wizard", 4.0f, Archetype::MeleeSquad, 714, SPEED_FAST, 5.0f, 118, 18, 'z')
++        add(troop(35, "Electro Wizard", 4.0f, Archetype::MeleeSquad, 714, SPEED_FAST, 5.0f, 115, 18, 'z')
+             .withTargetsAir()
+             .withSplitTargets(2)
+             .withOnHit(std::make_shared<FreezeOnHit>(5, 0.0f))
+-            .withSpawnEffect(3.0f, 118, std::make_shared<FreezeOnHit>(5, 0.0f)));
++            .withSpawnEffect(3.0f, 118, std::make_shared<FreezeOnHit>(5, 0.0f)) /* audit 0003: wiki Electro Wizard, level 11 */);
+ 
+         // Flying troops. Minions and Minion Horde are one unit at two squad
+         // sizes; Mega Minion is a single heavier flier. All hit air and ground.
+@@ -527,10 +543,10 @@ private:
+             .withOffsets({ {0.0f, 0.0f}, {0.6f, 0.0f}, {-0.6f, 0.0f} })
+             .withFlying().withTargetsAir());
+ 
+-        add(troop(42, "Minion Horde", 5.0f, Archetype::MeleeSquad, 230, SPEED_FAST, 2.5f, 107, 12, 'h')
++        add(troop(42, "Minion Horde", 5.0f, Archetype::MeleeSquad, 230, SPEED_FAST, 2.5f, 107, 11, 'h')
+             .withOffsets({ {-0.6f, -0.3f}, {0.0f, -0.3f}, {0.6f, -0.3f},
+                            {-0.6f, 0.3f}, {0.0f, 0.3f}, {0.6f, 0.3f} })
+-            .withFlying().withTargetsAir());
++            .withFlying().withTargetsAir() /* audit 0003: wiki Minion Horde, level 11 */);
+ 
+         add(troop(43, "Mega Minion", 3.0f, Archetype::MeleeSquad, 837, SPEED_MEDIUM, 1.6f, 312, 15, 'F')
+             .withFlying().withTargetsAir());
+@@ -545,9 +561,9 @@ private:
+         add(troop(6, "Musketeer", 4.0f, Archetype::RangedSquad, 721, SPEED_MEDIUM, 6.0f, 217, 10, 'U')
+             .withTargetsAir().withSightRange(6.0f));
+         // Bomber is ground-only; so are Bowler, Sparky and Cannon Cart.
+-        add(troop(9, "Bomber", 2.0f, Archetype::RangedSquad, 304, SPEED_MEDIUM, 4.5f, 225, 18, 'b'));
+-        add(troop(11, "Wizard", 5.0f, Archetype::RangedSquad, 755, SPEED_MEDIUM, 5.5f, 281, 14, 'W')
+-            .withTargetsAir().withSplash(1.5f));
++        add(troop(9, "Bomber", 2.0f, Archetype::RangedSquad, 304, SPEED_MEDIUM, 4.5f, 212, 18, 'b').withSplash(1.5f) /* audit 0003: wiki Bomber, level 11 */);
++        add(troop(11, "Wizard", 5.0f, Archetype::RangedSquad, 832, SPEED_MEDIUM, 5.5f, 281, 14, 'W')
++            .withTargetsAir().withSplash(1.5f) /* audit 0003: wiki Wizard, level 11 */);
+         add(troop(20, "Dart Goblin", 3.0f, Archetype::RangedSquad, 261, SPEED_VERY_FAST, 6.5f, 151, 8, 'd')
+             .withTargetsAir().withSightRange(7.5f));
+         // A piercing line: 11.5 total (4.0 range + 7.5), half-width 1.8.
+@@ -562,7 +578,8 @@ private:
+         // Ice Wizard fires a projectile; the slow lands on arrival.
+         add(troop(34, "Ice Wizard", 3.0f, Archetype::RangedSquad, 689, SPEED_MEDIUM, 5.5f, 90, 17, 'i')
+             .withTargetsAir()
+-            .withOnHit(std::make_shared<FreezeOnHit>(30, 0.65f)));
++            .withOnHit(std::make_shared<FreezeOnHit>(30, 0.65f))
++            .withSplash(1.5f) /* audit 0003: wiki Ice Wizard, level 11 */);
+ 
+         // Executioner's axe hits on arrival and again 1.5 s later on the
+         // return. The real axe pierces everything along its path both ways;
+@@ -588,13 +605,15 @@ private:
+                 std::vector<std::shared_ptr<IDeathEffect>>{
+                     std::make_shared<SpawnOnDeath>(golemiteStats()),
+                     std::make_shared<AreaDamageOnDeath>(2.5f, 200) }))
+-            .withSightRange(7.0f));
++            .withSightRange(7.0f).withDeployTime(30) /* audit 0003: wiki Golem, level 11 */);
+ 
+         // Ice Golem: the slow is on the death explosion, as in the real card;
+         // there is no on-attack slow. The 30 ticks / 0.65 are not sourced.
+-        add(troop(40, "Ice Golem", 2.0f, Archetype::MeleeBuildingTargeter, 1315, SPEED_SLOW, 0.75f, 84, 25, 'c')
++        // Card-stats audit (patch 0003), wiki Ice Golem, level 11: 92 damage and
++        // 92 death damage; Death Nova slows 30% for 2.5 s (6/10/2025).
++        add(troop(40, "Ice Golem", 2.0f, Archetype::MeleeBuildingTargeter, 1315, SPEED_SLOW, 0.75f, 92, 25, 'c')
+             .withDeathEffect(std::make_shared<AreaDamageOnDeath>(
+-                2.0f, 84, std::make_shared<FreezeOnHit>(30, 0.65f))).withSightRange(7.0f));
++                2.0f, 92, std::make_shared<FreezeOnHit>(25, 0.70f))).withSightRange(7.0f));
+ 
+         // Balloon: flying and building-only, point-blank range; building
+         // targeters never consider air, so no withTargetsAir. The real death
+@@ -608,7 +627,7 @@ private:
+ 
+         // === Defensive structures ===
+         add(building(25, "Cannon", 3.0f, 824, 'C', 5.5f, 202, 10));
+-        add(building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir());
++        add(building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir().withLifetime(250) /* audit 0003: wiki Tesla, level 11 */);
+         // withSightRange(6.0f) is not redundant with the 5.5 default: with
+         // attackRange 6.0, the default would let it attack what it cannot see.
+         // Pinned by test_sight_range.cpp.
+@@ -632,13 +651,14 @@ private:
+ 
+         // === Spells ===
+         // Arrows: 3 volleys of 123, not one 369 hit.
+-        add(spell(3, "Arrows", 3.0f, 3.5f, 123, 10, '*').withRepeats(3, 2));
++        add(spell(3, "Arrows", 3.0f, 3.5f, 123, 10, '*').withRepeats(3, 2).withCrownTowerDamage(31) /* audit 0003: wiki Arrows, level 11 */);
+         add(spell(7, "Fireball", 4.0f, 2.5f, 689, 10, 'O')
+-            .withKnockback(1.0f));
+-        add(spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z'));
++            .withKnockback(1.0f)
++            .withCrownTowerDamage(159)); // audit 0003: wiki Fireball, level 11 (25% since 1/6/2026)
++        add(spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z').withCrownTowerDamage(48) /* audit 0003: wiki Zap, level 11 */);
+         add(spell(30, "Rocket", 6.0f, 2.0f, 1485, 15, 'r')
+-            .withKnockback(1.0f));
+-        add(spell(31, "Lightning", 6.0f, 3.5f, 1057, 5, 'j'));
++            .withKnockback(1.0f).withCrownTowerDamage(371) /* audit 0003: wiki Rocket, level 11 */);
++        add(spell(31, "Lightning", 6.0f, 3.5f, 1057, 5, 'j').withCrownTowerDamage(286) /* audit 0003: wiki Lightning, level 11 */);
+         // Poison: 92 damage every second for 8 s; whoever stands in it takes
+         // each pulse. A Crown Tower takes 21 per pulse (168 in all: official
+         // June 2026 notes, fixed in game on 26 Aug), and enemy troops inside
+@@ -655,7 +675,8 @@ private:
+         // roll) and knockback (0.8) are not sourced.
+         add(spell(33, "The Log", 2.0f, 3.9f, 269, 8, 'o')
+             .withGroundOnly()
+-            .withRollingSweep(10.1f, 3.9f, 1.0f, 0.8f));
++            .withRollingSweep(10.1f, 3.9f, 1.0f, 0.8f)
++            .withCrownTowerDamage(35)); // audit 0003: wiki The Log, level 11 (13% since 1/6/2026)
+ 
+         // --- the 2026 roster expansion (ids 46+) ---
+         // Every remaining non-Champion, non-Evolution, non-Tower-Troop card,
+@@ -669,10 +690,10 @@ private:
+         // === Melee troops (expansion) ===
+         // Dark Prince jumps the river.
+         add(troop(46, "Dark Prince", 4.0f, Archetype::MeleeSquad, 1200, SPEED_MEDIUM, 1.2f, 266, 14, 'N')
+-            .withShield(240) // sourced
++            .withShield(256) // sourced
+             .withCharge(3.0f, 2.0f) // +100% on a charging hit
+             .withChargeSpeed(2.0f)  // and runs at 2x (item 35)
+-            .withIgnoresRiver());
++            .withIgnoresRiver().withSplash(1.1f) /* audit 0003: wiki Dark Prince, level 11 */);
+         // Royal Ghost jumps the river.
+         add(troop(47, "Royal Ghost", 3.0f, Archetype::MeleeSquad, 1210, SPEED_FAST, 1.2f, 261, 18, 'Q')
+             .withInvisibility(5) // brief reveal after attacking
+@@ -692,63 +713,63 @@ private:
+         // here as one 102 heal per landed hit. The larger deploy heal (202) is
+         // not modelled (spawn effects only damage). Battle Healer jumps the
+         // river.
+-        add(troop(49, "Battle Healer", 4.0f, Archetype::MeleeSquad, 1717, SPEED_MEDIUM, 1.2f, 148, 15, 'f')
++        add(troop(49, "Battle Healer", 4.0f, Archetype::MeleeSquad, 1920, SPEED_MEDIUM, 1.6f, 268, 20, 'f')
+             .withHealAura(3.0f, 102)
+-            .withIgnoresRiver());
++            .withIgnoresRiver() /* audit 0003: wiki Battle Healer, level 11 */);
+         // Bandit crosses the river only by dashing; with no separate dash
+         // state, she always ignores it.
+-        add(troop(50, "Bandit", 3.0f, Archetype::MeleeSquad, 906, SPEED_FAST, 1.0f, 194, 10, 'u')
++        add(troop(50, "Bandit", 3.0f, Archetype::MeleeSquad, 906, SPEED_FAST, 0.75f, 194, 10, 'u')
+             .withCharge(3.0f, 2.0f)
+             .withChargeInvulnerability() // invulnerable while charging
+             .withSightRange(6.0f)
+-            .withIgnoresRiver());
++            .withIgnoresRiver() /* audit 0003: wiki Bandit, level 11 */);
+         // Berserker: a flat 0.6 s hit speed, Fast, Melee: Short (0.8). There is
+         // no rage: the self-heal and hit-speed bonuses the wiki lists are event
+         // Modifiers, not the card (UPSTREAM_REQUESTS.md item 32d).
+         add(troop(51, "Berserker", 2.0f, Archetype::MeleeSquad, 896, SPEED_FAST, 0.8f, 102, 6, 'v'));
+-        add(troop(52, "Miner", 3.0f, Archetype::MeleeSquad, 1210, SPEED_FAST, 1.0f, 194, 13, '0')
+-            .withDeployAnywhere());
+-        add(troop(53, "Fisherman", 3.0f, Archetype::MeleeSquad, 870, SPEED_MEDIUM, 1.0f, 194, 13, '1')
+-            .withHook(6.5f).withSightRange(7.5f));
++        add(troop(52, "Miner", 3.0f, Archetype::MeleeSquad, 1210, SPEED_FAST, 1.2f, 194, 13, '0')
++            .withDeployAnywhere() /* audit 0003: wiki Miner, level 11 */);
++        add(troop(53, "Fisherman", 3.0f, Archetype::MeleeSquad, 870, SPEED_MEDIUM, 1.2f, 194, 13, '1')
++            .withHook(6.5f).withSightRange(7.5f) /* audit 0003: wiki Fisherman, level 11 */);
+         // Parry every 3.5 s. The real parry reflects 200% damage and only
+         // against ground melee; neither is modelled (takeDamage carries no
+         // attacker, and there is no melee/ranged distinction).
+-        add(troop(54, "Ronin", 5.0f, Archetype::MeleeSquad, 1779, 0.7f, 1.2f, 371, 14, '2')
+-            .withParry(35));
+-        add(troop(55, "Goblin Machine", 5.0f, Archetype::MeleeSquad, 2150, 0.5f, 1.2f, 212, 12, '3')
+-            .withSecondaryUnit(goblinMachineTurretStats())); // independently targeting rocket turret
++        add(troop(54, "Ronin", 5.0f, Archetype::MeleeSquad, 1779, SPEED_FAST, 1.2f, 371, 13, '2')
++            .withParry(35) /* audit 0003: wiki Ronin, level 11 */);
++        add(troop(55, "Goblin Machine", 5.0f, Archetype::MeleeSquad, 2150, SPEED_MEDIUM, 1.2f, 212, 12, '3')
++            .withSecondaryUnit(goblinMachineTurretStats()) /* audit 0003: wiki Goblin Machine, level 11 */); // independently targeting rocket turret
+ 
+         // Inferno Dragon and Electro Dragon: instant zaps, so MeleeSquad as
+         // with Electro Wizard. Inferno Dragon ramps 35 -> 120 -> 422 every 1.5
+         // s on one target; `damage` is the ramped max.
+-        add(troop(56, "Inferno Dragon", 4.0f, Archetype::MeleeSquad, 1295, SPEED_MEDIUM, 5.0f, 422, 4, '4')
++        add(troop(56, "Inferno Dragon", 4.0f, Archetype::MeleeSquad, 1295, SPEED_MEDIUM, 3.5f, 422, 4, '4')
+             .withFlying().withTargetsAir()
+-            .withDamageRamp(15, 30, 0.083f, 0.284f));
++            .withDamageRamp(15, 30, 0.083f, 0.284f) /* audit 0003: wiki Inferno Dragon, level 11 */);
+         // A true chain, not splash: up to 3 distinct targets (hops up to 4
+         // tiles), each taking the full 192.
+-        add(troop(57, "Electro Dragon", 5.0f, Archetype::MeleeSquad, 1049, SPEED_MEDIUM, 3.5f, 192, 21, '5')
++        add(troop(57, "Electro Dragon", 5.0f, Archetype::MeleeSquad, 1049, SPEED_MEDIUM, 3.5f, 192, 23, '5')
+             .withFlying().withTargetsAir()
+             .withSplitTargets(3)
+             .withSplitTargetsFullDamage()
+-            .withOnHit(std::make_shared<FreezeOnHit>(5, 0.0f)));
++            .withOnHit(std::make_shared<FreezeOnHit>(5, 0.0f)) /* audit 0003: wiki Electro Dragon, level 11 */);
+ 
+         // Night Witch: releases 3 Bats on death and spawns Bats periodically.
+-        add(troop(58, "Night Witch", 4.0f, Archetype::MeleeSquad, 906, SPEED_MEDIUM, 1.0f, 314, 13, '6')
++        add(troop(58, "Night Witch", 4.0f, Archetype::MeleeSquad, 906, SPEED_MEDIUM, 1.6f, 314, 13, '6')
+             .withDeathEffect(std::make_shared<SpawnOnDeath>(nightWitchBatStats()))
+-            .withPeriodicEffect(50, std::make_shared<PeriodicSpawnEffect>(nightWitchPeriodicBatStats())));
++            .withPeriodicEffect(50, std::make_shared<PeriodicSpawnEffect>(nightWitchPeriodicBatStats())) /* audit 0003: wiki Night Witch, level 11 */);
+         // Phoenix: one-time revive (phoenixReviveStats).
+-        add(troop(59, "Phoenix", 4.0f, Archetype::MeleeSquad, 1052, SPEED_MEDIUM, 1.0f, 217, 10, '7')
++        add(troop(59, "Phoenix", 4.0f, Archetype::MeleeSquad, 1052, SPEED_MEDIUM, 1.6f, 217, 10, '7')
+             .withFlying().withTargetsAir()
+-            .withDeathEffect(std::make_shared<SpawnOnDeath>(phoenixReviveStats())));
++            .withDeathEffect(std::make_shared<SpawnOnDeath>(phoenixReviveStats())) /* audit 0003: wiki Phoenix, level 11 */);
+ 
+         // === Ranged troops (expansion) ===
+         add(troop(60, "Sparky", 6.0f, Archetype::RangedSquad, 1451, SPEED_SLOW, 5.0f, 1331, 40, '8')
+-            .withSplash(1.5f)
++            .withSplash(1.8f)
+             .withStunResetsCooldown() // a stun restarts her charge
+-            .withSightRange(5.0f));
++            .withSightRange(5.0f) /* audit 0003: wiki Sparky, level 11 */);
+         add(troop(61, "Princess", 3.0f, Archetype::RangedSquad, 261, SPEED_MEDIUM, 9.0f, 168, 30, '9')
+             .withTargetsAir()
+-            .withSplash(1.5f).withSightRange(9.5f));
++            .withSplash(2.0f).withSightRange(9.5f).withDeployTime(12) /* audit 0003: wiki Princess, level 11 */);
+         // Hunter: the real card fires 10 randomly spread pellets and no falloff
+         // curve is published. withRangeFalloff is an invented deterministic
+         // approximation: linear from full damage point-blank to half at max
+@@ -770,9 +791,9 @@ private:
+             .withSplash(1.5f));
+         // At <= 50% hp it kills itself and the kamikaze form spawns in its
+         // place (goblinDemolisherKamikazeStats).
+-        add(troop(66, "Goblin Demolisher", 4.0f, Archetype::RangedSquad, 1300, 0.5f, 5.0f, 186, 11, '&')
++        add(troop(66, "Goblin Demolisher", 4.0f, Archetype::RangedSquad, 1300, SPEED_MEDIUM, 5.0f, 186, 12, '&')
+             .withSplash(1.5f)
+-            .withHpTransformIntoDeath(0.5f, std::make_shared<SpawnOnDeath>(goblinDemolisherKamikazeStats())));
++            .withHpTransformIntoDeath(0.5f, std::make_shared<SpawnOnDeath>(goblinDemolisherKamikazeStats())) /* audit 0003: wiki Goblin Demolisher, level 11 */);
+         add(troop(67, "Flying Machine", 4.0f, Archetype::RangedSquad, 614, SPEED_FAST, 6.0f, 171, 11, '+')
+             .withFlying().withTargetsAir().withSightRange(6.0f));
+         // The curse spawns a Cursed Hog for Mother Witch (CursedHogOnHit).
+@@ -794,7 +815,7 @@ private:
+             .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(furnaceFireSpiritStats())));
+         add(troop(71, "Witch", 5.0f, Archetype::RangedSquad, 839, SPEED_MEDIUM, 5.5f, 135, 11, ':')
+             .withTargetsAir()
+-            .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(witchSkeletonStats())));
++            .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(witchSkeletonStats())).withSplash(1.5f) /* audit 0003: wiki Witch, level 11 */);
+ 
+         // "Spirit" troops detonate on their first hit and vanish
+         // (CombatEntity::dieAfterFirstHit).
+@@ -809,18 +830,23 @@ private:
+         // 2.3-tile area (UPSTREAM_REQUESTS.md item 32b).
+         add(troop(72, "Ice Spirit", 1.0f, Archetype::RangedSquad, 215, SPEED_VERY_FAST, 2.5f, 110, 10, ';')
+             .withTargetsAir()
+-            .withOnHit(std::make_shared<FreezeOnHit>(10, 0.0f))
++            // Card-stats audit (patch 0003), wiki Ice Spirit, level 11: splash
++            // 1.5 and a 1.1 s freeze (8/7/2025) on everything the splash hits.
++            // 215 hp is the table value after the 4/8/2026 -6% (which is why a
++            // lone Ice Spirit no longer reaches the Princess Tower).
++            .withSplash(1.5f).withSplashOnHit()
++            .withOnHit(std::make_shared<FreezeOnHit>(11, 0.0f))
+             .withDieAfterFirstHit());
+-        add(troop(73, "Fire Spirit", 1.0f, Archetype::RangedSquad, 215, SPEED_VERY_FAST, 2.5f, 215, 10, '<')
++        add(troop(73, "Fire Spirit", 1.0f, Archetype::RangedSquad, 215, SPEED_VERY_FAST, 2.5f, 207, 10, '<')
+             .withTargetsAir()
+             .withSplash(2.3f)
+-            .withDieAfterFirstHit());
++            .withDieAfterFirstHit() /* audit 0003: wiki Fire Spirit, level 11 */);
+         // The real heal is 4 pulses of 100.25 (401), applied here as one heal
+         // on its single hit.
+-        add(troop(74, "Heal Spirit", 1.0f, Archetype::RangedSquad, 215, 0.85f, 2.5f, 110, 10, '=')
++        add(troop(74, "Heal Spirit", 1.0f, Archetype::RangedSquad, 215, SPEED_VERY_FAST, 2.5f, 110, 10, '=')
+             .withTargetsAir()
+             .withHealAura(2.5f, 401)
+-            .withDieAfterFirstHit());
++            .withDieAfterFirstHit().withSplash(1.5f) /* audit 0003: wiki Heal Spirit, level 11 */);
+         add(troop(75, "Electro Spirit", 1.0f, Archetype::RangedSquad, 215, SPEED_VERY_FAST, 2.5f, 99, 10, '>')
+             .withTargetsAir()
+             .withSplitTargets(2)
+@@ -829,25 +855,25 @@ private:
+ 
+         // === Swarms (expansion) ===
+         // Guards and Royal Recruits shields: 256 and 240.
+-        add(troop(76, "Guards", 3.0f, Archetype::MeleeSquad, 81, SPEED_FAST, 1.0f, 117, 10, '?')
++        add(troop(76, "Guards", 3.0f, Archetype::MeleeSquad, 81, SPEED_FAST, 1.6f, 117, 10, '?')
+             .withOffsets({ {0.0f, 0.0f}, {0.6f, 0.0f}, {-0.6f, 0.0f} })
+-            .withShield(256));
+-        add(troop(77, "Royal Recruits", 7.0f, Archetype::MeleeSquad, 547, SPEED_MEDIUM, 1.0f, 133, 13, '@')
++            .withShield(256) /* audit 0003: wiki Guards, level 11 */);
++        add(troop(77, "Royal Recruits", 7.0f, Archetype::MeleeSquad, 547, SPEED_MEDIUM, 1.6f, 133, 13, '@')
+             .withOffsets({ {-2.5f, 0.0f}, {-1.5f, 0.0f}, {-0.5f, 0.0f}, {0.5f, 0.0f}, {1.5f, 0.0f}, {2.5f, 0.0f} })
+-            .withShield(240));
+-        add(troop(78, "Bats", 2.0f, Archetype::MeleeSquad, 81, SPEED_VERY_FAST, 1.0f, 81, 12, 't')
++            .withShield(240) /* audit 0003: wiki Royal Recruits, level 11 */);
++        add(troop(78, "Bats", 2.0f, Archetype::MeleeSquad, 81, SPEED_VERY_FAST, 1.2f, 81, 13, 't')
+             .withOffsets({ {0.0f, 0.0f}, {0.6f, 0.0f}, {-0.6f, 0.0f}, {0.3f, 0.5f}, {-0.3f, 0.5f} })
+-            .withFlying().withTargetsAir());
++            .withFlying().withTargetsAir() /* audit 0003: wiki Bats, level 11 */);
+ 
+-        add(troop(79, "Zappies", 4.0f, Archetype::RangedSquad, 529, SPEED_MEDIUM, 4.5f, 117, 21, '[')
++        add(troop(79, "Zappies", 4.0f, Archetype::RangedSquad, 529, SPEED_MEDIUM, 4.5f, 117, 22, '[')
+             .withOffsets({ {0.0f, 0.0f}, {0.6f, 0.0f}, {-0.6f, 0.0f} })
+             .withTargetsAir()
+-            .withOnHit(std::make_shared<FreezeOnHit>(3, 0.0f)).withSightRange(5.0f));
++            .withOnHit(std::make_shared<FreezeOnHit>(3, 0.0f)).withSightRange(5.0f) /* audit 0003: wiki Zappies, level 11 */);
+         // withSightRange(6.0f), like the single Musketeer (id 6): three of her,
+         // with attackRange 6.0.
+-        add(troop(80, "Three Musketeers", 9.0f, Archetype::RangedSquad, 722, SPEED_MEDIUM, 6.0f, 218, 10, ']')
++        add(troop(80, "Three Musketeers", 9.0f, Archetype::RangedSquad, 883, SPEED_MEDIUM, 6.0f, 218, 13, ']')
+             .withOffsets({ {-2.0f, 0.0f}, {0.0f, 0.0f}, {2.0f, 0.0f} })
+-            .withTargetsAir().withSightRange(6.0f));
++            .withTargetsAir().withSightRange(6.0f) /* audit 0003: wiki Three Musketeers, level 11 */);
+ 
+         // === Building targeters (expansion) ===
+         // Battle Ram: breaks on its first hit on a building and releases its
+@@ -863,45 +889,45 @@ private:
+             .withDeathEffect(std::make_shared<SpawnOnDeath>(battleRamBarbarianStats()))
+             .withCharge(3.0f, 2.0f).withChargeSpeed(2.0f).withDieAfterFirstHit().withSightRange(6.5f));
+         // Royal Hogs jump the river.
+-        add(troop(82, "Royal Hogs", 5.0f, Archetype::MeleeBuildingTargeter, 837, SPEED_VERY_FAST, 1.0f, 74, 12, '_')
++        add(troop(82, "Royal Hogs", 5.0f, Archetype::MeleeBuildingTargeter, 837, SPEED_VERY_FAST, 0.7f, 74, 12, '_')
+             .withOffsets({ {-1.0f, -0.3f}, {-0.3f, 0.3f}, {0.3f, -0.3f}, {1.0f, 0.3f} })
+             .withCharge(3.0f, 2.0f).withSightRange(9.5f)
+-            .withIgnoresRiver());
+-        add(troop(83, "Wall Breakers", 2.0f, Archetype::MeleeBuildingTargeter, 330, SPEED_VERY_FAST, 1.0f, 350, 12, '{')
++            .withIgnoresRiver() /* audit 0003: wiki Royal Hogs, level 11 */);
++        add(troop(83, "Wall Breakers", 2.0f, Archetype::MeleeBuildingTargeter, 330, SPEED_VERY_FAST, 0.5f, 302, 12, '{')
+             .withOffsets({ {-0.4f, 0.0f}, {0.4f, 0.0f} })
+             .withSplash(1.5f)
+-            .withDieAfterFirstHit().withSightRange(7.0f));
+-        add(troop(84, "Electro Giant", 7.0f, Archetype::MeleeBuildingTargeter, 3952, SPEED_SLOW, 1.0f, 163, 18, '|')
++            .withDieAfterFirstHit().withSightRange(7.0f) /* audit 0003: wiki Wall Breakers, level 11 */);
++        add(troop(84, "Electro Giant", 7.0f, Archetype::MeleeBuildingTargeter, 3952, SPEED_SLOW, 1.2f, 163, 18, '|')
+             .withSplash(1.5f)
+-            .withPeriodicEffect(50, std::make_shared<AreaStunEffect>(2.5f, 5)));
+-        add(troop(85, "Suspicious Bush", 2.0f, Archetype::MeleeBuildingTargeter, 81, 0.5f, 0.25f, 256, 14, '}')
++            .withPeriodicEffect(50, std::make_shared<AreaStunEffect>(2.5f, 5)) /* audit 0003: wiki Electro Giant, level 11 */);
++        add(troop(85, "Suspicious Bush", 2.0f, Archetype::MeleeBuildingTargeter, 81, SPEED_MEDIUM, 0.5f, 256, 14, '}')
+             .withInvisibility(5)
+-            .withDeathEffect(std::make_shared<SpawnOnDeath>(suspiciousBushGoblinStats())));
+-        add(troop(86, "Rune Giant", 4.0f, Archetype::MeleeBuildingTargeter, 2662, 0.5f, 1.2f, 153, 15, '~')
+-            .withAllyBuffAura(3.0f, 3, 1.5f, 50, 2));
++            .withDeathEffect(std::make_shared<SpawnOnDeath>(suspiciousBushGoblinStats())) /* audit 0003: wiki Suspicious Bush, level 11 */);
++        add(troop(86, "Rune Giant", 4.0f, Archetype::MeleeBuildingTargeter, 2662, SPEED_MEDIUM, 1.2f, 153, 15, '~')
++            .withAllyBuffAura(3.0f, 3, 1.5f, 50, 2) /* audit 0003: wiki Rune Giant, level 11 */);
+         // Ram Rider jumps the river.
+-        add(troop(87, "Ram Rider", 5.0f, Archetype::MeleeBuildingTargeter, 1766, SPEED_MEDIUM, 1.0f, 250, 17, '"')
++        add(troop(87, "Ram Rider", 5.0f, Archetype::MeleeBuildingTargeter, 1766, SPEED_MEDIUM, 0.8f, 250, 18, '"')
+             .withCharge(3.0f, 2.0f).withChargeSpeed(2.0f) // the ram charges at 2x (item 35)
+             .withSecondaryUnit(ramRiderCrossbowStats()) // the rider's independently targeting crossbow (default 5.5 sight)
+             .withSightRange(7.5f) // the ram itself
+-            .withIgnoresRiver());
++            .withIgnoresRiver() /* audit 0003: wiki Ram Rider, level 11 */);
+         add(troop(88, "Goblin Giant", 6.0f, Archetype::MeleeBuildingTargeter, 3110, SPEED_MEDIUM, 1.2f, 176, 15, '`')
+             .withSecondaryUnit(goblinGiantSpearGoblinsStats()).withSightRange(7.5f)); // carried Spear Goblins, independently targeting
+         // Skeleton Barrel releases 2 Skeletons on death.
+-        add(troop(89, "Skeleton Barrel", 3.0f, Archetype::MeleeBuildingTargeter, 532, SPEED_FAST, 1.0f, 81, 10, ',')
++        add(troop(89, "Skeleton Barrel", 3.0f, Archetype::MeleeBuildingTargeter, 532, SPEED_FAST, 0.35f, 81, 10, ',')
+             .withFlying()
+-            .withDeathEffect(std::make_shared<SpawnOnDeath>(skeletonBarrelSkeletonStats())).withSightRange(7.7f));
++            .withDeathEffect(std::make_shared<SpawnOnDeath>(skeletonBarrelSkeletonStats())).withSightRange(7.7f) /* audit 0003: wiki Skeleton Barrel, level 11 */);
+         // The split chain: Golem -> 2 Golemites (each -> 2 Blobs), with elixir
+         // to the opponent at each tier (see elixirGolemiteStats,
+         // elixirBlobStats).
+-        add(troop(90, "Elixir Golem", 3.0f, Archetype::MeleeBuildingTargeter, 1569, SPEED_SLOW, 1.0f, 253, 11, '(')
++        add(troop(90, "Elixir Golem", 3.0f, Archetype::MeleeBuildingTargeter, 1569, SPEED_SLOW, 0.8f, 253, 11, '(')
+             .withDeathEffect(std::make_shared<CompositeDeathEffect>(
+                 std::vector<std::shared_ptr<IDeathEffect>>{
+                     std::make_shared<SpawnOnDeath>(
+                         elixirGolemiteStats().withOffsets({ {-0.4f, 0.0f}, {0.4f, 0.0f} })),
+                     std::make_shared<EnemyElixirGrantOnDeath>(1.0f)
+                 }))
+-            .withSightRange(7.5f));
++            .withSightRange(7.5f) /* audit 0003: wiki Elixir Golem, level 11 */);
+ 
+         // === Ranged building targeter (expansion) ===
+         // Lava Hound releases 6 Lava Pups; their spread is an engine choice.
+@@ -912,10 +938,10 @@ private:
+         // === Defensive structures (expansion) ===
+         // X-Bow: the default 30 s building lifetime matches the real card;
+         // withDeployDelay adds the ~3.5 s lock-on.
+-        add(building(92, "X-Bow", 6.0f, 1600, 'P', 11.5f, 43, 3)
+-            .withDeployDelay(35).withSightRange(11.5f));
+-        add(building(93, "Mortar", 4.0f, 1369, 'R', 11.5f, 266, 50)
+-            .withMinRange(3.5f).withSightRange(11.5f)); // blind spot
++        add(building(92, "X-Bow", 6.0f, 1600, 'P', 11.5f, 61, 4)
++            .withDeployTime(35).withSightRange(11.5f) /* audit 0003: wiki X-Bow, level 11: 61 dmg, 0.4 s hit, 3.5 s deploy (replaces the 3.5 s lock-on delay) */);
++        add(building(93, "Mortar", 4.0f, 1369, 'R', 11.5f, 266, 47 /* audit 0003: wiki Mortar History, 4.7 s since 4/8/2026 */)
++            .withMinRange(3.5f).withSightRange(11.5f).withDeployTime(35).withSplash(2.0f) /* audit 0003: wiki Mortar, level 11 */); // blind spot
+ 
+         // Spawner buildings do not attack in the real game: 0-damage structures
+         // spawning via PeriodicSpawnEffect. Barbarian Hut: 3 every 15 s, plus
+@@ -937,7 +963,7 @@ private:
+         // Goblin Cage: its whole function is releasing a Goblin Brawler on
+         // death.
+         add(building(97, "Goblin Cage", 4.0f, 780, '6', 0.0f, 0, 100)
+-            .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinCageBrawlerStats())));
++            .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinCageBrawlerStats())).withLifetime(200) /* audit 0003: wiki Goblin Cage, level 11 */);
+         // Goblin Drill: a one-time 360-degree emergence burst (the spawn
+         // effect; knockback not modelled), periodic Goblins, and 2 Goblins on
+         // death.
+@@ -945,42 +971,42 @@ private:
+             .withPeriodicEffect(30, std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats()))
+             .withDeployAnywhere()
+             .withSpawnEffect(2.0f, 84)
+-            .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinDrillDeathGoblinStats())));
++            .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinDrillDeathGoblinStats())).withLifetime(100) /* audit 0003: wiki Goblin Drill, level 11 */);
+         // Elixir Collector: no attack; periodically credits elixir
+         // (ElixirGrantEffect). Interval and amount are not sourced.
+         add(building(99, "Elixir Collector", 6.0f, 1070, '9', 0.0f, 0, 100)
+-            .withPeriodicEffect(80, std::make_shared<ElixirGrantEffect>(1.0f)));
++            .withPeriodicEffect(80, std::make_shared<ElixirGrantEffect>(1.0f)).withLifetime(1100) /* audit 0003: wiki Elixir Collector, level 11 */);
+ 
+         // === Spells (expansion) ===
+         add(spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+             .withSpellOnHit(std::make_shared<FreezeOnHit>(15, 0.5f))
+-            .withKnockback(1.0f));
++            .withKnockback(1.0f).withCrownTowerDamage(45) /* audit 0003: wiki Giant Snowball, level 11 */);
+         // Barbarian Barrel: rolls 4.5 tiles at width 2.6 (published), and its
+         // Barbarian spawns where the barrel stops. No knockback: the real
+         // barrel does not throw what it rolls over. Cast on its own side only,
+         // unlike The Log's river allowance (UPSTREAM_REQUESTS.md item 32n).
+-        add(spell(101, "Barbarian Barrel", 2.0f, 2.5f, 232, 8, '#')
++        add(spell(101, "Barbarian Barrel", 2.0f, 2.5f, 215, 8, '#')
+             .withGroundOnly()
+             .withOwnSideOnly()
+             .withRollingSweep(4.5f, 2.6f, 0.5f, 0.0f)
+-            .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(barbarianBarrelBarbarianStats())));
++            .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(barbarianBarrelBarbarianStats())) /* audit 0003: wiki Barbarian Barrel, level 11 */);
+         // Goblin Curse: only the damage over time is modelled, not the
+         // damage-taken amplification or the Goblin on cursed death.
+-        add(spell(102, "Goblin Curse", 2.0f, 3.0f, 43, 8, '$').withRepeats(6, 10));
++        add(spell(102, "Goblin Curse", 2.0f, 3.0f, 35, 8, '$').withRepeats(6, 10).withCrownTowerDamage(10) /* audit 0003: wiki Goblin Curse, level 11 */);
+         // Earthquake: ground-only damage over time with the 50% movement slow.
+         // The real 3.5x damage against buildings is not modelled.
+-        add(spell(103, "Earthquake", 3.0f, 3.5f, 82, 8, '%').withRepeats(3, 10).withGroundOnly()
+-            .withSpellOnHit(std::make_shared<FreezeOnHit>(30, 0.5f)));
++        add(spell(103, "Earthquake", 3.0f, 3.5f, 84, 8, '%').withRepeats(3, 10).withGroundOnly()
++            .withSpellOnHit(std::make_shared<FreezeOnHit>(30, 0.5f)).withCrownTowerDamage(53) /* audit 0003: wiki Earthquake, level 11 */);
+         // Void: three damage tiers (340 per hit on 1 target, 160 on 2-4, 76 on
+         // 5+), once per wave.
+-        add(spell(104, "Void", 3.0f, 2.5f, 0, 8, '&').withRepeats(3, 10)
+-            .withSpellTieredDamage(340, 160, 76));
++        add(spell(104, "Void", 5.0f, 2.5f, 0, 8, '&').withRepeats(3, 10)
++            .withSpellTieredDamage(340, 160, 76) /* audit 0003: wiki Void, level 11 */);
+         // Vines: only the 3 highest-HP enemies in radius. Pulling flyers to the
+         // ground is not modelled.
+-        add(spell(105, "Vines", 3.0f, 2.5f, 135, 8, '+').withRepeats(3, 7)
+-            .withSpellTopHpTargets(3));
+-        add(spell(106, "Tornado", 3.0f, 5.5f, 154, 8, '_')
+-            .withKnockback(-1.5f)); // negative: pulls toward the centre
++        add(spell(105, "Vines", 3.0f, 2.5f, 153, 8, '+').withRepeats(2, 10) /* audit 0003: wiki Vines, level 11: 153 x2 over 2 s */
++            .withSpellTopHpTargets(3).withCrownTowerDamage(39) /* audit 0003: wiki Vines, level 11 */);
++        add(spell(106, "Tornado", 3.0f, 5.5f, 84, 8, '_')
++            .withKnockback(-1.5f).withCrownTowerDamage(29) /* audit 0003: wiki Tornado, level 11 */); // negative: pulls toward the centre
+         // Freeze: the source's damage field is treated as vestigial; the card
+         // is a 4 s full stun and no damage.
+         add(spell(107, "Freeze", 4.0f, 3.0f, 0, 8, '~')
+@@ -1007,8 +1033,8 @@ private:
+             .withSpellSpawnRing(3.3f)
+             .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(graveyardSkeletonStats())));
+         // Royal Delivery: a shielded Royal Recruit plus its own landing damage.
+-        add(spell(111, "Royal Delivery", 3.0f, 2.0f, 438, 8, '^')
+-            .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(royalDeliveryRecruitStats())));
++        add(spell(111, "Royal Delivery", 3.0f, 3.0f, 438, 8, '^')
++            .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(royalDeliveryRecruitStats())) /* audit 0003: wiki Royal Delivery, level 11 */);
+ 
+         // === Compound troops ===
+         // Goblin Gang and Rascals: both halves spawn via the primary unit plus
+@@ -1020,10 +1046,10 @@ private:
+                     .withOffsets({ {-0.5f, 0.5f}, {0.5f, 0.5f}, {0.0f, -0.5f} })));
+         // Rascals: only the Boy's stats are sourced; the two Girls reuse Spear
+         // Goblins' ranged stats.
+-        add(troop(113, "Rascals", 5.0f, Archetype::MeleeSquad, 1832, SPEED_MEDIUM, 1.2f, 217, 15, 'X')
++        add(troop(113, "Rascals", 5.0f, Archetype::MeleeSquad, 1832, SPEED_MEDIUM, 0.8f, 217, 15, 'X')
+             .withSecondaryUnit(
+                 troop(-28, "Rascals", 0.0f, Archetype::RangedSquad, 133, 0.5f, 5.0f, 81, 17, 'r')
+-                    .withOffsets({ {-0.5f, 0.0f}, {0.5f, 0.0f} })));
++                    .withOffsets({ {-0.5f, 0.0f}, {0.5f, 0.0f} })) /* audit 0003: wiki Rascals, level 11 */);
+ 
+         // Clone: duplicates every allied troop in radius; each clone has a
+         // fresh id and 1 hp.
+@@ -1050,11 +1076,11 @@ private:
+         // Skeleton King: collects up to 10 souls from any death within
+         // soulCollectionRadius (not sourced); "Soul Summoning" spawns 6 + 1 per
+         // soul, consuming them.
+-        add(troop(117, "Skeleton King", 4.0f, Archetype::MeleeSquad, 2298, SPEED_MEDIUM, 1.2f, 180, 16, 'K')
++        add(troop(117, "Skeleton King", 4.0f, Archetype::MeleeSquad, 2298, SPEED_MEDIUM, 1.2f, 204, 16, 'K')
+             .withSplash(1.3f)
+             .withSoulCollection(5.0f, 10)
+             .withChampionAbility(2.0f, 200,
+-                std::make_shared<SkeletonKingSoulSummonEffect>(skeletonKingSummonedSkeletonStats(), 6, 3.5f)));
++                std::make_shared<SkeletonKingSoulSummonEffect>(skeletonKingSummonedSkeletonStats(), 6, 3.5f)) /* audit 0003: wiki Skeleton King, level 11 */);
+ 
+         // Archer Queen's "Cloaking Cape": untargetable and ~2.8x attack speed
+         // for 3.5 s.
+@@ -1064,16 +1090,16 @@ private:
+ 
+         // Monk: his 3-hit combo is flat damage here. "Pensive Protection" (65%
+         // damage reduction for 4 s): see MonkDeflectEffect.
+-        add(troop(119, "Monk", 4.0f, Archetype::MeleeSquad, 2214, SPEED_MEDIUM, 1.2f, 140, 8, 'M')
+-            .withChampionAbility(1.0f, 170, std::make_shared<MonkDeflectEffect>(0.35f, 40)));
++        add(troop(119, "Monk", 5.0f, Archetype::MeleeSquad, 2214, SPEED_MEDIUM, 1.2f, 140, 8, 'M')
++            .withChampionAbility(1.0f, 170, std::make_shared<MonkDeflectEffect>(0.35f, 40)) /* audit 0003: wiki Monk, level 11 */);
+ 
+         // Little Prince: hit speed ramps 1.2 s -> 0.8 s -> 0.4 s on one target
+         // (3 attacks per stage, as tick thresholds). "Royal Rescue" summons the
+         // Guardienne.
+-        add(troop(120, "Little Prince", 3.0f, Archetype::RangedSquad, 698, 0.5f, 5.5f, 104, 12, 'p')
++        add(troop(120, "Little Prince", 3.0f, Archetype::RangedSquad, 698, SPEED_MEDIUM, 5.5f, 104, 12, 'p')
+             .withTargetsAir()
+             .withHitSpeedRamp(36, 60, 8.0f / 12.0f, 4.0f / 12.0f)
+-            .withChampionAbility(3.0f, 300, std::make_shared<SpawnOnAbility>(guardienneStats())));
++            .withChampionAbility(3.0f, 300, std::make_shared<SpawnOnAbility>(guardienneStats())) /* audit 0003: wiki Little Prince, level 11 */);
+ 
+         // Goblinstein: the Monster (front, building-only tank, carries the
+         // ability) plus the Doctor (secondary, 3 tiles behind at a fixed
+@@ -1092,11 +1118,11 @@ private:
+         // as the Bandit does. "Getaway Grenade": brief invisibility and a
+         // 6-tile teleport back toward her own side, limited to 2 uses per
+         // deploy.
+-        add(troop(122, "Boss Bandit", 6.0f, Archetype::MeleeSquad, 2624, 0.7f, 0.8f, 245, 11, 'x')
++        add(troop(122, "Boss Bandit", 6.0f, Archetype::MeleeSquad, 2624, SPEED_FAST, 0.8f, 245, 11, 'x')
+             .withCharge(3.0f, 2.0f)
+             .withChargeInvulnerability()
+             .withIgnoresRiver()
+-            .withChampionAbility(1.0f, 30, std::make_shared<BossBanditGetawayGrenadeEffect>(10, 6.0f), 2));
++            .withChampionAbility(1.0f, 30, std::make_shared<BossBanditGetawayGrenadeEffect>(10, 6.0f), 2) /* audit 0003: wiki Boss Bandit, level 11 */);
+ 
+         // === Evolutions ===
+         // A deck holds the Evolution's id instead of the base card's. Unless
+@@ -1109,11 +1135,11 @@ private:
+         // (runnerStats). One Runner per Wall Breaker. Sources disagree on a
+         // walking-damage buff, so the stats stay unchanged.
+         addEvolution(123,
+-            troop(83, "Wall Breakers", 2.0f, Archetype::MeleeBuildingTargeter, 330, SPEED_VERY_FAST, 1.0f, 350, 12, '{')
++            troop(83, "Wall Breakers", 2.0f, Archetype::MeleeBuildingTargeter, 330, SPEED_VERY_FAST, 0.5f, 302, 12, '{')
+                 .withOffsets({ {-0.4f, 0.0f}, {0.4f, 0.0f} })
+                 .withSplash(1.5f)
+-                .withDieAfterFirstHit().withSightRange(7.0f),
+-            troop(83, "Wall Breakers", 2.0f, Archetype::MeleeBuildingTargeter, 330, SPEED_VERY_FAST, 1.0f, 350, 12, '{')
++                .withDieAfterFirstHit().withSightRange(7.0f) /* audit 0003: wiki Wall Breakers, level 11 */,
++            troop(83, "Wall Breakers", 2.0f, Archetype::MeleeBuildingTargeter, 330, SPEED_VERY_FAST, 0.5f, 302, 12, '{')
+                 .withOffsets({ {-0.4f, 0.0f}, {0.4f, 0.0f} })
+                 .withSplash(1.5f)
+                 .withDieAfterFirstHit().withSightRange(7.0f)
+@@ -1121,14 +1147,14 @@ private:
+                     std::vector<std::shared_ptr<IDeathEffect>>{
+                         std::make_shared<AreaDamageOnDeath>(1.5f, 150),
+                         std::make_shared<SpawnOnDeath>(runnerStats())
+-                    })),
++                    })) /* audit 0003: wiki Wall Breakers, level 11 */,
+             2, 1);
+ 
+         // Zap ("Triple Shock"): three zaps instead of one. The growing radius
+         // between zaps is not modelled; the 3-tick gap is not sourced.
+         addEvolution(124,
+-            spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z'),
+-            spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z').withRepeats(3, 3),
++            spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z').withCrownTowerDamage(48) /* audit 0003: wiki Zap, level 11 */,
++            spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z').withRepeats(3, 3).withCrownTowerDamage(58) /* audit 0003: wiki Zap/Evolution, level 11 */,
+             2, 1);
+ 
+         // Skeletons ("Never-ending Horde"): see evolvedSkeletonChildStats.
+@@ -1137,28 +1163,31 @@ private:
+                 .withOffsets({ {0.0f, 0.0f}, {0.6f, 0.0f}, {-0.6f, 0.0f} }),
+             troop(24, "Skeletons", 1.0f, Archetype::MeleeSquad, 81, SPEED_FAST, 0.5f, 81, 11, 'k')
+                 .withOffsets({ {0.0f, 0.0f}, {0.6f, 0.0f}, {-0.6f, 0.0f} })
+-                .withOnHitSpawn(std::make_shared<CappedSpawnOnHitEffect>(evolvedSkeletonChildStats(), 8)),
++                // Card-stats audit (patch 0003), wiki Skeletons/Evolution, level
++                // 11: every Evolved Skeleton, spawned ones included, multiplies
++                // after attacking, up to 8 alive; 2 cycles.
++                .withOnHitSpawn(std::make_shared<CappedSpawnOnHitEffect>(evolvedSkeletonChildStats(), 8, true)),
+             2, 1);
+ 
+         // Bats: 122 hp (+50%); every attack heals two pulses of 38, 0.5 s
+         // apart, overhealing up to 244 (wiki, level 11; UPSTREAM_REQUESTS.md
+         // item 32g).
+         addEvolution(126,
+-            troop(78, "Bats", 2.0f, Archetype::MeleeSquad, 81, SPEED_VERY_FAST, 1.0f, 81, 12, 't')
++            troop(78, "Bats", 2.0f, Archetype::MeleeSquad, 81, SPEED_VERY_FAST, 1.2f, 81, 13, 't')
+                 .withOffsets({ {0.0f, 0.0f}, {0.6f, 0.0f}, {-0.6f, 0.0f}, {0.3f, 0.5f}, {-0.3f, 0.5f} })
+-                .withFlying().withTargetsAir(),
+-            troop(78, "Bats", 2.0f, Archetype::MeleeSquad, 122, SPEED_VERY_FAST, 1.0f, 81, 12, 't')
++                .withFlying().withTargetsAir() /* audit 0003: wiki Bats, level 11 */,
++            troop(78, "Bats", 2.0f, Archetype::MeleeSquad, 122, SPEED_VERY_FAST, 1.2f, 81, 13, 't')
+                 .withOffsets({ {0.0f, 0.0f}, {0.6f, 0.0f}, {-0.6f, 0.0f}, {0.3f, 0.5f}, {-0.3f, 0.5f} })
+                 .withFlying().withTargetsAir()
+-                .withHealOnHit(38, 244, 5),
++                .withHealOnHit(38, 244, 5) /* audit 0003: wiki Bats, level 11 */,
+             2, 1);
+ 
+         // Bomber: +25% hp (380). "Bouncy Bomb" bounces twice at full damage,
+         // approximated as a 3-target full-damage split.
+         addEvolution(127,
+-            troop(9, "Bomber", 2.0f, Archetype::RangedSquad, 304, SPEED_MEDIUM, 4.5f, 225, 18, 'b'),
+-            troop(9, "Bomber", 2.0f, Archetype::RangedSquad, 380, SPEED_MEDIUM, 4.5f, 225, 18, 'b')
+-                .withSplitTargets(3).withSplitTargetsFullDamage(),
++            troop(9, "Bomber", 2.0f, Archetype::RangedSquad, 304, SPEED_MEDIUM, 4.5f, 212, 18, 'b').withSplash(1.5f) /* audit 0003: wiki Bomber, level 11 */,
++            troop(9, "Bomber", 2.0f, Archetype::RangedSquad, 380, SPEED_MEDIUM, 4.5f, 212, 18, 'b')
++                .withSplitTargets(3).withSplitTargetsFullDamage().withSplash(1.5f) /* audit 0003: wiki Bomber, level 11 */,
+             2, 1);
+ 
+         // Archers: +1 tile range (6.0). "Power Shot": +50% damage at 4-6 tiles.
+@@ -1175,8 +1204,17 @@ private:
+         // is not modelled.
+         addEvolution(129,
+             building(25, "Cannon", 3.0f, 824, 'C', 5.5f, 202, 10),
++            // Card-stats audit (patch 0003), wiki Cannon/Evolution, level 11:
++            // barrage of 9 impacts, 304 damage, 89 Crown Tower damage, radius
++            // 2 (since 5/5/2025), with knockback. The wiki gives no layout
++            // ("barrages both sides of the Arena"): two rows across the full
++            // width in front of the Cannon (5 + 4) and a 1.0 knockback are
++            // assumptions.
+             building(25, "Cannon", 3.0f, 824, 'C', 5.5f, 202, 10)
+-                .withSpawnEffect(2.5f, 202),
++                .withSpawnEffect(2.0f, 304)
++                .withSpawnBarrage({ {-7.0f, 3.0f}, {-3.5f, 3.0f}, {0.0f, 3.0f}, {3.5f, 3.0f}, {7.0f, 3.0f},
++                                    {-5.25f, 6.0f}, {-1.75f, 6.0f}, {1.75f, 6.0f}, {5.25f, 6.0f} },
++                                  1.0f, 89),
+             2, 1);
+ 
+         // Firecracker: the real center and shrapnel sparks (low damage every
+@@ -1228,14 +1266,14 @@ private:
+         // Skeleton Barrel: +25% hp (665). The real card drops 7 skeletons at
+         // 75% hp and again on death; only the death drop is modelled, with 7.
+         addEvolution(134,
+-            troop(89, "Skeleton Barrel", 3.0f, Archetype::MeleeBuildingTargeter, 532, SPEED_FAST, 1.0f, 81, 10, ',')
++            troop(89, "Skeleton Barrel", 3.0f, Archetype::MeleeBuildingTargeter, 532, SPEED_FAST, 0.35f, 81, 10, ',')
+                 .withFlying()
+-                .withDeathEffect(std::make_shared<SpawnOnDeath>(skeletonBarrelSkeletonStats())).withSightRange(7.7f),
+-            troop(89, "Skeleton Barrel", 3.0f, Archetype::MeleeBuildingTargeter, 665, SPEED_FAST, 1.0f, 81, 10, ',')
++                .withDeathEffect(std::make_shared<SpawnOnDeath>(skeletonBarrelSkeletonStats())).withSightRange(7.7f) /* audit 0003: wiki Skeleton Barrel, level 11 */,
++            troop(89, "Skeleton Barrel", 3.0f, Archetype::MeleeBuildingTargeter, 665, SPEED_FAST, 0.35f, 81, 10, ',')
+                 .withFlying()
+                 .withDeathEffect(std::make_shared<SpawnOnDeath>(skeletonBarrelSkeletonStats().withOffsets({
+                     {-0.6f,0.0f},{0.6f,0.0f},{-0.3f,0.3f},{0.3f,0.3f},{-0.3f,-0.3f},{0.3f,-0.3f},{0.0f,0.0f}
+-                }))).withSightRange(7.7f),
++                }))).withSightRange(7.7f) /* audit 0003: wiki Skeleton Barrel, level 11 */,
+             2, 1);
+ 
+         // Knight: the real shield (60% less damage while approaching) is a flat
+@@ -1265,9 +1303,9 @@ private:
+         // movement-speed buff here.
+         addEvolution(137,
+             troop(44, "Baby Dragon", 4.0f, Archetype::RangedSquad, 1152, SPEED_FAST, 3.5f, 168, 15, 'y')
+-                .withFlying().withTargetsAir(),
++                .withFlying().withTargetsAir().withSplash(1.5f) /* audit 0003: wiki Baby Dragon/Evolution, level 11 */,
+             troop(44, "Baby Dragon", 4.0f, Archetype::RangedSquad, 1152, SPEED_FAST, 3.5f, 168, 15, 'y')
+-                .withFlying().withTargetsAir()
++                .withFlying().withTargetsAir().withSplash(1.5f) /* audit 0003: wiki Baby Dragon/Evolution, level 11 */
+                 .withAllyBuffAura(4.0f, 1, 1.3f, 20, 1000000),
+             2, 1);
+ 
+@@ -1290,11 +1328,11 @@ private:
+         // mark; there is no hold mechanism.
+         addEvolution(139,
+             building(97, "Goblin Cage", 4.0f, 780, '6', 0.0f, 0, 100)
+-                .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinCageBrawlerStats())),
++                .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinCageBrawlerStats())).withLifetime(200) /* audit 0003: wiki Goblin Cage, level 11 */,
+             building(97, "Goblin Cage", 4.0f, 780, '6', 3.0f, 40, 20)
+                 .withHook(3.0f)
+                 .withOnHit(std::make_shared<PoisonOnHit>(30, 40, 10))
+-                .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinCageBrawlerStats())),
++                .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinCageBrawlerStats())).withLifetime(200) /* audit 0003: wiki Goblin Cage, level 11 */,
+             2, 1);
+ 
+         // Musketeer ("Sniper Shot"): +80% damage on empowered shots, via
+@@ -1310,23 +1348,23 @@ private:
+         // Wizard ("Fire Shield"): a shield of 25% of his hp (189). The
+         // shield-break explosion is not modelled.
+         addEvolution(141,
+-            troop(11, "Wizard", 5.0f, Archetype::RangedSquad, 755, SPEED_MEDIUM, 5.5f, 281, 14, 'W')
+-                .withTargetsAir().withSplash(1.5f),
+-            troop(11, "Wizard", 5.0f, Archetype::RangedSquad, 755, SPEED_MEDIUM, 5.5f, 281, 14, 'W')
+-                .withTargetsAir().withSplash(1.5f).withShield(189),
+-            2, 1);
++            troop(11, "Wizard", 5.0f, Archetype::RangedSquad, 832, SPEED_MEDIUM, 5.5f, 281, 14, 'W')
++                .withTargetsAir().withSplash(1.5f) /* audit 0003: wiki Wizard, level 11 */,
++            troop(11, "Wizard", 5.0f, Archetype::RangedSquad, 832, SPEED_MEDIUM, 5.5f, 281, 14, 'W')
++                .withTargetsAir().withSplash(1.5f).withShield(192 /* audit 0003: wiki Wizard/Evolution, level 11 */) /* audit 0003: wiki Wizard, level 11 */,
++            1 /* audit 0003: wiki Evolution, level 11: 1 cycle */, 1);
+ 
+         // Witch: the real heal when a spawned Skeleton dies is approximated as
+         // healing on her own hits, capped at 124% hp (1040).
+         addEvolution(142,
+             troop(71, "Witch", 5.0f, Archetype::RangedSquad, 839, SPEED_MEDIUM, 5.5f, 135, 11, ':')
+                 .withTargetsAir()
+-                .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(witchSkeletonStats())),
++                .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(witchSkeletonStats())).withSplash(1.5f) /* audit 0003: wiki Witch, level 11 */,
+             troop(71, "Witch", 5.0f, Archetype::RangedSquad, 839, SPEED_MEDIUM, 5.5f, 135, 11, ':')
+                 .withTargetsAir()
+                 .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(witchSkeletonStats()))
+-                .withHealOnHit(20, 1040),
+-            2, 1);
++                .withHealOnHit(20, 1040).withSplash(1.5f) /* audit 0003: wiki Witch, level 11 */,
++            1 /* audit 0003: wiki Evolution, level 11: 1 cycle */, 1);
+ 
+         // Royal Giant: every attack also splashes 2.5 tiles. The knockback is
+         // not modelled.
+@@ -1335,7 +1373,7 @@ private:
+                 .withSightRange(7.5f),
+             troop(18, "Royal Giant", 6.0f, Archetype::RangedBuildingTargeter, 3164, SPEED_SLOW, 5.0f, 307, 18, 'Y')
+                 .withSplash(2.5f).withSightRange(7.5f),
+-            2, 1);
++            1 /* audit 0003: wiki Evolution, level 11: 1 cycle */, 1);
+ 
+         // Ice Spirit: +0.5 splash radius, applied as an absolute 1.7 on the
+         // evolved form (the base card has no splash here). Both forms carry the
+@@ -1343,12 +1381,15 @@ private:
+         addEvolution(144,
+             troop(72, "Ice Spirit", 1.0f, Archetype::RangedSquad, 215, SPEED_VERY_FAST, 2.5f, 110, 10, ';')
+                 .withTargetsAir()
+-                .withOnHit(std::make_shared<FreezeOnHit>(10, 0.0f))
++                .withSplash(1.5f).withSplashOnHit() // audit 0003: wiki Ice Spirit, level 11
++                .withOnHit(std::make_shared<FreezeOnHit>(11, 0.0f))
+                 .withDieAfterFirstHit(),
++            // Card-stats audit (patch 0003), wiki Ice Spirit/Evolution, level 11:
++            // splash 2, 1.1 s freeze on every splash victim.
+             troop(72, "Ice Spirit", 1.0f, Archetype::RangedSquad, 215, SPEED_VERY_FAST, 2.5f, 110, 10, ';')
+                 .withTargetsAir()
+-                .withSplash(1.7f)
+-                .withOnHit(std::make_shared<FreezeOnHit>(10, 0.0f))
++                .withSplash(2.0f).withSplashOnHit()
++                .withOnHit(std::make_shared<FreezeOnHit>(11, 0.0f))
+                 .withDieAfterFirstHit(),
+             2, 1);
+ 
+@@ -1356,10 +1397,10 @@ private:
+         // lingering slow zone on death is not modelled.
+         addEvolution(145,
+             troop(61, "Princess", 3.0f, Archetype::RangedSquad, 261, SPEED_MEDIUM, 9.0f, 168, 30, '9')
+-                .withTargetsAir().withSplash(1.5f).withSightRange(9.5f),
++                .withTargetsAir().withSplash(2.0f).withSightRange(9.5f).withDeployTime(12) /* audit 0003: wiki Princess, level 11 */,
+             troop(61, "Princess", 3.0f, Archetype::RangedSquad, 261, SPEED_MEDIUM, 9.0f, 168, 30, '9')
+-                .withTargetsAir().withSplash(1.5f).withSightRange(9.5f)
+-                .withOnHit(std::make_shared<FreezeOnHit>(70, 0.7f)),
++                .withTargetsAir().withSplash(2.0f).withSightRange(9.5f)
++                .withOnHit(std::make_shared<FreezeOnHit>(70, 0.7f)).withDeployTime(12) /* audit 0003: wiki Princess, level 11 */,
+             2, 1);
+ 
+         // Hunter ("Netting Trap"): nets the nearest enemy for 3 s every 8 s (3
+@@ -1378,10 +1419,10 @@ private:
+         // not sourced; the lingering zone is not modelled.
+         addEvolution(147,
+             troop(10, "Valkyrie", 4.0f, Archetype::MeleeSquad, 1907, SPEED_MEDIUM, 1.2f, 266, 15, 'V')
+-                .withSplash(1.5f),
++                .withSplash(2.0f) /* audit 0003: wiki Valkyrie, level 11 */,
+             troop(10, "Valkyrie", 4.0f, Archetype::MeleeSquad, 1907, SPEED_MEDIUM, 1.2f, 266, 15, 'V')
+-                .withSplash(1.5f)
+-                .withOnHitPull(5.5f, 2.0f, 50),
++                .withSplash(2.0f)
++                .withOnHitPull(5.5f, 2.0f, 50) /* audit 0003: wiki Valkyrie, level 11 */,
+             2, 1);
+ 
+         // P.E.K.K.A. ("Butter-Heal"): the real heal on each kill, up to +66% hp
+@@ -1391,56 +1432,56 @@ private:
+                 .withSightRange(5.0f),
+             troop(13, "P.E.K.K.A.", 7.0f, Archetype::MeleeSquad, 3760, SPEED_SLOW, 1.2f, 842, 18, 'E')
+                 .withHealOnHit(40, 6242).withSightRange(5.0f),
+-            2, 1);
++            1 /* audit 0003: wiki Evolution, level 11: 1 cycle */, 1);
+ 
+         // Minion Horde ("Dark Guard"): a member hit by a troop or spell turns
+         // invisible for 3 s (DarkGuardOnDamageEffect). The real card triggers
+         // on the first hit only; this refreshes on every hit.
+         addEvolution(149,
+-            troop(42, "Minion Horde", 5.0f, Archetype::MeleeSquad, 230, SPEED_FAST, 2.5f, 107, 12, 'h')
++            troop(42, "Minion Horde", 5.0f, Archetype::MeleeSquad, 230, SPEED_FAST, 2.5f, 107, 11, 'h')
+                 .withOffsets({ {-0.6f, -0.3f}, {0.0f, -0.3f}, {0.6f, -0.3f},
+                                {-0.6f, 0.3f}, {0.0f, 0.3f}, {0.6f, 0.3f} })
+-                .withFlying().withTargetsAir(),
+-            troop(42, "Minion Horde", 5.0f, Archetype::MeleeSquad, 230, SPEED_FAST, 2.5f, 107, 12, 'h')
++                .withFlying().withTargetsAir() /* audit 0003: wiki Minion Horde, level 11 */,
++            troop(42, "Minion Horde", 5.0f, Archetype::MeleeSquad, 230, SPEED_FAST, 2.5f, 107, 11, 'h')
+                 .withOffsets({ {-0.6f, -0.3f}, {0.0f, -0.3f}, {0.6f, -0.3f},
+                                {-0.6f, 0.3f}, {0.0f, 0.3f}, {0.6f, 0.3f} })
+                 .withFlying().withTargetsAir()
+-                .withOnDamageTaken(std::make_shared<DarkGuardOnDamageEffect>(30)),
++                .withOnDamageTaken(std::make_shared<DarkGuardOnDamageEffect>(30)) /* audit 0003: wiki Minion Horde, level 11 */,
+             2, 1);
+ 
+         // Royal Recruits: the real charge after the shield breaks (2.5 tiles
+         // for 2x) is unconditional here.
+         addEvolution(150,
+-            troop(77, "Royal Recruits", 7.0f, Archetype::MeleeSquad, 547, SPEED_MEDIUM, 1.0f, 133, 13, '@')
++            troop(77, "Royal Recruits", 7.0f, Archetype::MeleeSquad, 547, SPEED_MEDIUM, 1.6f, 133, 13, '@')
+                 .withOffsets({ {-2.5f, 0.0f}, {-1.5f, 0.0f}, {-0.5f, 0.0f}, {0.5f, 0.0f}, {1.5f, 0.0f}, {2.5f, 0.0f} })
+-                .withShield(240),
+-            troop(77, "Royal Recruits", 7.0f, Archetype::MeleeSquad, 547, SPEED_MEDIUM, 1.0f, 133, 13, '@')
++                .withShield(240) /* audit 0003: wiki Royal Recruits, level 11 */,
++            troop(77, "Royal Recruits", 7.0f, Archetype::MeleeSquad, 547, SPEED_MEDIUM, 1.6f, 133, 13, '@')
+                 .withOffsets({ {-2.5f, 0.0f}, {-1.5f, 0.0f}, {-0.5f, 0.0f}, {0.5f, 0.0f}, {1.5f, 0.0f}, {2.5f, 0.0f} })
+                 .withShield(240)
+-                .withCharge(2.5f, 2.0f),
+-            2, 1);
++                .withCharge(2.5f, 2.0f) /* audit 0003: wiki Royal Recruits, level 11 */,
++            1 /* audit 0003: wiki Evolution, level 11: 1 cycle */, 1);
+ 
+         // Electro Dragon ("Infinite Bolts"): the real unbounded chain with
+         // degrading effect is a fixed 6 full-damage targets.
+         addEvolution(151,
+-            troop(57, "Electro Dragon", 5.0f, Archetype::MeleeSquad, 1049, SPEED_MEDIUM, 3.5f, 192, 21, '5')
++            troop(57, "Electro Dragon", 5.0f, Archetype::MeleeSquad, 1049, SPEED_MEDIUM, 3.5f, 192, 23, '5')
+                 .withFlying().withTargetsAir()
+                 .withSplitTargets(3).withSplitTargetsFullDamage()
+-                .withOnHit(std::make_shared<FreezeOnHit>(5, 0.0f)),
+-            troop(57, "Electro Dragon", 5.0f, Archetype::MeleeSquad, 1049, SPEED_MEDIUM, 3.5f, 192, 21, '5')
++                .withOnHit(std::make_shared<FreezeOnHit>(5, 0.0f)) /* audit 0003: wiki Electro Dragon, level 11 */,
++            troop(57, "Electro Dragon", 5.0f, Archetype::MeleeSquad, 1049, SPEED_MEDIUM, 3.5f, 192, 23, '5')
+                 .withFlying().withTargetsAir()
+                 .withSplitTargets(6).withSplitTargetsFullDamage()
+-                .withOnHit(std::make_shared<FreezeOnHit>(5, 0.0f)),
+-            2, 1);
++                .withOnHit(std::make_shared<FreezeOnHit>(5, 0.0f)) /* audit 0003: wiki Electro Dragon, level 11 */,
++            1 /* audit 0003: wiki Evolution, level 11: 1 cycle */, 1);
+ 
+         // Mortar: attack period 5 s -> 4 s. "Green Siege": a Goblin spawns with
+         // every landed shot (onHitSpawnEffect).
+         addEvolution(152,
+-            building(93, "Mortar", 4.0f, 1369, 'R', 11.5f, 266, 50)
+-                .withMinRange(3.5f).withSightRange(11.5f),
++            building(93, "Mortar", 4.0f, 1369, 'R', 11.5f, 266, 47 /* audit 0003: wiki Mortar History, 4.7 s since 4/8/2026 */)
++                .withMinRange(3.5f).withSightRange(11.5f).withDeployTime(35).withSplash(2.0f) /* audit 0003: wiki Mortar, level 11 */,
+             building(93, "Mortar", 4.0f, 1369, 'R', 11.5f, 266, 40)
+                 .withMinRange(3.5f).withSightRange(11.5f)
+-                .withOnHitSpawn(std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats())),
++                .withOnHitSpawn(std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats())).withDeployTime(35).withSplash(2.0f) /* audit 0003: wiki Mortar, level 11 */,
+             2, 1);
+ 
+         // Goblin Drill: the real resurfacing at 66% / 33% hp (leaving a Goblin
+@@ -1450,21 +1491,21 @@ private:
+                 .withPeriodicEffect(30, std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats()))
+                 .withDeployAnywhere()
+                 .withSpawnEffect(2.0f, 84)
+-                .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinDrillDeathGoblinStats())),
++                .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinDrillDeathGoblinStats())).withLifetime(100) /* audit 0003: wiki Goblin Drill, level 11 */,
+             building(98, "Goblin Drill", 4.0f, 1313, '7', 0.0f, 0, 100)
+                 .withPeriodicEffect(30, std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats()))
+                 .withDeployAnywhere()
+                 .withSpawnEffect(2.0f, 84)
+                 .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinDrillDeathGoblinStats()
+-                    .withOffsets({ {-0.4f,0.0f},{0.4f,0.0f},{0.0f,0.4f},{0.0f,-0.4f} }))),
++                    .withOffsets({ {-0.4f,0.0f},{0.4f,0.0f},{0.0f,0.4f},{0.0f,-0.4f} }))).withLifetime(100) /* audit 0003: wiki Goblin Drill, level 11 */,
+             2, 1);
+ 
+         // Tesla ("Electro Pulse"): 6-tile radius, low damage and a 0.5 s stun.
+         // There is no hiding to emerge from here, so it fires once on deploy.
+         addEvolution(154,
+-            building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir(),
++            building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir().withLifetime(250) /* audit 0003: wiki Tesla, level 11 */,
+             building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir()
+-                .withSpawnEffect(6.0f, 100, std::make_shared<FreezeOnHit>(5, 0.0f)),
++                .withSpawnEffect(6.0f, 100, std::make_shared<FreezeOnHit>(5, 0.0f)).withLifetime(250) /* audit 0003: wiki Tesla, level 11 */,
+             2, 1);
+ 
+         // Barbarians: the base 716 hp, the Evolution's hp bonus cut to 0% by
+@@ -1478,7 +1519,7 @@ private:
+             troop(8, "Barbarians", 5.0f, Archetype::MeleeSquad, 716, SPEED_MEDIUM, 0.7f, 192, 14, 'B')
+                 .withOffsets({ {0.0f, 0.0f}, {-0.5f, -0.5f}, {0.5f, -0.5f}, {-0.5f, 0.5f}, {0.5f, 0.5f} })
+                 .withSelfHasteOnHit(30, 0.74f),
+-            2, 1);
++            1 /* audit 0003: wiki Evolution, level 11: 1 cycle */, 1);
+ 
+         // Lumberjack: the ghost (lumberjackGhostStats) composed with the Rage
+         // drop.
+@@ -1510,10 +1551,10 @@ private:
+         addEvolution(158,
+             spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+                 .withSpellOnHit(std::make_shared<FreezeOnHit>(15, 0.5f))
+-                .withKnockback(1.0f),
++                .withKnockback(1.0f).withCrownTowerDamage(45) /* audit 0003: wiki Giant Snowball, level 11 */,
+             spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+                 .withSpellOnHit(std::make_shared<FreezeOnHit>(40, 0.7f))
+-                .withKnockback(-4.5f),
++                .withKnockback(-4.5f).withCrownTowerDamage(54) /* audit 0003: wiki Giant Snowball/Evolution, level 11 */,
+             2, 1);
+ 
+         // Goblin Giant ("Sack-trick"): the real knife Goblins every 2.2 s below
+@@ -1525,7 +1566,7 @@ private:
+             troop(88, "Goblin Giant", 6.0f, Archetype::MeleeBuildingTargeter, 3110, SPEED_MEDIUM, 1.2f, 176, 15, '`')
+                 .withSecondaryUnit(goblinGiantSpearGoblinsStats()).withSightRange(7.5f)
+                 .withPeriodicEffect(22, std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats())),
+-            2, 1);
++            1 /* audit 0003: wiki Evolution, level 11: 1 cycle */, 1);
+ 
+         // Mega Knight: identical stats. "Mega Uppercut" (hit targets launched 4
+         // tiles toward the enemy Crown Tower) is not modelled: there is no
+@@ -1535,7 +1576,7 @@ private:
+                 .withSplash(1.5f).withSpawnEffect(1.3f, 430).withJump(3.5f, 5.0f, 2.0f, 2.2f).withIgnoresRiver(),
+             troop(48, "Mega Knight", 7.0f, Archetype::MeleeSquad, 3993, SPEED_MEDIUM, 1.2f, 268, 17, 'X')
+                 .withSplash(1.5f).withSpawnEffect(1.3f, 430).withJump(3.5f, 5.0f, 2.0f, 2.2f).withIgnoresRiver(),
+-            2, 1);
++            1 /* audit 0003: wiki Evolution, level 11: 1 cycle */, 1);
+ 
+         // Battle Ram: the real card's death-spawned Barbarians are themselves
+         // evolved; here they get a flat stat buff (the Evolution machinery is
+@@ -1559,12 +1600,12 @@ private:
+         // for 155% damage on the first attack) is not modelled, and how it
+         // would stack with the charge bonus is unsourced.
+         addEvolution(162,
+-            troop(82, "Royal Hogs", 5.0f, Archetype::MeleeBuildingTargeter, 837, SPEED_VERY_FAST, 1.0f, 74, 12, '_')
++            troop(82, "Royal Hogs", 5.0f, Archetype::MeleeBuildingTargeter, 837, SPEED_VERY_FAST, 0.7f, 74, 12, '_')
+                 .withOffsets({ {-1.0f, -0.3f}, {-0.3f, 0.3f}, {0.3f, -0.3f}, {1.0f, 0.3f} })
+-                .withCharge(3.0f, 2.0f).withSightRange(9.5f).withIgnoresRiver(),
+-            troop(82, "Royal Hogs", 5.0f, Archetype::MeleeBuildingTargeter, 837, SPEED_VERY_FAST, 1.0f, 74, 12, '_')
++                .withCharge(3.0f, 2.0f).withSightRange(9.5f).withIgnoresRiver() /* audit 0003: wiki Royal Hogs, level 11 */,
++            troop(82, "Royal Hogs", 5.0f, Archetype::MeleeBuildingTargeter, 837, SPEED_VERY_FAST, 0.7f, 74, 12, '_')
+                 .withOffsets({ {-1.0f, -0.3f}, {-0.3f, 0.3f}, {0.3f, -0.3f}, {1.0f, 0.3f} })
+-                .withCharge(3.0f, 2.0f).withSightRange(9.5f).withIgnoresRiver(),
++                .withCharge(3.0f, 2.0f).withSightRange(9.5f).withIgnoresRiver() /* audit 0003: wiki Royal Hogs, level 11 */,
+             2, 1);
+ 
+         // Inferno Dragon ("Damage Charge-up"): identical stats to id 56. Losing
+@@ -1573,14 +1614,14 @@ private:
+         // stage after 20 s of continuous attacking deals double the max. The
+         // sources disagree (49 ticks vs 20 s); the seconds figure is used.
+         addEvolution(163,
+-            troop(56, "Inferno Dragon", 4.0f, Archetype::MeleeSquad, 1295, SPEED_MEDIUM, 5.0f, 422, 4, '4')
++            troop(56, "Inferno Dragon", 4.0f, Archetype::MeleeSquad, 1295, SPEED_MEDIUM, 3.5f, 422, 4, '4')
+                 .withFlying().withTargetsAir()
+-                .withDamageRamp(15, 30, 0.083f, 0.284f),
+-            troop(56, "Inferno Dragon", 4.0f, Archetype::MeleeSquad, 1295, SPEED_MEDIUM, 5.0f, 422, 4, '4')
++                .withDamageRamp(15, 30, 0.083f, 0.284f) /* audit 0003: wiki Inferno Dragon, level 11 */,
++            troop(56, "Inferno Dragon", 4.0f, Archetype::MeleeSquad, 1295, SPEED_MEDIUM, 3.5f, 422, 4, '4')
+                 .withFlying().withTargetsAir()
+                 .withDamageRamp(15, 30, 0.083f, 0.284f)
+                 .withRampStage4(200, 2.0f)
+-                .withRampGracePeriod(90),
++                .withRampGracePeriod(90) /* audit 0003: wiki Inferno Dragon, level 11 */,
+             2, 1);
+ 
+         // === Mirror ===
+@@ -1610,7 +1651,13 @@ private:
+         // with a 10 s lifetime (heroMusketeerTurretStats).
+         add(troop(168, "Hero Musketeer", 4.0f, Archetype::RangedSquad, 721, SPEED_MEDIUM, 6.0f, 217, 10, 'U')
+             .withTargetsAir().withSightRange(6.0f)
+-            .withHeroAbility(3.0f, 220, std::make_shared<SpawnOnAbility>(heroMusketeerTurretStats())));
++            // Card-stats audit (patch 0003), wiki Musketeer/Hero, level 11: 3
++            // elixir, single use per deployment (History 4/8/2026; was a 22 s
++            // cooldown), turret placed 3 tiles forward after a 1 s delay with
++            // 204 landing damage. The landing radius is not on the wiki (2.0
++            // assumed); she does not pause during the delay here.
++            .withHeroAbility(3.0f, 0, std::make_shared<SpawnOnAbility>(heroMusketeerTurretStats(),
++                3.0f, 10, 204, 2.0f), 1));
+ 
+         // Hero Goblins (base: id 4). "Banner Brigade" (1 elixir, one use,
+         // within 7 s of the last goblin dying): a fresh squad at the death
+@@ -1633,9 +1680,9 @@ private:
+         // flies for 5 s, each landed attack pulsing a damaging, pulling tornado
+         // on the target (HeroWizardFieryFlightEffect). The 0.5-tile pull
+         // approximates the sourced "~50% pull strength".
+-        add(troop(167, "Hero Wizard", 5.0f, Archetype::RangedSquad, 755, SPEED_MEDIUM, 5.5f, 281, 14, 'W')
++        add(troop(167, "Hero Wizard", 5.0f, Archetype::RangedSquad, 832, SPEED_MEDIUM, 5.5f, 281, 14, 'W')
+             .withTargetsAir().withSplash(1.5f)
+-            .withHeroAbility(1.0f, 200, std::make_shared<HeroWizardFieryFlightEffect>(50, 4.0f, 20, 0.5f)));
++            .withHeroAbility(1.0f, 200, std::make_shared<HeroWizardFieryFlightEffect>(50, 4.0f, 20, 0.5f)) /* audit 0003: wiki Wizard/Hero, level 11 */);
+ 
+         // Hero Giant (base: id 2). "Heroic Hurl" (2 elixir, 14 s cooldown):
+         // throws the highest-HP enemy troop within 3.0 tiles (not sourced) to
+@@ -1656,21 +1703,27 @@ private:
+         // Hero Magic Archer (base: id 63). "Triple Threat" (2 elixir, 25 s
+         // cooldown): dashes back 5 tiles, leaves a decoy, and gains a 7 s
+         // multi-shot window (HeroMagicArcherTripleThreatEffect).
+-        add(troop(171, "Hero Magic Archer", 4.0f, Archetype::RangedSquad, 529, SPEED_MEDIUM, 7.0f, 143, 11, '#')
++        add(troop(171, "Hero Magic Archer", 4.0f, Archetype::RangedSquad, 529, SPEED_MEDIUM, 7.0f, 135, 11, '#')
+             .withTargetsAir()
+             .withSplash(0.25f).withLineSplash(11.0f).withSightRange(7.5f)
+             .withHeroAbility(2.0f, 250, std::make_shared<HeroMagicArcherTripleThreatEffect>(
+-                5.0f, heroMagicArcherDecoyStats(), 70)));
++                5.0f, heroMagicArcherDecoyStats(), 70)) /* audit 0003: wiki Magic Archer/Hero, level 11 */);
+ 
+         // Hero Ice Golem (base: id 40, including the slow on its death
+         // explosion). "Snowstorm" (2 elixir, 17 s cooldown): three staggered
+         // blasts in a 4-tile radius, the third a 1.5 s freeze, with reduced
+         // Crown Tower damage (HeroIceGolemSnowstormEffect). Per-blast damage,
+         // knockback and slow are not sourced.
+-        add(troop(175, "Hero Ice Golem", 2.0f, Archetype::MeleeBuildingTargeter, 1315, SPEED_SLOW, 0.75f, 84, 25, 'c')
++        // Card-stats audit (patch 0003), wiki Ice Golem/Hero, level 11: range
++        // Melee: Medium (1.2), 84 damage / death damage, death slow 30% 2.5 s.
++        // Snowstorm: 2 elixir, 4-tile radius, 3 blasts of 69, each a 30% slow
++        // for 2 s, no pushback (7/4/2026), all three slow and single use
++        // (4/8/2026; was a 17 s cooldown), after a 1 s delay.
++        add(troop(175, "Hero Ice Golem", 2.0f, Archetype::MeleeBuildingTargeter, 1315, SPEED_SLOW, 1.2f, 84, 25, 'c')
+             .withDeathEffect(std::make_shared<AreaDamageOnDeath>(
+-                2.0f, 84, std::make_shared<FreezeOnHit>(30, 0.65f))).withSightRange(7.0f)
+-            .withHeroAbility(2.0f, 170, std::make_shared<HeroIceGolemSnowstormEffect>(4.0f, 80, 1.0f, 20, 0.6f, 15)));
++                2.0f, 84, std::make_shared<FreezeOnHit>(25, 0.70f))).withSightRange(7.0f)
++            .withHeroAbility(2.0f, 0, std::make_shared<HeroIceGolemSnowstormEffect>(4.0f, 69, 0.0f, 20, 0.70f, 0,
++                true, 10), 1));
+ 
+         // Hero Barbarian Barrel (base: id 101). The ability lives on the
+         // spawned Barbarian (heroBarbarianBarrelBarbarianStats), since the
+@@ -1684,7 +1737,7 @@ private:
+                 .withGroundOnly()
+                 .withOwnSideOnly()
+                 .withRollingSweep(4.5f, 2.6f, 0.5f, 0.0f)
+-                .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(heroBarbarianBarrelBarbarianStats()));
++                .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(heroBarbarianBarrelBarbarianStats())).withCrownTowerDamage(116) /* audit 0003: wiki Barbarian Barrel/Hero, level 11 */;
+             heroBarbarianBarrelSpellStats.isHero = true;
+             add(heroBarbarianBarrelSpellStats);
+         }
+diff --git a/include/core/CardStats.h b/include/core/CardStats.h
+index bb2523d..4a1fde9 100644
+--- a/include/core/CardStats.h
++++ b/include/core/CardStats.h
+@@ -139,6 +139,22 @@ struct CardStats {
+     float spawnEffectRadius = 0.0f;
+     int spawnEffectDamage = 0;
+     std::shared_ptr<IOnHitEffect> spawnEffectOnHit;
++    // Card-stats audit (patch 0003): a deploy burst may be several impacts
++    // (Evolved Cannon's barrage). Offsets are relative to the placement point
++    // with +y toward the enemy for team 0 (mirrored for team 1); empty means
++    // one impact at the placement point. Knockback and Crown Tower damage are
++    // the AreaSpell fields of the same name (-1 = full damage).
++    std::vector<Vector2D> spawnEffectOffsets;
++    float spawnEffectKnockback = 0.0f;
++    int spawnEffectCrownTowerDamage = -1;
++
++    // Card-stats audit (patch 0003): DefensiveBuilding lifetime in ticks
++    // (Building's decay clock). 300 = the 30 s the engine used for every
++    // building before; set per card from the wiki's Lifetime attribute.
++    int lifetimeTicks = 300;
++    // Card-stats audit (patch 0003): on-hit effects (freeze) also land on
++    // splash victims. Ice Spirit only.
++    bool splashAppliesOnHit = false;
+ 
+     // Fired once when a unit of this card dies (e.g. Golem's Golemites).
+     // Concrete effects live in core/.
+@@ -387,6 +403,21 @@ struct CardStats {
+         spawnEffectOnHit = std::move(effect);
+         return *this;
+     }
++    // A multi-impact deploy burst (see spawnEffectOffsets).
++    CardStats& withSpawnBarrage(std::vector<Vector2D> offsets, float knockback, int crownTowerDamage) {
++        spawnEffectOffsets = std::move(offsets);
++        spawnEffectKnockback = knockback;
++        spawnEffectCrownTowerDamage = crownTowerDamage;
++        return *this;
++    }
++    CardStats& withSplashOnHit(bool value = true) {
++        splashAppliesOnHit = value;
++        return *this;
++    }
++    CardStats& withLifetime(int ticks) {
++        lifetimeTicks = ticks;
++        return *this;
++    }
+     CardStats& withDeathEffect(std::shared_ptr<IDeathEffect> effect) {
+         deathEffect = std::move(effect);
+         return *this;
+diff --git a/include/core/DelayedAreaDamageOnDeath.h b/include/core/DelayedAreaDamageOnDeath.h
+index f2b5dcd..32542da 100644
+--- a/include/core/DelayedAreaDamageOnDeath.h
++++ b/include/core/DelayedAreaDamageOnDeath.h
+@@ -29,6 +29,10 @@ public:
+             std::string bombName, bool groundOnly = false)
+         : radius(radius), damage(damage), fuseTicks(fuseTicks), knockback(knockback),
+           sourceCardId(sourceCardId), bombName(std::move(bombName)), groundOnly(groundOnly) {}
++    // Read-only, for get_card_stats (card-stats audit, patch 0003).
++    float getRadius() const { return radius; }
++    int getDamage() const { return damage; }
++    int getFuseTicks() const { return fuseTicks; }
+ 
+     void apply(Board& board, const Vector2D& position, int team) const override {
+         auto bomb = std::make_shared<AreaSpell>(board.allocateId(), position.x, position.y, team, radius, damage,
+diff --git a/include/core/HeroIceGolemSnowstormEffect.h b/include/core/HeroIceGolemSnowstormEffect.h
+index 7998830..c33f24a 100644
+--- a/include/core/HeroIceGolemSnowstormEffect.h
++++ b/include/core/HeroIceGolemSnowstormEffect.h
+@@ -15,23 +15,31 @@ class HeroIceGolemSnowstormEffect : public IAbilityEffect {
+     int slowTicks;
+     float slowFactor;
+     int freezeTicks;
++    // Card-stats audit (patch 0003): since 4/8/2026 the third blast slows
++    // like the others instead of freezing (finalBlastSlows), and the blasts
++    // start after the ability's 1 s delay (startDelayTicks). Defaults keep the
++    // old behaviour.
++    bool finalBlastSlows;
++    int startDelayTicks;
+ 
+ public:
+     HeroIceGolemSnowstormEffect(float radius, int blastDamage, float knockback,
+-            int slowTicks, float slowFactor, int freezeTicks)
++            int slowTicks, float slowFactor, int freezeTicks,
++            bool finalBlastSlows = false, int startDelayTicks = 0)
+         : radius(radius), blastDamage(blastDamage), knockback(knockback),
+-          slowTicks(slowTicks), slowFactor(slowFactor), freezeTicks(freezeTicks) {}
++          slowTicks(slowTicks), slowFactor(slowFactor), freezeTicks(freezeTicks),
++          finalBlastSlows(finalBlastSlows), startDelayTicks(startDelayTicks) {}
+ 
+     void apply(Board& board, CombatEntity& self) const override {
+         const int STAGE_GAP_TICKS = 5;
+         for (int stage = 0; stage < 3; ++stage) {
+-            bool isFinalBlast = (stage == 2);
++            bool isFinalBlast = (stage == 2) && !finalBlastSlows;
+             auto onHit = isFinalBlast
+                 ? std::make_shared<FreezeOnHit>(freezeTicks, 0.0f)
+                 : std::make_shared<FreezeOnHit>(slowTicks, slowFactor);
+             auto blast = std::make_shared<AreaSpell>(
+                 board.allocateId(), self.position.x, self.position.y, self.team,
+-                radius, blastDamage, stage * STAGE_GAP_TICKS, /*symbol=*/'*', onHit,
++                radius, blastDamage, startDelayTicks + stage * STAGE_GAP_TICKS, /*symbol=*/'*', onHit,
+                 /*groundOnly=*/false, /*remainingHits=*/1, /*tickInterval=*/0,
+                 /*buffsAllies=*/false, /*buffMultiplier=*/1.0f, /*buffDurationTicks=*/0,
+                 /*knockback=*/isFinalBlast ? 0.0f : knockback, /*spawnOnDetonate=*/nullptr,
+diff --git a/include/core/SpawnOnAbility.h b/include/core/SpawnOnAbility.h
+index 19396b8..3196cf8 100644
+--- a/include/core/SpawnOnAbility.h
++++ b/include/core/SpawnOnAbility.h
+@@ -3,17 +3,55 @@
+ #include "CombatEntity.h"
+ #include "CardStats.h"
+ #include "CardFactories.h"
++#include "PeriodicSpawnEffect.h"
++#include "AreaSpell.h"
++#include "ArenaLayout.h"
+ #include "Board.h"
++#include <algorithm>
++#include <memory>
+ 
+ // A summon ability (Little Prince's Royal Rescue): spawns a fixed troop at the
+ // Champion's position.
++//
++// Card-stats audit (patch 0003): optionally `forwardTiles` ahead of the caster
++// (toward the enemy), after `delayTicks`, with a landing burst of
++// `landingDamage` in `landingRadius` (Hero Musketeer's Trusty Turret). The
++// delayed form is an AreaSpell whose detonation spawns the child, the same
++// path Royal Delivery uses. All defaults reproduce the original behaviour.
+ class SpawnOnAbility : public IAbilityEffect {
+     CardStats childStats;
++    float forwardTiles;
++    int delayTicks;
++    int landingDamage;
++    float landingRadius;
+ 
+ public:
+-    explicit SpawnOnAbility(CardStats childStats) : childStats(std::move(childStats)) {}
++    explicit SpawnOnAbility(CardStats childStats, float forwardTiles = 0.0f, int delayTicks = 0,
++            int landingDamage = 0, float landingRadius = 0.0f)
++        : childStats(std::move(childStats)), forwardTiles(forwardTiles), delayTicks(delayTicks),
++          landingDamage(landingDamage), landingRadius(landingRadius) {}
++
++    const CardStats& child() const { return childStats; }
++    float getForwardTiles() const { return forwardTiles; }
++    int getDelayTicks() const { return delayTicks; }
++    int getLandingDamage() const { return landingDamage; }
++    float getLandingRadius() const { return landingRadius; }
+ 
+     void apply(Board& board, CombatEntity& self) const override {
+-        CardFactories::spawn(childStats, self.position.x, self.position.y, self.team, board);
++        const float x = self.position.x;
++        float y = self.position.y + ((self.team == 0) ? forwardTiles : -forwardTiles);
++        y = std::clamp(y, 0.0f, static_cast<float>(ArenaLayout::HEIGHT - 1));
++        if (delayTicks <= 0 && landingDamage <= 0) {
++            CardFactories::spawn(childStats, x, y, self.team, board);
++            return;
++        }
++        // AreaSpell detonates on the update after its delay reaches 0.
++        auto drop = std::make_shared<AreaSpell>(board.allocateId(), x, y, self.team,
++            std::max(landingRadius, 0.01f), landingDamage, std::max(delayTicks - 1, 0), childStats.symbol,
++            nullptr, false, 1, 0, false, 1.0f, 0, 0.0f,
++            std::make_shared<PeriodicSpawnEffect>(childStats));
++        drop->name = childStats.name;
++        drop->cardId = self.cardId;
++        board.addEntity(drop);
+     }
+ };
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index 847b3fb..eabc072 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -24,7 +24,8 @@ inline void applyAreaHeal(Board& board, const Vector2D& origin, float radius, in
+ // hitsAir false: a ground-only attacker's splash skips flying units (the Bomb
+ // Tower's bombs; Building::performAttack passes its own targetsAir).
+ inline void applySplashDamage(Board& board, const Vector2D& origin, float radius, int excludeId,
+-    int attackerId, int attackerTeam, int attackerCardId, int dealt, bool hitsAir = true);
++    int attackerId, int attackerTeam, int attackerCardId, int dealt, bool hitsAir = true,
++    const std::vector<std::shared_ptr<IOnHitEffect>>* splashOnHit = nullptr);
+ // Declared early for Evolved Valkyrie's on-hit pull in update().
+ inline void applyPullNearby(Board& board, const Vector2D& origin, float radius, float distance,
+     int excludeId, int attackerTeam);
+@@ -153,6 +154,9 @@ public:
+     // air alike, regardless of targetsAir. A free function (applySplashDamage)
+     // because Projectile needs it too.
+     float splashRadius = 0.0f;
++    // Card-stats audit (patch 0003): on-hit effects also land on splash
++    // victims (Ice Spirit). CardStats::splashAppliesOnHit.
++    bool splashAppliesOnHit = false;
+ 
+     // Shield (Guards, Royal Recruits, Dark Prince, Cannon Cart): a second hp
+     // pool that absorbs damage from any source first. Does not regenerate.
+@@ -1064,7 +1068,8 @@ protected:
+ // with its own DamageDealtEvent. A free function because Projectile, not a
+ // CombatEntity, needs it too. No-op for radius <= 0.
+ inline void applySplashDamage(Board& board, const Vector2D& origin, float radius, int excludeId,
+-        int attackerId, int attackerTeam, int attackerCardId, int dealt, bool hitsAir) {
++        int attackerId, int attackerTeam, int attackerCardId, int dealt, bool hitsAir,
++        const std::vector<std::shared_ptr<IOnHitEffect>>* splashOnHit) {
+     if (radius <= 0.0f) return;
+     for (const auto& entity : board.getEntities()) {
+         if (entity->id == excludeId) continue; // already hit as the primary target
+@@ -1074,6 +1079,13 @@ inline void applySplashDamage(Board& board, const Vector2D& origin, float radius
+         entity->takeDamage(dealt);
+         board.statsEvents.notifyDamageDealt(
+             { attackerId, attackerTeam, attackerCardId, entity->id, entity->cardId, entity->team, dealt, board.currentTick, entity->isTower() });
++        // Card-stats audit (patch 0003): Ice Spirit's freeze lands on
++        // everything its splash hits, not just the primary target.
++        if (splashOnHit && !splashOnHit->empty()) {
++            if (auto c = std::dynamic_pointer_cast<CombatEntity>(entity)) {
++                for (const auto& e : *splashOnHit) e->apply(c);
++            }
++        }
+     }
+ }
+ 
+diff --git a/include/entities/FreezeOnHit.h b/include/entities/FreezeOnHit.h
+index 5ee9cee..578f810 100644
+--- a/include/entities/FreezeOnHit.h
++++ b/include/entities/FreezeOnHit.h
+@@ -10,6 +10,9 @@ class FreezeOnHit : public IOnHitEffect {
+ 
+ public:
+     FreezeOnHit(int ticks, float slowFactor) : ticks(ticks), slowFactor(slowFactor) {}
++    // Read-only, for get_card_stats (card-stats audit, patch 0003).
++    int getTicks() const { return ticks; }
++    float getSlowFactor() const { return slowFactor; }
+ 
+     void apply(std::shared_ptr<CombatEntity> target) const override {
+         target->applyFreeze(ticks, slowFactor);
+diff --git a/include/entities/Projectile.h b/include/entities/Projectile.h
+index 87a722c..1bcf7f1 100644
+--- a/include/entities/Projectile.h
++++ b/include/entities/Projectile.h
+@@ -41,17 +41,20 @@ private:
+     bool returnsToSender;
+     int returnDelayTicks;
+     bool outboundHitLanded = false;
++    // Card-stats audit (patch 0003): see CombatEntity::splashAppliesOnHit.
++    bool splashAppliesOnHit = false;
+ 
+ public:
+     Projectile(int id, float x, float y, int team, std::weak_ptr<Entity> target, float speed, int damage,
+         std::vector<std::shared_ptr<IOnHitEffect>> onHitEffects = {},
+         bool returnsToSender = false, int returnDelayTicks = 0,
+         int attackerId = -1, int attackerCardId = -1, float splashRadius = 0.0f,
+-        bool lineSplash = false, float lineSplashRange = 0.0f)
++        bool lineSplash = false, float lineSplashRange = 0.0f, bool splashAppliesOnHit = false)
+         : Entity(id, x, y, 1, team, '-'), target(target), speed(speed), damage(damage),
+         onHitEffects(std::move(onHitEffects)), attackerId(attackerId), attackerCardId(attackerCardId),
+         splashRadius(splashRadius), lineSplash(lineSplash), lineSplashRange(lineSplashRange), origin{ x, y },
+-        returnsToSender(returnsToSender), returnDelayTicks(returnDelayTicks) {}
++        returnsToSender(returnsToSender), returnDelayTicks(returnDelayTicks),
++        splashAppliesOnHit(splashAppliesOnHit) {}
+ 
+     bool isTargetable() const override { return false; }
+ 
+@@ -131,7 +134,8 @@ private:
+             applyLineSplashDamage(board, origin, t->position, lineSplashRange, splashRadius,
+                 t->id, attackerId, team, attackerCardId, damage);
+         } else {
+-            applySplashDamage(board, t->position, splashRadius, t->id, attackerId, team, attackerCardId, damage);
++            applySplashDamage(board, t->position, splashRadius, t->id, attackerId, team, attackerCardId, damage,
++                true, splashAppliesOnHit ? &onHitEffects : nullptr);
+         }
+     }
+ };
+diff --git a/include/entities/RangedTroop.h b/include/entities/RangedTroop.h
+index 0defc23..7a59dad 100644
+--- a/include/entities/RangedTroop.h
++++ b/include/entities/RangedTroop.h
+@@ -29,7 +29,8 @@ protected:
+         // On-hit effects travel with the shot and land when it does.
+         auto arrow = std::make_shared<Projectile>(
+             board.allocateId(), position.x, position.y, team, target, 1.5f, getCurrentDamage(), onHitEffects,
+-            boomerang, boomerangReturnDelayTicks, id, cardId, splashRadius, lineSplash, lineSplashRange);
++            boomerang, boomerangReturnDelayTicks, id, cardId, splashRadius, lineSplash, lineSplashRange,
++            splashAppliesOnHit);
+         board.addEntity(arrow);
+     }
+ };
+\ No newline at end of file
+diff --git a/python_ai/tests/test_damage_spell_is_deck_derived.py b/python_ai/tests/test_damage_spell_is_deck_derived.py
+index 336edba..e8a9aeb 100644
+--- a/python_ai/tests/test_damage_spell_is_deck_derived.py
++++ b/python_ai/tests/test_damage_spell_is_deck_derived.py
+@@ -92,7 +92,8 @@ def test_a_damage_over_time_spell_is_read_to_completion():
+     Curse (43 x 6 = 258) is a second, independent control.
+     """
+     assert card_probes.spell_effect(POISON)[1] == pytest.approx(92 * 8)
+-    assert card_probes.spell_effect(GOBLIN_CURSE)[1] == pytest.approx(43 * 6)
++    # 35 a pulse since patch 0003 (wiki Goblin Curse, level 11); was 43.
++    assert card_probes.spell_effect(GOBLIN_CURSE)[1] == pytest.approx(35 * 6)
+ 
+ 
+ def test_reading_longer_adds_nothing_for_any_damaging_spell():
+@@ -127,15 +128,19 @@ def _lethal_stats(tower_hp, *, damage, cost, elixir=10.0):
+ 
+ 
+ def test_the_lethal_window_is_the_decks_spell_damage():
+-    """A tower on 900 HP is lethal to a Rocket and not to a Fireball."""
++    """A tower on 300 HP is lethal to a Rocket and not to a Fireball.
++
++    300, not 900: since patch 0003 the probe reads Crown Tower damage, Fireball
++    159 and Rocket 371 (wiki, level 11); before, towers took the full damage.
++    """
+     _, fb_dmg, fb_cost = card_probes.damage_spell(HOG_26)
+     _, rk_dmg, rk_cost = card_probes.damage_spell(ROCKET_26)
+-    assert fb_dmg < 900.0 < rk_dmg, "fixture no longer straddles the two spells"
++    assert fb_dmg < 300.0 < rk_dmg, "fixture no longer straddles the two spells"
+ 
+     fireball = shaping.lethal_spell_potential(
+-        _lethal_stats(900.0, damage=fb_dmg, cost=fb_cost))
++        _lethal_stats(300.0, damage=fb_dmg, cost=fb_cost))
+     rocket = shaping.lethal_spell_potential(
+-        _lethal_stats(900.0, damage=rk_dmg, cost=rk_cost))
++        _lethal_stats(300.0, damage=rk_dmg, cost=rk_cost))
+     assert float(fireball[0]) == 0.0
+     assert float(rocket[0]) == pytest.approx(W.W_LETHAL_SPELL)
+ 
+@@ -229,7 +234,10 @@ def test_the_26_deck_resolves_to_exactly_the_constants_it_used_to_hardcode():
+     """
+     cid, damage, cost = card_probes.damage_spell(HOG_26)
+     assert cid == W.FIREBALL_CARD_ID
+-    assert damage == W.FIREBALL_DAMAGE == 689.0
++    # The probe measures the TOWER: 159 Crown Tower damage since patch 0003
++    # (wiki Fireball, level 11). The troop figure is unchanged.
++    assert damage == 159.0
++    assert W.FIREBALL_DAMAGE == 689.0
+     assert cost == W.FIREBALL_COST == 4.0   # the retired SPELL_SOLVENCY_RESERVE
+ 
+ 
+diff --git a/python_ai/tests/test_deck_contract.py b/python_ai/tests/test_deck_contract.py
+index a80bf13..1d6a3be 100644
+--- a/python_ai/tests/test_deck_contract.py
++++ b/python_ai/tests/test_deck_contract.py
+@@ -48,7 +48,9 @@ def test_a_deck_without_fireball_keys_the_spell_terms_to_its_own_spell():
+     assert spell_lines, text(report)
+     lvl, msg = spell_lines[0]
+     assert lvl == "INFO" and "Lightning" in msg, msg
+-    assert "1057" in msg and "6 elixir" in msg, msg
++    # 286 is Lightning's Crown Tower damage (card-stats audit, patch 0003:
++    # wiki Lightning, level 11); before the patch towers took the full 1057.
++    assert "286" in msg and "6 elixir" in msg, msg
+ 
+ 
+ def test_a_deck_with_no_damaging_spell_warns_that_the_spell_terms_are_off():
+diff --git a/python_ai/tests/test_teacher_wincon_resolver.py b/python_ai/tests/test_teacher_wincon_resolver.py
+index 8b91870..b87d0a0 100644
+--- a/python_ai/tests/test_teacher_wincon_resolver.py
++++ b/python_ai/tests/test_teacher_wincon_resolver.py
+@@ -112,7 +112,9 @@ def test_a_goblin_drill_is_measured_and_played_beside_the_enemy_tower():
+     import numpy as np
+     from python_ai import engine_constants as EC
+     assert teacher._wincon_eligible(GOBLIN_DRILL, False)
+-    assert teacher.wincon_damage_per_elixir(GOBLIN_DRILL) * 4.0 > 2000.0
++    # 1000, not 2000: the Drill lives 10 s since patch 0003 (wiki Goblin
++    # Drill, level 11), not the old 30 s default; it still measures ~1600.
++    assert teacher.wincon_damage_per_elixir(GOBLIN_DRILL) * 4.0 > 1000.0
+     deck = [GOBLIN_DRILL, 3, 29, 0, 1, 24, 41, 25]
+     t = teacher.UtilityTeacher(deck, team=0)
+     env = E.ClashRoyaleEnv(deck, deck, 3600)
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index ca36f19..426c7e7 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -3,9 +3,153 @@
+ #include <optional>
+ #include "ArenaLayout.h"
+ #include "ClashEnv.h"
++#include "SpawnOnAbility.h"
++#include "CappedSpawnOnHitEffect.h"
++#include "AreaDamageOnDeath.h"
++#include "DelayedAreaDamageOnDeath.h"
++#include "FreezeOnHit.h"
++#include <algorithm>
+ 
+ namespace py = pybind11;
+ 
++
++// --- get_card_stats (card-stats audit, patch 0003) ---
++// The CardStats a registered card spawns with, in engine units, for comparing
++// against the wiki. Read-only. Effect objects are described where their type
++// is known (dynamic_cast); unknown effects appear by presence only.
++namespace {
++
++const char* archetypeName(Archetype a) {
++    switch (a) {
++        case Archetype::MeleeSquad: return "MeleeSquad";
++        case Archetype::RangedSquad: return "RangedSquad";
++        case Archetype::MeleeBuildingTargeter: return "MeleeBuildingTargeter";
++        case Archetype::RangedBuildingTargeter: return "RangedBuildingTargeter";
++        case Archetype::DefensiveBuilding: return "DefensiveBuilding";
++        case Archetype::Spell: return "Spell";
++    }
++    return "?";
++}
++
++py::object onHitDict(const std::shared_ptr<IOnHitEffect>& e) {
++    if (!e) return py::none();
++    py::dict d;
++    if (auto f = std::dynamic_pointer_cast<FreezeOnHit>(e)) {
++        d["type"] = "freeze";
++        d["ticks"] = f->getTicks();
++        d["slow_factor"] = f->getSlowFactor();
++    } else {
++        d["type"] = "other";
++    }
++    return d;
++}
++
++py::dict statsDict(const CardStats& s, int depth = 0) {
++    constexpr float TICKS_PER_SECOND = 10.0f;
++    py::dict d;
++    d["id"] = s.id;
++    d["name"] = s.name;
++    d["cost"] = s.cost;
++    d["archetype"] = archetypeName(s.archetype);
++    d["hp"] = s.hp;
++    d["damage"] = s.damage;
++    d["attack_cooldown_ticks"] = s.attackCooldown;
++    d["hit_speed_s"] = s.attackCooldown / TICKS_PER_SECOND;
++    d["first_hit_ticks"] = s.initialCooldownTicks;   // 0 = no seeded first-hit delay
++    d["speed_tiles_per_tick"] = s.speed;
++    d["speed_engine_tiles_per_s"] = s.speed * TICKS_PER_SECOND;
++    // Inverse of troop()'s MOVEMENT_SPEED_SCALE and the SPEED_* tier factor:
++    // the wiki's "Medium (60)" number.
++    d["speed_wiki_tiles_per_min"] = s.speed / (MOVEMENT_SPEED_SCALE * REAL_TILES_PER_MIN_TO_ENGINE);
++    d["attack_range"] = s.attackRange;
++    d["min_attack_range"] = s.minAttackRange;
++    d["sight_range"] = s.sightRange;
++    d["deploy_ticks"] = s.deployTicks;
++    d["count"] = static_cast<int>(s.spawnOffsets.size());
++    py::list offs;
++    for (const auto& o : s.spawnOffsets) offs.append(py::make_tuple(o.x, o.y));
++    d["spawn_offsets"] = offs;
++    d["is_flying"] = s.isFlying;
++    d["targets_air"] = s.targetsAir;
++    d["ground_only_spell"] = s.spellGroundOnly;
++    d["splash_radius"] = s.splashRadius;
++    d["shield_hp"] = s.shieldHp;
++    d["charge_threshold"] = s.chargeThreshold;
++    d["charge_multiplier"] = s.chargeMultiplier;
++    d["die_after_first_hit"] = s.dieAfterFirstHit;
++    d["on_hit"] = onHitDict(s.onHit);
++    d["lifetime_ticks"] = (s.archetype == Archetype::DefensiveBuilding) ? s.lifetimeTicks : 0;
++    d["transform_at_hp_fraction"] = s.transformAtHpFraction;
++    d["transform_lifetime_ticks"] = s.transformLifetimeTicks;
++    // Spells.
++    d["spell_radius"] = s.spellRadius;
++    d["spell_delay_ticks"] = s.spellDelayTicks;
++    d["spell_hits"] = s.spellRemainingHits;
++    d["spell_tick_interval"] = s.spellTickInterval;
++    d["spell_knockback"] = s.spellKnockback;
++    d["spell_crown_tower_damage"] = s.spellCrownTowerDamage;   // -1 = full damage
++    d["spell_on_hit"] = onHitDict(s.spellOnHit);
++    d["roll_range"] = s.spellRollRange;
++    d["roll_width"] = s.spellRollWidth;
++    d["roll_speed"] = s.spellRollSpeed;
++    d["roll_knockback"] = s.spellRollKnockback;
++    // Deploy burst.
++    d["spawn_effect_radius"] = s.spawnEffectRadius;
++    d["spawn_effect_damage"] = s.spawnEffectDamage;
++    d["spawn_effect_count"] = s.spawnEffectRadius > 0.0f
++        ? static_cast<int>(std::max<size_t>(1, s.spawnEffectOffsets.size())) : 0;
++    d["spawn_effect_knockback"] = s.spawnEffectKnockback;
++    d["spawn_effect_crown_tower_damage"] = s.spawnEffectCrownTowerDamage;
++    // Death effect.
++    py::object death = py::none();
++    if (auto a = std::dynamic_pointer_cast<AreaDamageOnDeath>(s.deathEffect)) {
++        py::dict dd; dd["type"] = "area_damage"; dd["radius"] = a->getRadius(); dd["damage"] = a->getDamage();
++        dd["on_hit"] = onHitDict(a->getOnHit());
++        death = dd;
++    } else if (auto b = std::dynamic_pointer_cast<DelayedAreaDamageOnDeath>(s.deathEffect)) {
++        py::dict dd; dd["type"] = "delayed_area_damage"; dd["radius"] = b->getRadius();
++        dd["damage"] = b->getDamage(); dd["fuse_ticks"] = b->getFuseTicks();
++        death = dd;
++    } else if (s.deathEffect) {
++        py::dict dd; dd["type"] = "other"; death = dd;
++    }
++    d["death_effect"] = death;
++    // On-hit spawn (Evolved Skeletons).
++    py::object ohs = py::none();
++    if (auto c = std::dynamic_pointer_cast<CappedSpawnOnHitEffect>(s.onHitSpawnEffect)) {
++        py::dict dd; dd["type"] = "capped_spawn"; dd["max_alive"] = c->getMaxAlive();
++        if (depth < 2) dd["child"] = statsDict(c->child(), depth + 1);
++        ohs = dd;
++    } else if (s.onHitSpawnEffect) {
++        py::dict dd; dd["type"] = "other"; ohs = dd;
++    }
++    d["on_hit_spawn"] = ohs;
++    d["secondary_unit"] = (s.secondaryUnit && depth < 2) ? py::object(statsDict(*s.secondaryUnit, depth + 1)) : py::none();
++    // Champion / Hero ability.
++    d["is_champion"] = s.isChampion;
++    d["is_hero"] = s.isHero;
++    d["ability_cost"] = s.abilityElixirCost;
++    d["ability_cooldown_ticks"] = s.abilityCooldownTicks;
++    d["ability_uses_limit"] = s.abilityUsesLimit;   // -1 = unlimited
++    d["initial_ability_cooldown_ticks"] = s.initialAbilityCooldownTicks;
++    py::object ability = py::none();
++    if (auto sp = std::dynamic_pointer_cast<SpawnOnAbility>(s.abilityEffect)) {
++        py::dict dd; dd["type"] = "spawn";
++        dd["forward_tiles"] = sp->getForwardTiles();
++        dd["delay_ticks"] = sp->getDelayTicks();
++        dd["landing_damage"] = sp->getLandingDamage();
++        dd["landing_radius"] = sp->getLandingRadius();
++        if (depth < 2) dd["child"] = statsDict(sp->child(), depth + 1);
++        ability = dd;
++    } else if (s.abilityEffect) {
++        py::dict dd; dd["type"] = "other"; ability = dd;
++    }
++    d["ability_effect"] = ability;
++    return d;
++}
++
++} // namespace
++
+ PYBIND11_MODULE(clash_royale_env, m) {
+     m.doc() = "Clash Royale RL Environment with Pybind11";
+ 
+@@ -233,6 +377,35 @@ PYBIND11_MODULE(clash_royale_env, m) {
+         "Registry facts for one card id: name, cost, is_spell, is_building, "
+         "placement_radius, deploy_anywhere, is_champion, is_hero.");
+ 
++    // Card-stats audit (patch 0003): the full CardStats behind a card id.
++    // {"base": stats, "evolved": stats | None, "evolution_cycle_threshold",
++    //  "evolved_uses", "units": {...}}. Units: ticks (10/s), tiles; speeds in
++    // engine tiles/tick plus the wiki tier number they came from.
++    m.def("get_card_stats", [](int cardId) {
++        const CardDefinition* def = CardRegistry::getInstance().getCard(cardId);
++        if (!def || !def->stats) {
++            throw std::invalid_argument("get_card_stats: unknown card id " + std::to_string(cardId));
++        }
++        py::dict out;
++        out["id"] = def->id;
++        out["name"] = def->name;
++        out["is_evolution"] = def->isEvolution;
++        out["base"] = statsDict(*def->stats);
++        out["evolved"] = def->evolvedStats ? py::object(statsDict(*def->evolvedStats)) : py::none();
++        out["evolution_cycle_threshold"] = def->evolutionCycleThreshold;
++        out["evolved_uses"] = def->evolvedUsesGranted;
++        py::dict units;
++        units["ticks_per_second"] = 10;
++        units["distance"] = "tiles (ranges, radii, offsets); arena 18 x 34";
++        units["movement_speed_scale"] = MOVEMENT_SPEED_SCALE;
++        units["real_tiles_per_min_to_engine"] = REAL_TILES_PER_MIN_TO_ENGINE;
++        units["speed_tiers_wiki"] = py::make_tuple(30, 45, 60, 90, 120);
++        units["default_deploy_ticks"] = DEPLOY_TIME_TICKS;
++        out["units"] = units;
++        return out;
++    }, py::arg("card_id"),
++        "Engine CardStats for one card id (base, evolved form, hero ability child), in engine units.");
++
+     // The slot-legality check GameManager::reset and setOpponentDeck enforce,
+     // so Python validates decks without restating the rules. "" for a legal
+     // deck, else the reason.

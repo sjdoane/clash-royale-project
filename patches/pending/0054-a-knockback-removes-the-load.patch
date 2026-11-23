@@ -1,0 +1,137 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 51d755c..0180760 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1234,6 +1234,37 @@ the three spell distances through `get_card_stats`),
+ `python_ai/tests/test_knockback_resets_charge.py` (a Fireball no longer costs a
+ Prince his charge; a Giant Snowball costs a Battle Ram its charge).
+ 
++## 2026-11-22: a knockback removes the load (patch 0054)
++
++**GAMEPLAY-AFFECTING.** EVIDENCE LEVEL: one description, not a published
++field. RoyaleAPI's "The Secret Stats" (2020) explains load time with the
++Balloon (then 3.0 s hit time, 2.8 s load): a Fireball that displaces a loaded
++Balloon before its first bomb removes the load, which restarts the countdown
++to the full hit time. The article could not be fetched (403); the passage is
++known from two independent search summaries that agree, not from a verbatim
++quote. If that is not enough, drop this patch: nothing after it depends on it.
++
++`CombatEntity::onKnockedBack` (called by `pushAway` and `pushAlong` after they
++have moved a unit) now also sets the cooldown to a whole hit speed. The engine
++keeps one timer for "time since the last hit" and "load", so removing the load
++is the same as starting the hit speed again; it runs down while the unit walks
++back, as the load does in the game.
++
++Scope chosen: every unit an ordinary knockback can move. A unit published with
++IgnorePushback keeps its load even when The Log (PushbackAll) moves it: the
++description covers no such case and The Log is not known to reset Sparky.
++Pulls (Tornado) do not call `onKnockedBack` and are unchanged.
++
++What it changes in play: The Log, Fireball, Rocket and Giant Snowball cost
++every unit they move its next hit's timing (a Hog Rider logged at the tower, a
++Musketeer hit by a Fireball), not only the distance.
++
++Tests: `tests/core/test_card_registry.cpp` `[patch0054]` (a Knight nudged 0.3 s
++before his hit lands it 1.2 s later; a P.E.K.K.A. is not moved by an ordinary
++knockback, is moved by a PushbackAll and hits on time),
++`tests/entities/test_combat_entity.cpp` (the two knockback-charge sections now
++wait the hit speed for the plain hit).
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index 968166d..2a666c9 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -228,7 +228,17 @@ public:
+     // engine are kept: a charge that has stuck (Evolved Battle Ram) stays,
+     // and a dash that is past the point of immunity (Bandit) is not stopped
+     // by a spell that could not hurt it.
++    //
++    // A knockback also removes the unit's load (patch 0054): its next hit is a
++    // whole hit speed away, as after a hit. RoyaleAPI, "The Secret Stats"
++    // (2020), on a Balloon about to drop its first bomb: a Fireball that
++    // displaces it removes the load, which restarts the countdown to the full
++    // hit time. Applied to every unit an ordinary knockback can move. A unit
++    // published with IgnorePushback keeps its load even when a PushbackAll
++    // (The Log) moves it: the description covers no such case, and The Log is
++    // not known to reset Sparky.
+     void onKnockedBack() override {
++        if (!pushbackImmune && attackCooldown > 0) currentCooldown = static_cast<float>(attackCooldown);
+         if (chargeThreshold <= 0.0f || chargeHasStuck) return;
+         if (chargeGrantsInvulnerability && chargeProgress >= chargeThreshold * 0.5f) return;
+         chargeProgress = 0.0f;
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index dccca42..9f7a84f 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -2286,6 +2286,44 @@ TEST_CASE("Knockback immunity: the published units, their Evolutions and Heroes,
+     }
+ }
+ 
++TEST_CASE("A knockback removes the load: the next hit is a whole hit speed away",
++          "[card_registry][knockback][load_time][patch0054]") {
++    // Knight: hit speed 1.2 s, first hit 0.5 s.
++    Board board;
++    auto dummy = std::make_shared<DummyEntity>(901, 5.0f, 5.6f, 100000, 1);
++    spawn(board, dummy);
++    CardRegistry::getInstance().getCard(0)->spawnEntity(5.0f, 5.0f, 0, board);
++    board.commitPendingEntities();
++    auto knight = std::dynamic_pointer_cast<CombatEntity>(board.getEntities().back());
++    advancePastDeploy(knight, board);
++    REQUIRE(updatesUntilHit(knight, dummy, board) == 6);
++    for (int i = 0; i < 9; ++i) knight->update(board);   // 0.3 s of the cycle left
++    // A nudge that leaves the target in reach, so only the load is at stake.
++    pushAway(*knight, Vector2D{ 5.0f, 5.6f }, 0.1f);
++    REQUIRE(updatesUntilHit(knight, dummy, board) == 12);  // not 3
++    REQUIRE(updatesUntilHit(knight, dummy, board) == 12);
++}
++
++TEST_CASE("A unit that ignores pushback keeps its load, whatever moves it",
++          "[card_registry][knockback][load_time][patch0054]") {
++    // P.E.K.K.A.: hit speed 1.8 s, published IgnorePushback.
++    Board board;
++    auto dummy = std::make_shared<DummyEntity>(901, 5.0f, 5.6f, 100000, 1);
++    spawn(board, dummy);
++    CardRegistry::getInstance().getCard(13)->spawnEntity(5.0f, 5.0f, 0, board);
++    board.commitPendingEntities();
++    auto pekka = std::dynamic_pointer_cast<CombatEntity>(board.getEntities().back());
++    advancePastDeploy(pekka, board);
++    REQUIRE(updatesUntilHit(pekka, dummy, board) > 0);
++    for (int i = 0; i < 15; ++i) pekka->update(board);   // 0.3 s of the cycle left
++    const Vector2D before = pekka->position;
++    pushAway(*pekka, Vector2D{ 5.0f, 5.6f }, 0.1f);       // an ordinary knockback: not moved
++    REQUIRE(pekka->position.distanceTo(before) == Catch::Approx(0.0f).margin(1e-6));
++    pushAlong(*pekka, 0.0f, -1.0f, 0.1f);                 // a PushbackAll: moved
++    REQUIRE(pekka->position.distanceTo(before) == Catch::Approx(0.1f).margin(1e-4));
++    REQUIRE(updatesUntilHit(pekka, dummy, board) == 3);
++}
++
+ TEST_CASE("Switching between targets in range keeps the hit-speed rhythm; a new engagement winds up again",
+           "[card_registry][load_time]") {
+     // Knight: hit speed 1.2 s, first hit 0.5 s. Two targets in reach.
+diff --git a/tests/entities/test_combat_entity.cpp b/tests/entities/test_combat_entity.cpp
+index 8b49539..7793e0d 100644
+--- a/tests/entities/test_combat_entity.cpp
++++ b/tests/entities/test_combat_entity.cpp
+@@ -932,6 +932,10 @@ TEST_CASE("A knockback throws away the charge a troop had built", "[combat_entit
+         pushAlong(*attacker, 0.0f, -1.0f, 0.5f); // back to (0, 3.5), still in reach
+         REQUIRE(attacker->chargeProgress == 0.0f);
+         REQUIRE_FALSE(attacker->isCharging());
++        // Patch 0054: the knockback also removed the load, so the hit comes a
++        // whole hit speed (10 ticks) later.
++        for (int i = 0; i < 9; ++i) attacker->update(board);
++        REQUIRE(target->hp == 10000);
+         attacker->update(board);
+         REQUIRE(target->hp == 10000 - 100); // a plain hit, not the doubled one
+     }
+@@ -946,6 +950,8 @@ TEST_CASE("A knockback throws away the charge a troop had built", "[combat_entit
+         REQUIRE(attacker->hp == 90);
+         REQUIRE(attacker->position.y == Catch::Approx(3.5f));
+         REQUIRE(attacker->chargeProgress == 0.0f);
++        for (int i = 0; i < 9; ++i) attacker->update(board);
++        REQUIRE(target->hp == 10000);
+         attacker->update(board);
+         REQUIRE(target->hp == 10000 - 100);
+     }

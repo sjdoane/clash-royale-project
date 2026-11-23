@@ -1,0 +1,370 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 2a64027..2de346e 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -755,6 +755,36 @@ being PICKED as a target.
+ 
+ **GAMEPLAY-AFFECTING.**
+ 
++## 2026-11-22: published sight clip of the building-targeters (patch 0042)
++
++**GAMEPLAY-AFFECTING.** The game's unit table gives the building-targeting
++troops two fields next to SightRange: `SightClip` and `SightClipSide` (Hog
++Rider 9500 / 4000 / 4000, Giant, Royal Giant, Goblin Giant 7500 / 2000 / 2000,
++Ice Golem 7000 / 2000 / 2000, Golem 7000 / 2000 / 1900, Balloon and Skeleton
++Barrel 7700 / - / 2000; none for Battle Ram, Ram Rider, Lava Hound, Wall
++Breakers). Sources: FirstLight-Zero card_specs.json release 15.535.13 and
++RoyaleAPI cards_stats.json, which agree. New table `include/core/SightClips.h`
++(keyed by name like LoadTimes.h), applied in `applyCardMetadata`, used by
++`CombatEntity::withinSightClip` in both `findTarget`s, exposed as
++`sight_clip` / `sight_clip_side` in `get_card_stats`.
++
++- **The reading is inferred**, not published as prose: the sight disc is cut to
++  a box, `sightRange - clipSide` across the arena and `sightRange - clip` along
++  it, measured to the target's footprint. Every clipped troop then reaches
++  5.0-5.7 tiles sideways: lane to arena centre. A Cannon in the middle pulls a
++  Hog or Giant from either lane; one placed 7+ tiles to the side does not,
++  although it is inside the 9.5 / 7.5 disc. The reverse reading (the clip is
++  the half-width) would stop a centre building pulling a Giant at all.
++- Before: disc only, so a Hog left its lane for a Cannon 7-8 tiles to the side
++  when the Cannon was played early (tower HP lost 0 instead of a full Hog).
++- Hero Giant / Hero Ice Golem / Hero Balloon rows are assumed equal to the base
++  troop. Electro Giant and Suspicious Bush publish a clip too but are NOT in
++  the table: their registry sight is still the default 5.5, not the published
++  7.5.
++- Tests: `python_ai/tests/test_sight_clip_of_building_targeters.py`,
++  `tests/core/test_sight_range.cpp` ("a published sight clip cuts the sideways
++  reach"; the raw-range case now uses the unclipped Battle Ram).
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index e209cb8..09dc133 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -1,6 +1,7 @@
+ #pragma once
+ #include "CardStats.h"
+ #include "LoadTimes.h"
++#include "SightClips.h"
+ #include "Board.h"
+ #include "MeleeTroop.h"
+ #include "RangedTroop.h"
+@@ -78,6 +79,11 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     entity->recoilDistance = stats.recoilDistance;
+     entity->minAttackRange = stats.minAttackRange;
+     entity->sightRange = stats.sightRange;
++    // Published sight clip of the building-targeters (SightClips.h).
++    if (const SightClips::Row* clipRow = SightClips::find(stats.name)) {
++        entity->sightClip = clipRow->clip;
++        entity->sightClipSide = clipRow->clipSide;
++    }
+     entity->transformAtHpFraction = stats.transformAtHpFraction;
+     entity->transformCheckMaxHp = stats.hp;
+     entity->transformLifetimeTicks = stats.transformLifetimeTicks;
+diff --git a/include/core/SightClips.h b/include/core/SightClips.h
+new file mode 100644
+index 0000000..5fe45cd
+--- /dev/null
++++ b/include/core/SightClips.h
+@@ -0,0 +1,94 @@
++#pragma once
++
++#include <string>
++
++// Published sight clip of the building-targeting troops, in tiles. Read by
++// CardFactories::applyCardMetadata, used in CombatEntity::withinSightClip.
++//
++// The game's unit table gives these troops two extra sight fields next to
++// SightRange, "SightClip" and "SightClipSide" (1/1000 tile):
++//
++//                  SightRange  SightClip  SightClipSide
++//   Hog Rider         9500       4000        4000
++//   Royal Hog         9500       4000        4000
++//   Giant             7500       2000        2000
++//   Royal Giant       7500       2000        2000
++//   Goblin Giant      7500       2000        2000
++//   Electro Giant     7500       2000        2000
++//   Ice Golem         7000       2000        2000
++//   Golem             7000       2000        1900
++//   Golemite          (older file only)  2000  2000
++//   Balloon           7700        -          2000
++//   Skeleton Barrel   7700        -          2000
++//   Suspicious Bush   7500       2000        2000
++//
++// and none for the Battle Ram, Ram Rider's ram, Lava Hound, Wall Breakers and
++// Elixir Golem. No other unit has them.
++//
++// READING (inferred, not published as prose): the sight disc is cut down to a
++// box. A building is in sight only if it is within SightRange AND no further
++// than SightRange - SightClipSide to the side (x) AND no further than
++// SightRange - SightClip along the arena (y). That makes every clipped troop's
++// sideways reach 5.0-5.7 tiles: the distance from a lane to the middle of the
++// arena. It is the rule players know: a building in the middle pulls a Hog or a
++// Giant from either lane, one placed towards the far lane does not, although
++// both are well inside the 9.5 or 7.5 sight radius. The other reading (the
++// clip itself is the half-width: 4 tiles for a Hog, 2 for a Giant) would make a
++// centre building unable to pull a Giant at all, which is plainly not the game.
++// Supercell's own balance note for the unclipped Battle Ram and the Golem
++// ("slipping past standard building placements that other win conditions get
++// pulled by") is the same geometry.
++//
++// Before this table the engine had the disc only, and got the "a Cannon 7-8
++// tiles off-lane does not pull a Hog" observation by inflating the Crown
++// Towers' targeting footprint instead (Tower::getTargetingRadius, removed in
++// the next patch).
++//
++// Sources: FLZ = FirstLight-Zero card_specs.json (release 15.535.13), CRAPI =
++// RoyaleAPI cr-api-data cards_stats.json (older files; the two agree wherever
++// both have a row). HERO rows are ASSUMED equal to the base troop: the hero
++// forms are not in either file.
++//
++// NOT APPLIED: Electro Giant and Suspicious Bush. Their registry rows still
++// carry the default 5.5 sight, not the published 7.5; a clip on top of that
++// would shrink it to 3.5. They get their row when their sight is corrected.
++//
++// Keyed by registry NAME, like LoadTimes.h, so Evolutions inherit the row.
++namespace SightClips {
++
++struct Row {
++    const char* name;
++    float clip;       // along the arena (y); 0 = not clipped
++    float clipSide;   // across the arena (x); 0 = not clipped
++};
++
++inline const Row* table(int& count) {
++    static const Row rows[] = {
++        { "Hog Rider",       4.0f, 4.0f },   // FLZ, CRAPI
++        { "Royal Hogs",      4.0f, 4.0f },   // FLZ, CRAPI
++        { "Giant",           2.0f, 2.0f },   // FLZ, CRAPI
++        { "Royal Giant",     2.0f, 2.0f },   // FLZ, CRAPI
++        { "Goblin Giant",    2.0f, 2.0f },   // FLZ, CRAPI
++        { "Ice Golem",       2.0f, 2.0f },   // FLZ, CRAPI
++        { "Golem",           2.0f, 1.9f },   // FLZ, CRAPI
++        { "Golemite",        2.0f, 2.0f },   // CRAPI
++        { "Balloon",         0.0f, 2.0f },   // FLZ, CRAPI
++        { "Skeleton Barrel", 0.0f, 2.0f },   // FLZ, CRAPI
++        { "Hero Giant",      2.0f, 2.0f },   // HERO: assumed as Giant
++        { "Hero Ice Golem",  2.0f, 2.0f },   // HERO: assumed as Ice Golem
++        { "Hero Balloon",    0.0f, 2.0f },   // HERO: assumed as Balloon
++    };
++    count = static_cast<int>(sizeof(rows) / sizeof(rows[0]));
++    return rows;
++}
++
++inline const Row* find(const std::string& name) {
++    int count = 0;
++    const Row* rows = table(count);
++    for (int i = 0; i < count; ++i) {
++        if (name == rows[i].name) return &rows[i];
++    }
++    return nullptr;
++}
++
++} // namespace SightClips
+diff --git a/include/entities/BuildingTargeter.h b/include/entities/BuildingTargeter.h
+index 9eaaa9c..b3464d1 100644
+--- a/include/entities/BuildingTargeter.h
++++ b/include/entities/BuildingTargeter.h
+@@ -48,7 +48,8 @@ protected:
+             // effectiveSightWith on centre distance, as in
+             // CombatEntity::findTarget.
+             const float rank = dist - entity->getTargetingRadius();
+-            if (rank <= effectiveSightWith(myRadius, *entity) && rank < minSightDistance) {
++            if (rank <= effectiveSightWith(myRadius, *entity) && withinSightClip(*entity)
++                && rank < minSightDistance) {
+                 minSightDistance = rank;
+                 closestInSight = entity;
+             }
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index 5dc96bf..bae07aa 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -381,6 +381,13 @@ public:
+     // attackRange.
+     float sightRange = 5.5f;
+ 
++    // Published sight clip (SightClips.h): the sight disc cut to a box, no
++    // further than sightRange - sightClipSide across the arena and sightRange -
++    // sightClip along it. 0 = not clipped. Only the building-targeting troops
++    // publish one.
++    float sightClip = 0.0f;
++    float sightClipSide = 0.0f;
++
+     // HP-threshold transform (Cannon Cart: at <= 50% hp it grounds itself and
+     // self-destructs after a fixed lifespan). The fraction is of
+     // transformCheckMaxHp, the spawn hp. Grounding reuses applyFreeze(ticks,
+@@ -1088,6 +1095,19 @@ protected:
+         return sightRange;
+     }
+ 
++    // The published sight clip (SightClips.h). Measured to the target's
++    // footprint, as findTarget ranks; the unit's own reach is far inside the
++    // box, so there is nothing to floor.
++    bool withinSightClip(const Entity& target) const {
++        if (sightClip <= 0.0f && sightClipSide <= 0.0f) return true;
++        const float r = target.getTargetingRadius();
++        if (sightClipSide > 0.0f
++            && std::fabs(target.position.x - position.x) - r > sightRange - sightClipSide) return false;
++        if (sightClip > 0.0f
++            && std::fabs(target.position.y - position.y) - r > sightRange - sightClip) return false;
++        return true;
++    }
++
+     // Re-validates the locked target by id rather than re-scanning for the
+     // closest. nullptr if there is no lock or the target is no longer legal.
+     std::shared_ptr<Entity> resolveCurrentTarget(Board& board) const {
+@@ -1123,7 +1143,8 @@ protected:
+             // footprint distance (Entity::getTargetingRadius); the sight gate
+             // uses centre distance.
+             const float rank = dist - entity->getTargetingRadius();
+-            if (rank <= effectiveSightWith(myRadius, *entity) && rank < minSightDistance) {
++            if (rank <= effectiveSightWith(myRadius, *entity) && withinSightClip(*entity)
++                && rank < minSightDistance) {
+                 minSightDistance = rank;
+                 closestInSight = entity;
+             }
+diff --git a/python_ai/tests/test_sight_clip_of_building_targeters.py b/python_ai/tests/test_sight_clip_of_building_targeters.py
+new file mode 100644
+index 0000000..eb5d24c
+--- /dev/null
++++ b/python_ai/tests/test_sight_clip_of_building_targeters.py
+@@ -0,0 +1,88 @@
++"""Published sight clip of the building-targeting troops (patch 0042).
++
++The game's unit table gives the Hog Rider SightRange 9500, SightClip 4000,
++SightClipSide 4000 and the Giant 7500 / 2000 / 2000 (FirstLight-Zero
++card_specs.json release 15.535.13; RoyaleAPI cards_stats.json agrees). Read as
++a box cut out of the sight disc (include/core/SightClips.h), a building pulls
++one of these troops only from within sightRange - clip: 5.5 tiles sideways for
++both. So a Cannon in the middle of the arena pulls a Hog Rider or a Giant from
++either lane, and one placed towards the other lane does not, although it is
++inside the 9.5 / 7.5 sight radius. Before the patch only the disc existed.
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++import pytest
++
++NOOP = 4
++HOG, GIANT, BALLOON, BATTLE_RAM, CANNON = 15, 2, 45, 81, 129
++OURS = [129, 168, 125, 15, 40, 72, 33, 7]
++
++
++def _first_target(attacker, cannon_x, cannon_y=12.0, ticks=420):
++    """Team 0 has a Cannon standing at (cannon_x, cannon_y); team 1 then drops
++    `attacker` at its left bridge (x 3). -> (name of the first thing the
++    attacker hits or None, Princess Tower HP lost, Cannon HP lost)."""
++    deck = [attacker] + [c for c in (4, 12, 112, 61, 20, 14, 26, 24) if c != attacker][:7]
++    env = E.ClashRoyaleEnv(list(OURS), deck, 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    env.set_elixir_for_team(0, 10.0)
++    env.set_elixir_for_team(1, 10.0)
++    assert env.set_hand_for_team(0, [CANNON, 168, 125, 15])
++    assert env.set_hand_for_team(1, deck[:4])
++    tower0 = env.get_tower_hp(0, 1)
++    env.step_self_play(0, float(cannon_x), float(cannon_y), NOOP, 0.0, 0.0, 12)
++    env.step_self_play(NOOP, 0.0, 0.0, 0, 3.0, 15.0, 1)
++    cannon_max, first = None, None
++    cannon_lost = 0
++    for _ in range(ticks):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        cannon = [u for u in env.get_units() if u["team"] == 0 and u["name"] == "Cannon"]
++        if cannon:
++            hp = cannon[0]["hp"]
++            if cannon_max is None:
++                cannon_max = hp
++        tower_lost = tower0 - env.get_tower_hp(0, 1)
++        if first is None:
++            # the Cannon decays, so "hit" is a drop larger than a tick of decay
++            if tower_lost > 0:
++                first = "tower"
++            elif cannon and cannon_max - hp > 150:
++                first = "cannon"
++            if cannon:
++                cannon_max = hp
++        if first is not None:
++            break
++    return first
++
++
++def test_a_balloon_is_clipped_sideways_only():
++    # Balloon: SightClipSide 2000 on 7700 (5.7 to the side), no forward clip.
++    assert _first_target(BALLOON, 9, 14.0) == "cannon"
++    assert _first_target(BALLOON, 10, 14.0) == "tower"
++
++
++def test_the_clip_values_are_the_published_ones():
++    hog = E.get_card_stats(HOG)["base"]
++    assert (hog["sight_range"], hog["sight_clip"], hog["sight_clip_side"]) == pytest.approx((9.5, 4.0, 4.0))
++    giant = E.get_card_stats(GIANT)["base"]
++    assert (giant["sight_range"], giant["sight_clip"], giant["sight_clip_side"]) == pytest.approx((7.5, 2.0, 2.0))
++    balloon = E.get_card_stats(BALLOON)["base"]
++    assert (balloon["sight_clip"], balloon["sight_clip_side"]) == pytest.approx((0.0, 2.0))
++    ram = E.get_card_stats(BATTLE_RAM)["base"]
++    assert (ram["sight_clip"], ram["sight_clip_side"]) == (0.0, 0.0)   # published without one
++
++
++@pytest.mark.parametrize("attacker", [HOG, GIANT])
++def test_a_cannon_in_the_middle_pulls_from_the_lane(attacker):
++    # lane x 3; the middle of the arena is x 8-9, 5-6 tiles to the side
++    for x in (5, 7, 9):
++        assert _first_target(attacker, x) == "cannon", (attacker, x)
++
++
++@pytest.mark.parametrize("attacker", [HOG, GIANT])
++def test_a_cannon_towards_the_other_lane_does_not_pull(attacker):
++    # 7+ tiles to the side: inside the Hog's 9.5 sight disc, outside the box.
++    # (Before the patch a Hog left its lane for a Cannon at x 10.)
++    for x in (10, 11, 13):
++        assert _first_target(attacker, x) == "tower", (attacker, x)
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index 0d75aa0..f8d449b 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -70,6 +70,12 @@ py::dict statsDict(const CardStats& s, int depth = 0) {
+     d["attack_range"] = s.attackRange;
+     d["min_attack_range"] = s.minAttackRange;
+     d["sight_range"] = s.sightRange;
++    // Published sight clip (SightClips.h); 0 = not clipped.
++    {
++        const SightClips::Row* clipRow = SightClips::find(s.name);
++        d["sight_clip"] = clipRow ? clipRow->clip : 0.0f;
++        d["sight_clip_side"] = clipRow ? clipRow->clipSide : 0.0f;
++    }
+     d["deploy_ticks"] = s.deployTicks;
+     d["count"] = static_cast<int>(s.spawnOffsets.size());
+     py::list offs;
+diff --git a/tests/core/test_sight_range.cpp b/tests/core/test_sight_range.cpp
+index ba76d2b..70dddd4 100644
+--- a/tests/core/test_sight_range.cpp
++++ b/tests/core/test_sight_range.cpp
+@@ -502,11 +502,22 @@ TEST_CASE("the nearest-building rule holds for every catalogued sight range",
+ TEST_CASE("sight still bounds acquisition at the raw catalogued range",
+           "[targeting][sight][centre_to_centre]") {
+     // Rule 1 alone. At y = 20 the tower is 14.0 away, so the Cannon is always
+-    // the nearest building and only sight can refuse it. 10.0 is outside the
+-    // Hog's 9.5. The gate uses footprint distance, so a Cannon (radius 1.0) is
+-    // refused past 10.5 centre.
+-    REQUIRE(driftAt(15, 20.0f, 11.0f) == Catch::Approx(0.0f).margin(0.05f));
+-    REQUIRE(driftAt(15, 20.0f, 9.0f) < -0.3f);
++    // the nearest building and only sight can refuse it. The Battle Ram
++    // publishes no sight clip, so its 6.5 is a plain disc. The gate uses
++    // footprint distance, so a Cannon (radius 1.0) is refused past 7.5 centre.
++    REQUIRE(driftAt(81, 20.0f, 8.0f) > -0.05f);   // never towards the Cannon
++    REQUIRE(driftAt(81, 20.0f, 7.0f) < -0.3f);
++}
++
++TEST_CASE("a published sight clip cuts the sideways reach of a building-targeter",
++          "[targeting][sight][sight_clip]") {
++    // SightClips.h: Hog Rider 9.5 sight, side clip 4.0, so a building pulls it
++    // from at most 5.5 to the side (footprint; 6.5 centre for a Cannon). The
++    // Giant's 7.5 with a 2.0 clip gives the same 5.5.
++    const int card = GENERATE(15, 2);
++    INFO("card id " << card);
++    REQUIRE(driftAt(card, 20.0f, 7.0f) > -0.05f);    // never towards the Cannon
++    REQUIRE(driftAt(card, 20.0f, 6.0f) < -0.1f);
+ }
+ 
+ TEST_CASE("sight is never shorter than the unit's own attack reach",

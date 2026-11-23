@@ -1,0 +1,27 @@
+{
+  "_doc": "Hand labels (read by eye from enlarged crops, 2026-11-18). Opponent Princess HP is piecewise constant: each segment is [first_frame, last_frame, hp] inclusive. 'exclude' lists frames where the numeral was hidden at the moment of change and the true value is ambiguous. Sources: rec = runs/live/rec_dry1 raw frames f00546-f00956 (ladder, opponent level 14); the three -act runs = overlay frames of Training Camp matches (level-15 trainer), whose drawn boxes/labels sometimes cover the numerals. max_hp = the full-HP numeral.",
+  "towers": {
+    "rec": {
+      "frames": [546, 956],
+      "max_hp": 4032,
+      "opp_princess_left": [[546, 667, 4032], [668, 956, 3822]],
+      "opp_princess_right": [[546, 956, 4032]]
+    },
+    "100718": {
+      "max_hp": 4424,
+      "opp_princess_left": [[0, 99999, 4424]],
+      "opp_princess_right": [[0, 99999, 4424]]
+    },
+    "101607": {
+      "max_hp": 4424,
+      "opp_princess_left": [[0, 99999, 4424]],
+      "opp_princess_right": [[0, 99999, 4424]]
+    },
+    "102102": {
+      "max_hp": 4424,
+      "opp_princess_left": [[0, 566, 4424], [578, 917, 4076], [928, 1081, 3984], [1093, 1356, 3636], [1379, 99999, 3288]],
+      "opp_princess_right": [[0, 99999, 4424]],
+      "exclude": {"opp_princess_left": [1368]}
+    }
+  }
+}

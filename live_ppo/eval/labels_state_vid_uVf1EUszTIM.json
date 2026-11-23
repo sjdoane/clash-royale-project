@@ -1,0 +1,146 @@
+{
+ "fix_spans": [
+  {
+   "from": 7590,
+   "to": 7635,
+   "set": {
+    "next": "ice_spirit"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 18645,
+   "to": 18705,
+   "set": {
+    "next": "ice_spirit"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 27525,
+   "to": 27585,
+   "set": {
+    "next": "musketeer"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 41385,
+   "to": 41445,
+   "set": {
+    "next": "hog_rider"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 51735,
+   "to": 51795,
+   "set": {
+    "next": "musketeer"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 65685,
+   "to": 65745,
+   "set": {
+    "next": "fireball"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 76245,
+   "to": 76320,
+   "set": {
+    "next": "ice_spirit"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 88350,
+   "to": 88410,
+   "set": {
+    "next": "ice_spirit"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 105405,
+   "to": 105450,
+   "set": {
+    "next": "the_log"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 123210,
+   "to": 123270,
+   "set": {
+    "next": "skeletons"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 151515,
+   "to": 151575,
+   "set": {
+    "next": "ice_spirit"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 167820,
+   "to": 167865,
+   "set": {
+    "next": "cannon"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 27690,
+   "to": 27720,
+   "set": {
+    "hand": [
+     "ice_spirit",
+     "musketeer",
+     "ice_golem",
+     "cannon"
+    ],
+    "next": "hog_rider"
+   },
+   "why": "Fireball played at 27690 (slot 2 blank, elixir 5->1 by 27720); Musketeer is the incoming card (shown in slot 2 at 27780); preview Hog at 27780",
+   "by": "eye"
+  },
+  {
+   "from": 27735,
+   "to": 27795,
+   "set": {
+    "hand": [
+     "hog_rider",
+     "musketeer",
+     "ice_golem",
+     "cannon"
+    ],
+    "next": "the_log"
+   },
+   "why": "Ice Spirit played at 27735 (slot 1 blank, elixir 2->1); Hog incoming; FIFO next the_log",
+   "by": "eye"
+  },
+  {
+   "from": 50580,
+   "to": 50655,
+   "set": {
+    "hand": [
+     "cannon",
+     "the_log",
+     "hog_rider",
+     "fireball"
+    ],
+    "next": "ice_spirit"
+   },
+   "why": "Skeletons played at 50580 bring Hog (preview Hog 50535-50640, Hog in slot 3 at 50655); Hog played at 50670 brings Ice Spirit (label skipped the Hog cycle)",
+   "by": "eye"
+  }
+ ],
+ "exclude": []
+}

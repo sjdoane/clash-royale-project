@@ -1,0 +1,266 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index ee1d9f0..07ae6bf 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1079,6 +1079,48 @@ the new flight differ by one or two frames of an 11 fps recording.
+   `unit_proj_speed` rows are now compared like every other field) and
+   `tests/core/test_card_registry.cpp` `[patch0049]`.
+ 
++## 2026-11-22: a stun pauses the attack; a slow is not a stun (patch 0050)
++
++**GAMEPLAY-AFFECTING.** The official rule (Supercell, balance notes of 13
++March 2017, "a fix and clarification of the stun/freeze mechanics"): *"All
++stun/freeze effects will now pause the target's attack, causing them to
++retarget when they resume. Exceptions are Sparky, Inferno Tower and Inferno
++Dragon, which will still be reset by stun/freeze effects."* The fan wiki's
++Electro Wizard page says the same of the current game (his zap "does not
++reset non-charge attacks but rather freezes the attack frame in place").
++
++`CombatEntity::update` differed in two ways:
++
++1. **A stun restarted the first-hit wind-up** (`windupTargetId = -1` on every
++   stunned tick; my own unsourced rule from patch 0034). So a stun cost its
++   length plus up to the whole first-hit time again: a Princess Tower (0.8 s
++   wind-up, 0.8 s hit speed) lost the stun plus 0.8 s, 0.4 s more than the
++   pause on average; a Musketeer 0.25 s more, a Hog Rider up to 0.6 s. Now the
++   wind-up is held like the cooldown and the unit carries on where it stopped,
++   on whatever it targets when it resumes.
++2. **A slow counted as a stun** wherever the code asked `wasFrozen` (any
++   freeze slot, slows included): a slowed unit dropped its target lock and
++   re-scanned every tick, a slowed Inferno never ramped, a slowed Sparky lost
++   her charge (`resetCooldownOnFreeze`). The comments already said "a stun";
++   two upstream tests pinned the opposite with a factor-1.0 "freeze". Now only
++   a full stop (factor 0: Zap, the spirits, Freeze) breaks the lock, resets
++   the ramp and resets Sparky. A slow slows the cooldown, the wind-up and
++   movement and nothing else.
++
++Unchanged: a stun still holds the cooldown, stops movement and resets a damage
++ramp at once (grace period or not). A charge (Prince, Battle Ram) is still not
++reset by a stun; the real game resets it, not changed here.
++
++Evidence level: the official sentence is from 2017 and no later official text
++on the mechanic was found; the wiki wording agrees. Nothing published says a
++slow retargets or resets, and the Ice Wizard is not among the cards any source
++lists as an Inferno reset.
++
++- Tests: `tests/core/test_card_registry.cpp` (`[patch0050]`: a stun during the
++  wind-up pauses it; a stun mid-fight costs its own length), and
++  `tests/entities/test_combat_entity.cpp` (lock, ramp and Sparky reset on a
++  stun but not on a slow).
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index 55a9c34..dead913 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -673,7 +673,8 @@ public:
+             }
+             refreshFreezeView();
+         }
+-        if (resetCooldownOnFreeze) {
++        // Only a stun or a freeze resets (Sparky); a slow does not.
++        if (resetCooldownOnFreeze && slowFactor <= 0.0f) {
+             currentCooldown = static_cast<float>(attackCooldown);
+         }
+     }
+@@ -868,7 +869,8 @@ public:
+         // trusted only while the locked target is within attack range; out of
+         // range (still approaching, knocked back, pulled away) there is no
+         // lock, and findTarget() re-scans every tick for whatever is closest in
+-        // sight. A stun breaks the lock outright.
++        // sight. A stun or a freeze breaks the lock outright; a slow does not
++        // (patch 0050).
+         std::shared_ptr<Entity> target;
+         if (forcedTargetTicksRemaining > 0) {
+             for (const auto& e : board.getEntities()) {
+@@ -876,7 +878,7 @@ public:
+             }
+         }
+         if (!target) {
+-            target = wasFrozen ? nullptr : resolveCurrentTarget(board);
++            target = stunned ? nullptr : resolveCurrentTarget(board);
+             if (target && position.distanceTo(target->position) > effectiveRangeTo(target)) {
+                 target = nullptr;
+             }
+@@ -885,12 +887,19 @@ public:
+             }
+         }
+ 
+-        // A stun, or no target at all, cancels a wind-up.
+-        if (!target || stunned) windupTargetId = -1;
++        // No target at all cancels a wind-up. A stun does not: it PAUSES the
++        // attack (the wind-up is held below, like the cooldown) and the unit
++        // carries on where it stopped, on whatever it targets when it resumes.
++        // Official, 13 March 2017: "All stun/freeze effects will now pause the
++        // target's attack, causing them to retarget when they resume.
++        // Exceptions are Sparky, Inferno Tower and Inferno Dragon, which will
++        // still be reset by stun/freeze effects." (patch 0050)
++        if (!target) windupTargetId = -1;
+ 
+         if (target) {
+-            if (wasFrozen) {
+-                // A stun resets unconditionally, grace period or not.
++            if (stunned) {
++                // A stun resets the ramp unconditionally, grace period or
++                // not. A slow is not a stun and resets nothing.
+                 currentTargetId = target->id;
+                 ticksOnTarget = 0;
+                 ticksSinceLastHit = 0;
+@@ -1050,8 +1059,8 @@ public:
+                 if (!windowRooted) moveTowards(board, LanePath::approachPoint(board, team, position, target));
+                 if (chargeThreshold > 0.0f) chargeProgress += beforeMove.distanceTo(position);
+             }
+-        } else if (wasFrozen || rampGracePeriodTicks <= 0 || ticksSinceLastHit >= rampGracePeriodTicks) {
+-            // No target: reset fully if frozen this tick, with no grace period
++        } else if (stunned || rampGracePeriodTicks <= 0 || ticksSinceLastHit >= rampGracePeriodTicks) {
++            // No target: reset fully if stunned this tick, with no grace period
+             // configured, or once it has run out.
+             currentTargetId = -1;
+             ticksOnTarget = 0;
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index 3e5b114..40f176e 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -2054,7 +2054,7 @@ TEST_CASE("Projectile speeds: Evolutions and Heroes inherit, every row names a r
+     }
+ }
+ 
+-TEST_CASE("A stun during the wind-up restarts it", "[card_registry][load_time]") {
++TEST_CASE("A stun during the wind-up pauses it", "[card_registry][load_time][patch0050]") {
+     Board board;
+     auto building = std::make_shared<Building>(999, 5.0f, 5.5f, 100000, 1, 'C', 5.0f, 10, 10);
+     spawn(board, building);
+@@ -2066,8 +2066,29 @@ TEST_CASE("A stun during the wind-up restarts it", "[card_registry][load_time]")
+     for (int i = 0; i < 4; ++i) hog->update(board); // 4 of the 6 wind-up ticks
+     REQUIRE(building->hp == 100000);
+     hog->applyFreeze(3, 0.0f);
+-    // 3 stunned ticks, then the full 6-tick wind-up again, then the hit.
+-    REQUIRE(updatesUntilHit(hog, building, board) == 3 + 6 + 1);
++    // 3 stunned ticks, then the 2 wind-up ticks that were left, then the hit.
++    // Official (13 March 2017): stun and freeze effects "pause the target's
++    // attack"; before patch 0050 the wind-up started again (3 + 6 + 1).
++    REQUIRE(updatesUntilHit(hog, building, board) == 3 + 2 + 1);
++}
++
++TEST_CASE("A stun in the middle of a fight costs its own length and nothing more", "[card_registry][load_time][patch0050]") {
++    // Knight: hit speed 1.2 s, first hit 0.5 s.
++    Board board;
++    auto dummy = std::make_shared<DummyEntity>(901, 5.0f, 5.6f, 100000, 1);
++    spawn(board, dummy);
++    CardRegistry::getInstance().getCard(0)->spawnEntity(5.0f, 5.0f, 0, board);
++    board.commitPendingEntities();
++    auto knight = std::dynamic_pointer_cast<CombatEntity>(board.getEntities().back());
++    advancePastDeploy(knight, board);
++    REQUIRE(updatesUntilHit(knight, dummy, board) == 6);
++    for (int i = 0; i < 9; ++i) knight->update(board);   // 0.3 s of the cycle left
++    knight->applyFreeze(5, 0.0f);
++    // 5 stunned ticks, then the 3 that were left. Before patch 0050 the stun
++    // also restarted the 0.5 s first-hit wind-up (5 + 5 + 1).
++    REQUIRE(updatesUntilHit(knight, dummy, board) == 5 + 3);
++    // And the rhythm carries on.
++    REQUIRE(updatesUntilHit(knight, dummy, board) == 12);
+ }
+ 
+ TEST_CASE("Switching between targets in range keeps the hit-speed rhythm; a new engagement winds up again",
+diff --git a/tests/entities/test_combat_entity.cpp b/tests/entities/test_combat_entity.cpp
+index d65120c..8b49539 100644
+--- a/tests/entities/test_combat_entity.cpp
++++ b/tests/entities/test_combat_entity.cpp
+@@ -206,9 +206,15 @@ TEST_CASE("A stun breaks the target lock too, unlike a plain closer enemy showin
+     auto closer = std::make_shared<DummyEntity>(3, 0.0f, 0.1f, 1000, 1, 'C');
+     spawn(board, closer);
+ 
+-    // As above, but stunned first. slowFactor 1.0 only marks the tick as
+-    // frozen.
+-    attacker->applyFreeze(1, 1.0f);
++    // A slow is not a stun: the lock holds (patch 0050).
++    attacker->applyFreeze(1, 0.5f);
++    attacker->update(board);
++    REQUIRE(attacker->lastTargetId == original->id);
++
++    // As above, but stunned first: one stunned tick (no attack), then it
++    // resumes on whatever is closest.
++    attacker->applyFreeze(1, 0.0f);
++    attacker->update(board);
+     attacker->update(board);
+ 
+     REQUIRE(attacker->lastTargetId == closer->id); // the stun broke the lock: switched to the closer enemy
+@@ -534,9 +540,18 @@ TEST_CASE("Ramping damage resets when the attacker is frozen, even mid-ramp", "[
+ 
+     for (int i = 0; i < 40; ++i) attacker->update(board); // fully ramped
+ 
+-    attacker->applyFreeze(1, 1.0f); // duration matters here, not slow strength
++    // A slow is not a stun and resets nothing (patch 0050).
++    attacker->applyFreeze(1, 0.5f);
+     int hpBefore = enemy->hp;
+-    attacker->update(board); // spent frozen -> ramp resets even though the target didn't change
++    attacker->update(board);
++    attacker->update(board);
++    REQUIRE(hpBefore - enemy->hp > 2 * 50); // still ramped
++
++    attacker->applyFreeze(1, 0.0f); // a stun, however short
++    hpBefore = enemy->hp;
++    attacker->update(board); // spent stunned: no hit, and the ramp resets though the target didn't change
++    REQUIRE(hpBefore == enemy->hp);
++    attacker->update(board);
+ 
+     REQUIRE(hpBefore - enemy->hp == 50); // back to stage 1, not full damage
+ }
+@@ -611,9 +626,10 @@ TEST_CASE("A grace period does not delay the reset caused by a stun -- freeze st
+ 
+     for (int i = 0; i < 41; ++i) attacker->update(board); // fully ramped
+ 
+-    attacker->applyFreeze(1, 1.0f);
++    attacker->applyFreeze(1, 0.0f);
+     int hpBefore = enemy->hp;
+-    attacker->update(board); // spent frozen -> resets even though a grace period is configured
++    attacker->update(board); // spent stunned -> resets even though a grace period is configured
++    attacker->update(board);
+ 
+     REQUIRE(hpBefore - enemy->hp == 50); // back to stage 1, not the preserved full stage
+ }
+@@ -1672,16 +1688,36 @@ TEST_CASE("resetCooldownOnFreeze fully restarts the attack cooldown instead of j
+     attacker->update(board); // lands the attack, currentCooldown -> 10
+     attacker->update(board); // decrements to 9 (unfrozen tick)
+ 
+-    attacker->applyFreeze(5, 0.5f);
++    attacker->applyFreeze(5, 0.0f);
+     REQUIRE(attacker->attackCount == 1); // hasn't fired again yet
+ 
+-    // The cooldown resets to the full 10 rather than staying at 9: five frozen
+-    // ticks drain 0.5 each (10 -> 7.5), then normal ticks drain 1, so the next
+-    // attack takes exactly 13 calls, against 12 without the reset.
+-    for (int i = 0; i < 12; ++i) attacker->update(board);
++    // The cooldown resets to the full 10 rather than staying at 9: five
++    // stunned ticks hold it, then normal ticks drain 1, so the next attack
++    // takes exactly 15 calls, against 14 without the reset.
++    for (int i = 0; i < 14; ++i) attacker->update(board);
+     REQUIRE(attacker->attackCount == 1); // not ready yet; would be without the reset
+     attacker->update(board);
+-    REQUIRE(attacker->attackCount == 2); // ready on the 13th
++    REQUIRE(attacker->attackCount == 2); // ready on the 15th
++}
++
++TEST_CASE("resetCooldownOnFreeze is for stuns and freezes: a slow only slows", "[combat_entity][freeze][patch0050]") {
++    Board board;
++    auto target = std::make_shared<DummyEntity>(1, 0.0f, 1.0f, 10000, 1);
++    spawn(board, target);
++
++    auto attacker = std::make_shared<StationaryCombatant>(2, 0.0f, 0.0f, 100, 0, 5.0f, 50, 10);
++    attacker->resetCooldownOnFreeze = true;
++
++    attacker->update(board); // lands the attack, currentCooldown -> 10
++    attacker->update(board); // 9
++
++    // Five slowed ticks drain 0.5 each (9 -> 6.5), then 7 normal ticks: the
++    // 12th call, as for any other unit.
++    attacker->applyFreeze(5, 0.5f);
++    for (int i = 0; i < 11; ++i) attacker->update(board);
++    REQUIRE(attacker->attackCount == 1);
++    attacker->update(board);
++    REQUIRE(attacker->attackCount == 2);
+ }
+ 
+ // ---------------- recoil on attack (Firecracker) ----------------

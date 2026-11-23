@@ -1,0 +1,164 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index ab4b90e..f017b75 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -707,6 +707,31 @@ change (replay parity on 3000 matches is identical with and without them).
+   target_team, target_id, amount). Off by default (`TowerHitLogCollector`).
+ - Test: `python_ai/tests/test_forensic_bindings.py`.
+ 
++## 2026-11-22: an invisible unit stays revealed while it keeps attacking (patch 0040)
++
++The Royal Ghost's reveal window after a hit was 0.5 s of its 1.8 s hit
++interval (base form; the evolved form already had 1.8 s). The game's unit table
++(`Ghost`) says `buff_when_not_attacking: Invisibility`,
++`buff_when_not_attacking_time: 1800`: the cloak returns 1.8 s after the LAST
++attack, so a Ghost that keeps hitting is visible the whole time. With 0.5 s the
++Princess Tower (first hit, patch 0035) never got a shot off; in replays of
++recorded matches a lone Ghost stood at a tower at full health for 13 s and
++more, and the card was the largest per-match source of tower damage the real
++match did not have (62 first-excess events per 100 matches it was held in).
++
++- Royal Ghost (47) and both forms of its Evolution (136): `withInvisibility(18)`.
++- Suspicious Bush (85): 14 ticks, one hit interval, the same rule. Its figure
++  is not in the unit table; published descriptions say it becomes visible on
++  reaching a tower. NOT SOURCED beyond that.
++- Still revealed at the first HIT, not at the start of the swing (0.6 s later
++  than the real Ghost if the real one is revealed by starting to attack; not
++  verified).
++- Test: `python_ai/tests/test_invisible_units_stay_revealed_while_attacking.py`.
++
++**GAMEPLAY-AFFECTING.** A lone Royal Ghost on a Princess Tower: 6 hits (1566)
++and dead 10 s after its first hit; before, it was never shot. A lone Bush: one
++hit, then dead (two Bush Goblins).
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index 6242a3b..140b84f 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -769,8 +769,11 @@ private:
+             .withChargeSpeed(2.0f)  // and runs at 2x (item 35)
+             .withIgnoresRiver().withSplash(1.1f) /* audit 0003: wiki Dark Prince, level 11 */);
+         // Royal Ghost jumps the river.
++        // Invisibility returns 1.8 s after the last attack (published
++        // buff_when_not_attacking_time 1800 ms, patch 0040): with a hit every
++        // 1.8 s the Ghost stays visible for as long as it keeps attacking.
+         add(troop(47, "Royal Ghost", 3.0f, Archetype::MeleeSquad, 1210, SPEED_FAST, 1.2f, 261, 18, 'Q')
+-            .withInvisibility(5) // brief reveal after attacking
++            .withInvisibility(18)
+             .withIgnoresRiver());
+         // Mega Knight: the deploy slam is the spawn-effect burst (radius 1.3,
+         // 430). The periodic jump closes 3.5-5 tiles instantly with a 2.0x,
+@@ -977,7 +980,10 @@ private:
+             .withSplash(1.5f)
+             .withPeriodicEffect(50, std::make_shared<AreaStunEffect>(2.5f, 5)) /* audit 0003: wiki Electro Giant, level 11 */);
+         add(troop(85, "Suspicious Bush", 2.0f, Archetype::MeleeBuildingTargeter, 81, SPEED_MEDIUM, 0.5f, 256, 14, '}')
+-            .withInvisibility(5)
++            // Visible from its first hit for as long as it keeps hitting (one
++            // hit interval, patch 0040): the Bush is revealed once it reaches
++            // a building, so the tower it attacks can shoot it.
++            .withInvisibility(14)
+             .withDeathEffect(std::make_shared<SpawnOnDeath>(suspiciousBushGoblinStats())) /* audit 0003: wiki Suspicious Bush, level 11 */);
+         add(troop(86, "Rune Giant", 4.0f, Archetype::MeleeBuildingTargeter, 2662, SPEED_MEDIUM, 1.2f, 153, 15, '~')
+             .withAllyBuffAura(3.0f, 3, 1.5f, 50, 2) /* audit 0003: wiki Rune Giant, level 11 */);
+@@ -1372,13 +1378,12 @@ private:
+                 .withPassiveDamageReduction(0.65f),
+             2, 1);
+ 
+-        // Royal Ghost: a longer reveal window (1.8 s vs 0.5 s), and every
+-        // landed hit spawns 2 Souldiers. The real "only while invisible"
+-        // condition is not checked; she is cloaked for nearly all her attacks
+-        // anyway.
++        // Royal Ghost: every landed hit spawns 2 Souldiers. The real "only
++        // while invisible" condition is not checked. Both forms re-cloak 1.8 s
++        // after the last attack (patch 0040).
+         addEvolution(136,
+             troop(47, "Royal Ghost", 3.0f, Archetype::MeleeSquad, 1210, SPEED_FAST, 1.2f, 261, 18, 'Q')
+-                .withInvisibility(5).withIgnoresRiver(),
++                .withInvisibility(18).withIgnoresRiver(),
+             troop(47, "Royal Ghost", 3.0f, Archetype::MeleeSquad, 1210, SPEED_FAST, 1.2f, 261, 18, 'Q')
+                 .withInvisibility(18)
+                 .withOnHitSpawn(std::make_shared<PeriodicSpawnEffect>(royalGhostSouldierStats()
+diff --git a/python_ai/tests/test_invisible_units_stay_revealed_while_attacking.py b/python_ai/tests/test_invisible_units_stay_revealed_while_attacking.py
+new file mode 100644
+index 0000000..21c3886
+--- /dev/null
++++ b/python_ai/tests/test_invisible_units_stay_revealed_while_attacking.py
+@@ -0,0 +1,75 @@
++"""An invisible unit stays visible for as long as it keeps attacking (patch 0040).
++
++Published (the game's own unit table, `Ghost`): `buff_when_not_attacking:
++Invisibility`, `buff_when_not_attacking_time: 1800` ms, hit speed 1800 ms. The
++Royal Ghost is invisible until its first hit and cloaks again only 1.8 s after
++its last attack, so a Ghost that is hitting a Princess Tower is shot by it the
++whole time and dies to it alone: 1210 HP against a 109-damage arrow every 0.8 s
++is twelve arrows, about ten seconds, five or six 261-damage hits.
++
++Before the patch the base form was visible for 0.5 s of every 1.8 s. The tower
++never completed a first hit on it: in replays a lone Ghost stood at the tower
++at full health for 13 s and more (the largest per-match source of tower damage
++the real game does not have, with Elite Barbarians).
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++
++NOOP = 4
++GHOST, BUSH = 47, 85
++PLAIN = [15, 6, 25, 40, 24, 72, 33, 7]
++
++
++def _lone(card, ticks=400):
++    """Team 1 drops `card` at its bridge and nobody answers. -> (per-tick
++    targetable flags from its first hit until it dies, tower HP lost, ticks it
++    lived after the first hit or None if it never died)."""
++    deck = [card] + [c for c in (4, 12, 112, 61, 20, 14, 2, 26) if c != card][:7]
++    env = E.ClashRoyaleEnv(list(PLAIN), deck, 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    env.set_elixir_for_team(1, 10.0)
++    assert env.set_hand_for_team(1, deck[:4])
++    before = env.get_tower_hp(0, 1)
++    env.step_self_play(NOOP, 0.0, 0.0, 0, 3.0, 15.0, 1)
++    flags, first, died = [], None, None
++    for t in range(ticks):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        u = [x for x in env.get_units() if x["card_id"] == card]
++        lost = before - env.get_tower_hp(0, 1)
++        if first is None and lost > 0:
++            first = t
++        if first is not None:
++            if not u:
++                died = t - first
++                break
++            flags.append(u[0]["targetable"])
++    return flags, before - env.get_tower_hp(0, 1), died
++
++
++def test_a_royal_ghost_hitting_a_tower_stays_visible_and_dies_to_it():
++    flags, lost, died = _lone(GHOST)
++    assert flags and all(flags), "the Ghost cloaked again between two hits"
++    assert died is not None, "the tower never killed a lone Royal Ghost"
++    # twelve arrows 0.8 s apart after the tower's first hit: 9 to 11 s
++    assert 85 <= died <= 115
++    assert lost in (5 * 261, 6 * 261, 7 * 261)
++
++
++def test_a_royal_ghost_is_invisible_until_its_first_hit():
++    deck = [GHOST, 4, 12, 112, 61, 20, 14, 2]
++    env = E.ClashRoyaleEnv(list(PLAIN), deck, 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    env.set_elixir_for_team(1, 10.0)
++    assert env.set_hand_for_team(1, deck[:4])
++    env.step_self_play(NOOP, 0.0, 0.0, 0, 3.0, 15.0, 1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 25)
++    ghost = next(x for x in env.get_units() if x["card_id"] == GHOST)
++    assert not ghost["targetable"]
++
++
++def test_a_suspicious_bush_at_a_tower_is_shot():
++    flags, lost, died = _lone(BUSH)
++    assert died is not None and died <= 25, "the tower never shot the Bush it was being hit by"
++    assert all(flags)

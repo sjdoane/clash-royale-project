@@ -1,0 +1,314 @@
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index a023f8e..2ba6ba3 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -1001,10 +1001,12 @@ private:
+         // The real 3.5x damage against buildings is not modelled.
+         add(spell(103, "Earthquake", 3.0f, 3.5f, 84, 8, '%').withRepeats(3, 10).withGroundOnly()
+             .withSpellOnHit(std::make_shared<FreezeOnHit>(30, 0.5f)).withCrownTowerDamage(53) /* audit 0003: wiki Earthquake, level 11 */);
+-        // Void: three damage tiers (340 per hit on 1 target, 160 on 2-4, 76 on
+-        // 5+), once per wave.
++        // Void: three damage tiers, once per wave. Official balance notes,
++        // 4 Aug 2026 rework: 5 elixir, 696 per hit on 1 target, 294 on 2-4,
++        // 153 on 5+; Crown Tower 97 / 51 / 35 (one value here: the 1-target
++        // 97, the usual case of a Void on a tower); 26 Aug: one hit per 1 s.
+         add(spell(104, "Void", 5.0f, 2.5f, 0, 8, '&').withRepeats(3, 10)
+-            .withSpellTieredDamage(340, 160, 76) /* audit 0003: wiki Void, level 11 */);
++            .withSpellTieredDamage(696, 294, 153).withCrownTowerDamage(97));
+         // Vines: only the 3 highest-HP enemies in radius. Pulling flyers to the
+         // ground is not modelled.
+         add(spell(105, "Vines", 3.0f, 2.5f, 153, 8, '+').withRepeats(2, 10) /* audit 0003: wiki Vines, level 11: 153 x2 over 2 s */
+@@ -1673,27 +1675,29 @@ private:
+                 troop(-48, "Goblins", 0.0f, Archetype::MeleeSquad, 202, SPEED_VERY_FAST, 0.5f, 120, 11, 'g')
+                     .withOffsets({ {-0.5f, -0.5f}, {0.5f, -0.5f}, {-0.5f, 0.5f}, {0.5f, 0.5f} }))));
+ 
+-        // Hero Knight (base: id 0). "Triumphant Taunt" (2 elixir, 25 s
+-        // cooldown): a shield, and enemies within 6.5 tiles must attack him for
++        // Hero Knight (base: id 0). "Triumphant Taunt" (2 elixir, single use
++        // since the 4 Aug 2026 notes; was a 25 s cooldown): a shield, and enemies within 6.5 tiles must attack him for
+         // 5 s (HeroKnightTauntEffect). The shield amount (~half his hp) is not
+         // sourced.
+         add(troop(166, "Hero Knight", 3.0f, Archetype::MeleeSquad, 1766, SPEED_MEDIUM, 1.2f, 202, 12, 'K')
+-            .withHeroAbility(2.0f, 250, std::make_shared<HeroKnightTauntEffect>(880, 50, 6.5f)));
++            .withHeroAbility(2.0f, 0, std::make_shared<HeroKnightTauntEffect>(880, 50, 6.5f), 1));
+ 
+-        // Hero Wizard (base: id 11). "Fiery Flight" (1 elixir, 20 s cooldown):
++        // Hero Wizard (base: id 11). "Fiery Flight" (1 elixir, single use
++        // since the 4 Aug 2026 notes; was a 20 s cooldown):
+         // flies for 5 s, each landed attack pulsing a damaging, pulling tornado
+         // on the target (HeroWizardFieryFlightEffect). The 0.5-tile pull
+         // approximates the sourced "~50% pull strength".
+         add(troop(167, "Hero Wizard", 5.0f, Archetype::RangedSquad, 832, SPEED_MEDIUM, 5.5f, 281, 14, 'W')
+             .withTargetsAir().withSplash(1.5f)
+-            .withHeroAbility(1.0f, 200, std::make_shared<HeroWizardFieryFlightEffect>(50, 4.0f, 20, 0.5f)) /* audit 0003: wiki Wizard/Hero, level 11 */);
++            .withHeroAbility(1.0f, 0, std::make_shared<HeroWizardFieryFlightEffect>(50, 4.0f, 20, 0.5f), 1) /* audit 0003: wiki Wizard/Hero, level 11 */);
+ 
+-        // Hero Giant (base: id 2). "Heroic Hurl" (2 elixir, 14 s cooldown):
++        // Hero Giant (base: id 2). "Heroic Hurl" (2 elixir, single use since
++        // the 4 Aug 2026 notes; was a 14 s cooldown):
+         // throws the highest-HP enemy troop within 3.0 tiles (not sourced) to
+         // the other lane and stuns it 2 s (HeroGiantHurlEffect).
+         add(troop(169, "Hero Giant", 5.0f, Archetype::MeleeBuildingTargeter, 3968, SPEED_SLOW, 1.2f, 253, 15, 'G')
+             .withSightRange(7.5f)
+-            .withHeroAbility(2.0f, 140, std::make_shared<HeroGiantHurlEffect>(3.0f, 20)));
++            .withHeroAbility(2.0f, 0, std::make_shared<HeroGiantHurlEffect>(3.0f, 20), 1));
+ 
+         // Hero Mega Minion (base: id 43). "Wounding Warp" (2 elixir, one use,
+         // locked for the first 1.5 s): teleports to the lowest-HP enemy
+@@ -1704,14 +1708,14 @@ private:
+             .withHeroAbility(2.0f, 0, std::make_shared<HeroMegaMinionWarpEffect>(300), 1)
+             .withInitialAbilityCooldown(15));
+ 
+-        // Hero Magic Archer (base: id 63). "Triple Threat" (2 elixir, 25 s
+-        // cooldown): dashes back 5 tiles, leaves a decoy, and gains a 7 s
++        // Hero Magic Archer (base: id 63). "Triple Threat" (2 elixir, single
++        // use since the 4 Aug 2026 notes; was a 25 s cooldown): dashes back 5 tiles, leaves a decoy, and gains a 7 s
+         // multi-shot window (HeroMagicArcherTripleThreatEffect).
+         add(troop(171, "Hero Magic Archer", 4.0f, Archetype::RangedSquad, 529, SPEED_MEDIUM, 7.0f, 135, 11, '#')
+             .withTargetsAir()
+             .withSplash(0.25f).withLineSplash(11.0f).withSightRange(7.5f)
+-            .withHeroAbility(2.0f, 250, std::make_shared<HeroMagicArcherTripleThreatEffect>(
+-                5.0f, heroMagicArcherDecoyStats(), 70)) /* audit 0003: wiki Magic Archer/Hero, level 11 */);
++            .withHeroAbility(2.0f, 0, std::make_shared<HeroMagicArcherTripleThreatEffect>(
++                5.0f, heroMagicArcherDecoyStats(), 70), 1) /* audit 0003: wiki Magic Archer/Hero, level 11 */);
+ 
+         // Hero Ice Golem (base: id 40, including the slow on its death
+         // explosion). "Snowstorm" (2 elixir, 17 s cooldown): three staggered
+diff --git a/python_ai/models/net.py b/python_ai/models/net.py
+index 0346269..ba7dfb3 100644
+--- a/python_ai/models/net.py
++++ b/python_ai/models/net.py
+@@ -19,6 +19,33 @@ HIRES_HIDDEN = 8
+ 
+ # Placement constants, read from the engine. get_own_half_max_y() needs an
+ # instance, so one is built once here.
++_CONV_BATCH_INVARIANT = {}
++
++
++def _conv_batch_invariant(device):
++    """Whether Conv2d on `device` gives a row the same bits whatever batch it
++    is in. forward_sequence's row compaction is only exact when it does: true
++    of the MKL-DNN CPU path, false of Accelerate (macOS) and of some cuDNN
++    algorithms. Probed once per device type."""
++    key = torch.device(device).type
++    if key not in _CONV_BATCH_INVARIANT:
++        # The placement head's own conv shapes (place_up, place_hires): a
++        # backend can be batch-invariant at small shapes only.
++        g = torch.Generator().manual_seed(0)
++        rows = torch.tensor([3, 9], device=device)
++        same = True
++        for cin, cout, h, w in ((32, 16, 18, 10), (16 + HIRES_CTX_DIM, HIRES_HIDDEN, 34, 18)):
++            # Private generator: the probe must not move the global RNG.
++            wt = torch.randn(cout, cin, 3, 3, generator=g).to(device)
++            b = torch.randn(cout, generator=g).to(device)
++            x = torch.randn(16, cin, h, w, generator=g).to(device)
++            with torch.no_grad():
++                same = same and bool(torch.equal(F.conv2d(x, wt, b, padding=1)[rows],
++                                                 F.conv2d(x[rows], wt, b, padding=1)))
++        _CONV_BATCH_INVARIANT[key] = same
++    return _CONV_BATCH_INVARIANT[key]
++
++
+ _probe = clash_royale_env.ClashRoyaleEnv(list(range(8)), list(range(8)), 100)
+ OWN_HALF_MAX_Y = _probe.get_own_half_max_y()
+ MAX_PLACEMENT_X = _probe.get_max_placement_x()
+@@ -885,6 +912,14 @@ class MicroRoyaleNet(nn.Module):
+                     flat_hx, flat_embeds, flat_idx, flat_obs, flat_spatial,
+                     hires_map=flat_hires, cycle_feat=flat_cycle)
+             out = flat_hx.new_zeros(L * B, self.placement_cells)
++            if not _conv_batch_invariant(flat_hx.device):
++                # A backend whose conv depends on the batch: the head runs on
++                # every row and only the fill is applied, so the kept rows
++                # stay bit-identical to the uncompacted call.
++                full = self.placement_given_card(
++                    flat_hx, flat_embeds, flat_idx, flat_obs, flat_spatial,
++                    hires_map=flat_hires, cycle_feat=flat_cycle)
++                return out.index_copy(0, active_rows, full[active_rows])
+             if active_rows.numel() == 0:
+                 # An all-forced chunk (common for a spent-down agent) would
+                 # hand Conv2d an empty batch.
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index f675102..ac6b42f 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -87,12 +87,12 @@ TEST_CASE("Every currently-defined card resolves with id/name/cost/isSpell", "[c
+         {94, "Barbarian Hut", 6.0f, false}, {95, "Goblin Hut", 4.0f, false}, {96, "Tombstone", 3.0f, false},
+         {97, "Goblin Cage", 4.0f, false}, {98, "Goblin Drill", 4.0f, false}, {99, "Elixir Collector", 6.0f, false},
+         {100, "Giant Snowball", 2.0f, true}, {101, "Barbarian Barrel", 2.0f, true}, {102, "Goblin Curse", 2.0f, true},
+-        {103, "Earthquake", 3.0f, true}, {104, "Void", 3.0f, true}, {105, "Vines", 3.0f, true},
++        {103, "Earthquake", 3.0f, true}, {104, "Void", 5.0f, true}, {105, "Vines", 3.0f, true},
+         {106, "Tornado", 3.0f, true}, {107, "Freeze", 4.0f, true}, {108, "Rage", 2.0f, true},
+         {109, "Goblin Barrel", 3.0f, true}, {110, "Graveyard", 5.0f, true}, {111, "Royal Delivery", 3.0f, true},
+         {112, "Goblin Gang", 3.0f, false}, {113, "Rascals", 5.0f, false}, {114, "Clone", 3.0f, true},
+         {115, "Mighty Miner", 4.0f, false}, {116, "Golden Knight", 4.0f, false}, {117, "Skeleton King", 4.0f, false},
+-        {118, "Archer Queen", 5.0f, false}, {119, "Monk", 4.0f, false}, {120, "Little Prince", 3.0f, false},
++        {118, "Archer Queen", 5.0f, false}, {119, "Monk", 5.0f, false}, {120, "Little Prince", 3.0f, false},
+         {121, "Goblinstein", 5.0f, false}, {122, "Boss Bandit", 6.0f, false},
+         {123, "Wall Breakers", 2.0f, false}, // Evolution of id 83
+         {124, "Zap", 2.0f, true}, // Evolution of id 29
+@@ -418,7 +418,7 @@ TEST_CASE("Giant Skeleton, Ice Golem and Balloon deal death-explosion damage", "
+         auto entity = board.getEntities().back();
+         entity->takeDamage(entity->hp);
+         board.cleanDeadEntities();
+-        REQUIRE(enemy->hp == 100000 - 84);
++        REQUIRE(enemy->hp == 100000 - 92); // audit 0003: 92 death damage
+     }
+ 
+     SECTION("Balloon") {
+@@ -732,8 +732,9 @@ TEST_CASE("Ice Golem's slow is on its death explosion, never on its attack",
+     // ...and dying does slow: same duration and strength, the right trigger.
+     golem->hp = 0;
+     board.cleanDeadEntities();
+-    REQUIRE(enemy->freezeTicks == 30);
+-    REQUIRE(enemy->freezeSlow == Catch::Approx(0.65f));
++    // Audit 0003 (wiki, 6/10/2025): the Death Nova slows 30% for 2.5 s.
++    REQUIRE(enemy->freezeTicks == 25);
++    REQUIRE(enemy->freezeSlow == Catch::Approx(0.70f));
+ }
+ 
+ TEST_CASE("Electro Wizard stuns on hit via the on-hit decorator (freeze with slowFactor 0)", "[card_registry][on_hit]") {
+@@ -757,9 +758,10 @@ TEST_CASE("Electro Wizard stuns on hit via the on-hit decorator (freeze with slo
+     // Direct damage (an instant zap): damage and stun land the same tick. One
+     // enemy in range, so it takes the full damage, not the split half.
+     advancePastDeploy(electroWizardEntity, board);
++    windUp(electroWizardEntity, board); // the 1.2 s first-attack load (patch 0006)
+     electroWizardEntity->update(board);
+ 
+-    REQUIRE(enemy->hp == 882); // 1000 - 118
++    REQUIRE(enemy->hp == 885); // 1000 - 115 (audit 0003)
+     REQUIRE(enemy->freezeTicks == 5);
+     REQUIRE(enemy->freezeSlow == Catch::Approx(0.0f));
+ }
+@@ -783,10 +785,11 @@ TEST_CASE("Electro Wizard splits its attack across the 2 closest enemies at half
+     REQUIRE(electroWizardEntity != nullptr);
+ 
+     advancePastDeploy(electroWizardEntity, board);
++    windUp(electroWizardEntity, board); // the 1.2 s first-attack load (patch 0006)
+     electroWizardEntity->update(board);
+ 
+-    REQUIRE(near->hp == 941);  // 1000 - 118/2
+-    REQUIRE(far->hp == 941);
++    REQUIRE(near->hp == 943);  // 1000 - 115/2 (audit 0003)
++    REQUIRE(far->hp == 943);
+     REQUIRE(near->freezeTicks == 5); // both stunned
+     REQUIRE(far->freezeTicks == 5);
+ }
+@@ -1582,10 +1585,13 @@ TEST_CASE("X-Bow can't fire until its slow initial deploy delay elapses", "[card
+     board.commitPendingEntities();
+     auto xbow = board.getEntities().back();
+ 
+-    for (int i = 0; i < 34; ++i) xbow->update(board); // 3.4s: still not ready (delay is 3.5s/35 ticks)
++    // Audit 0003 made the 3.5 s a deploy time (withDeployTime(35)), so it
++    // follows the deploy convention of advancePastDeploy: inert for 35
++    // updates, acting on the next one.
++    for (int i = 0; i < 35; ++i) xbow->update(board); // 3.5s: still deploying
+     REQUIRE(enemy->hp == 100000);
+ 
+-    xbow->update(board); // the 35th tick: ready to fire
++    xbow->update(board); // the first update after deploy: fires
+     REQUIRE(enemy->hp < 100000);
+ }
+ 
+diff --git a/tests/core/test_deck_audit_item32.cpp b/tests/core/test_deck_audit_item32.cpp
+index f7dbc9e..6eb2605 100644
+--- a/tests/core/test_deck_audit_item32.cpp
++++ b/tests/core/test_deck_audit_item32.cpp
+@@ -553,7 +553,7 @@ TEST_CASE("Goblin Hut is 1180 hp and its Spear Goblins shoot air, every 1.6 s",
+     REQUIRE(flyer->hp < 1000000); // was untouched: the Hut's goblins could not target air
+ }
+ 
+-TEST_CASE("Every Barbarian is 716 hp, and Barbarian Barrel rolls for 232",
++TEST_CASE("Every Barbarian is 716 hp, and Barbarian Barrel rolls for 215",
+           "[item32][barbarians][regression]") {
+     {
+         Match cardMatch;
+@@ -565,8 +565,8 @@ TEST_CASE("Every Barbarian is 716 hp, and Barbarian Barrel rolls for 232",
+     auto barbarian = m.stepUntil("Barbarians", 0, 40);
+     REQUIRE(barbarian);
+     REQUIRE(barbarian->hp == 716);
+-    REQUIRE(target->hp <= 10000 - 232);
+-    REQUIRE(target->hp > 10000 - 2 * 232); // one roll hit (the Barbarian may have swung too)
++    REQUIRE(target->hp <= 10000 - 215); // audit 0003: wiki Barbarian Barrel, level 11
++    REQUIRE(target->hp > 10000 - 2 * 215); // one roll hit (the Barbarian may have swung too)
+ }
+ 
+ TEST_CASE("Barbarian Barrel is cast on its own side only; The Log keeps the river",
+diff --git a/tests/core/test_hero_abilities.cpp b/tests/core/test_hero_abilities.cpp
+index a92eb32..d219d04 100644
+--- a/tests/core/test_hero_abilities.cpp
++++ b/tests/core/test_hero_abilities.cpp
+@@ -40,7 +40,7 @@ TEST_CASE("Hero Mini P.E.K.K.A. (170) is registered with base Mini PEKKA's stats
+     REQUIRE(hero->abilityUsesRemaining == 1);
+ }
+ 
+-TEST_CASE("Hero Musketeer (168) is registered with base Musketeer's stats and a repeating-cooldown ability",
++TEST_CASE("Hero Musketeer (168) is registered with base Musketeer's stats and a one-use ability",
+         "[card_registry][hero]") {
+     Board board;
+     const CardDefinition* def = CardRegistry::getInstance().getCard(168);
+@@ -55,8 +55,9 @@ TEST_CASE("Hero Musketeer (168) is registered with base Musketeer's stats and a
+     REQUIRE(hero->hp == 721); // base Musketeer hp (id 6)
+     REQUIRE(hero->sightRange == Catch::Approx(6.0f));
+     REQUIRE(hero->abilityElixirCost == Catch::Approx(3.0f));
+-    REQUIRE(hero->abilityCooldownTicks == 220);
+-    REQUIRE(hero->abilityUsesRemaining == -1); // unlimited, gated by cooldown and elixir
++    // Single use since the 4 Aug 2026 notes (audit 0003; was a 22 s cooldown).
++    REQUIRE(hero->abilityCooldownTicks == 0);
++    REQUIRE(hero->abilityUsesRemaining == 1);
+ }
+ 
+ // ---------------- HeroMiniPekkaBoostEffect ----------------
+@@ -163,7 +164,8 @@ TEST_CASE("Hero Knight (166) is registered with base Knight's stats and the Taun
+     REQUIRE(hero != nullptr);
+     REQUIRE(hero->hp == 1766); // base Knight hp (id 0)
+     REQUIRE(hero->abilityElixirCost == Catch::Approx(2.0f));
+-    REQUIRE(hero->abilityCooldownTicks == 250);
++    REQUIRE(hero->abilityCooldownTicks == 0); // single use (4 Aug 2026 notes)
++    REQUIRE(hero->abilityUsesRemaining == 1);
+ }
+ 
+ TEST_CASE("HeroKnightTauntEffect forces nearby enemies to retarget and grants an expiring shield",
+@@ -238,10 +240,11 @@ TEST_CASE("Hero Wizard (167) is registered with base Wizard's stats and the Fier
+ 
+     auto hero = std::dynamic_pointer_cast<CombatEntity>(board.getEntities()[0]);
+     REQUIRE(hero != nullptr);
+-    REQUIRE(hero->hp == 755); // base Wizard hp (id 11)
++    REQUIRE(hero->hp == 832); // base Wizard hp (id 11; audit 0003)
+     REQUIRE(hero->splashRadius == Catch::Approx(1.5f));
+     REQUIRE(hero->abilityElixirCost == Catch::Approx(1.0f));
+-    REQUIRE(hero->abilityCooldownTicks == 200);
++    REQUIRE(hero->abilityCooldownTicks == 0); // single use (4 Aug 2026 notes)
++    REQUIRE(hero->abilityUsesRemaining == 1);
+     REQUIRE_FALSE(hero->isFlying); // not yet activated
+ }
+ 
+@@ -334,7 +337,8 @@ TEST_CASE("Hero Giant (169) is registered with base Giant's stats and the Heroic
+     REQUIRE(hero != nullptr);
+     REQUIRE(hero->hp == 3968); // base Giant hp (id 2)
+     REQUIRE(hero->abilityElixirCost == Catch::Approx(2.0f));
+-    REQUIRE(hero->abilityCooldownTicks == 140);
++    REQUIRE(hero->abilityCooldownTicks == 0); // single use (4 Aug 2026 notes)
++    REQUIRE(hero->abilityUsesRemaining == 1);
+ }
+ 
+ TEST_CASE("HeroGiantHurlEffect throws the highest-HP enemy in range across the lane and stuns it",
+@@ -407,7 +411,8 @@ TEST_CASE("Hero Magic Archer (171) is registered with base Magic Archer's stats
+     REQUIRE(hero != nullptr);
+     REQUIRE(hero->hp == 529); // base Magic Archer hp (id 63)
+     REQUIRE(hero->abilityElixirCost == Catch::Approx(2.0f));
+-    REQUIRE(hero->abilityCooldownTicks == 250);
++    REQUIRE(hero->abilityCooldownTicks == 0); // single use (4 Aug 2026 notes)
++    REQUIRE(hero->abilityUsesRemaining == 1);
+     REQUIRE(hero->maxSplitTargets == 1); // not yet activated
+ }
+ 
+@@ -480,7 +485,8 @@ TEST_CASE("Hero Ice Golem (175) is registered with base Ice Golem's stats and th
+     REQUIRE(hero != nullptr);
+     REQUIRE(hero->hp == 1315); // base Ice Golem hp (id 40)
+     REQUIRE(hero->abilityElixirCost == Catch::Approx(2.0f));
+-    REQUIRE(hero->abilityCooldownTicks == 170);
++    REQUIRE(hero->abilityCooldownTicks == 0); // single use (audit 0003; was 17 s)
++    REQUIRE(hero->abilityUsesRemaining == 1);
+ }
+ 
+ TEST_CASE("HeroIceGolemSnowstormEffect's first blast damages/slows, discounting Tower damage",

@@ -1,0 +1,92 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index d4993eb..ee57fc4 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1354,9 +1354,20 @@ advancing every tick and damaging each target **at most once**.
+ 
+ | | width | range | speed | knockback |
+ |---|---|---|---|---|
+-| The Log (33) | 3.9 | 10.1 | 1.0 tiles/tick | 0.8 |
++| The Log (33) | 3.9 | 10.1 | 0.34 tiles/tick (measured) | 0.8 |
+ | Barbarian Barrel (101, 174) | 2.6 | 4.5 | 0.5 tiles/tick | none |
+ 
++**The Log's speed is measured, not guessed** (UPSTREAM_REQUESTS.md item 43). It
++was 1.0 tiles/tick, a whole 10.1 roll in ~1 s. In match footage (19 full rolls
++across 3 videos at 60 fps) the roll takes **2.96 s** from the first motion to
++rest, so 10.1 / 2.96 = 3.41 tiles/s, i.e. **0.34 tiles/tick**, about 30 ticks
++per roll. That agrees with the published speed 200 read as 60 = 1 tile/s
++(3.33). The range is unchanged, so the bridge-to-tower property below still
++holds; the hit just lands on tick 27 instead of tick 9. The Barrel's 0.5 is
++still unsourced: the one clean enemy Barrel in the footage looked faster
++(~13 screen-tiles/s peak, but its thrown arrival blurs the onset), so it is
++left alone until more footage is checked.
++
+ **3.9 is a WIDTH and was being read as a RADIUS**, so The Log's old footprint
+ was a circle of diameter 7.8 — twice as wide laterally as the real card, and
+ it never moved. Same for the Barrel at 2.5.
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index 9d15a1d..a023f8e 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -671,11 +671,15 @@ private:
+         // range 10.1. The radius argument is unused for rollers and kept at 3.9
+         // to match. From the bridge the 10.1 reaches an enemy Princess Tower's
+         // near edge (9.00 away) but not its centre (10.50); test_area_spell.cpp
+-        // pins this against ArenaLayout. Speed (1.0 tiles/tick, ~1 s for the
+-        // roll) and knockback (0.8) are not sourced.
++        // pins this against ArenaLayout. Speed 0.34 tiles/tick (3.4 tiles/s,
++        // the 10.1 roll takes ~3.0 s) is measured from match footage: 19 full
++        // rolls in 3 videos took 2.96 s median motion start to stop, and the
++        // moving-phase slope was 3.47 screen tiles/s (UPSTREAM_REQUESTS.md
++        // item 43). It agrees with the published speed 200 read as 60 = 1
++        // tile/s (3.33). Knockback (0.8) is not sourced.
+         add(spell(33, "The Log", 2.0f, 3.9f, 269, 8, 'o')
+             .withGroundOnly()
+-            .withRollingSweep(10.1f, 3.9f, 1.0f, 0.8f)
++            .withRollingSweep(10.1f, 3.9f, 0.34f, 0.8f)
+             .withCrownTowerDamage(35)); // audit 0003: wiki The Log, level 11 (13% since 1/6/2026)
+ 
+         // --- the 2026 roster expansion (ids 46+) ---
+diff --git a/tests/entities/test_area_spell.cpp b/tests/entities/test_area_spell.cpp
+index a6efcab..4c15436 100644
+--- a/tests/entities/test_area_spell.cpp
++++ b/tests/entities/test_area_spell.cpp
+@@ -1,4 +1,5 @@
+ #include <catch_amalgamated.hpp>
++#include <cmath>
+ #include "test_helpers.h"
+ #include "AreaSpell.h"
+ #include "ArenaLayout.h"
+@@ -458,6 +459,32 @@ TEST_CASE("The Log's 10.1 range reaches a Princess Tower from the bridge", "[are
+     REQUIRE(tower->hp == 2534 - 269);
+ }
+ 
++TEST_CASE("The Log rolls at the measured 0.34 tiles/tick and still reaches the tower", "[area_spell][roll][bridge][registry]") {
++    // The registry's own roll (UPSTREAM_REQUESTS.md item 43): footage puts the
++    // full 10.1 roll at ~3.0 s. From the bridge the tower's near edge is 9.0
++    // tiles of travel away, so the hit lands on tick ceil(9.0 / 0.34) = 27,
++    // not within the first second as at the old 1.0 tiles/tick.
++    const auto& stats = *CardRegistry::getInstance().getCard(33)->stats;
++    REQUIRE(stats.spellRollSpeed == Catch::Approx(0.34f));
++    REQUIRE(stats.spellRollRange == Catch::Approx(10.1f));
++
++    const float towerY = ArenaLayout::princessY(1);
++    Board board;
++    auto tower = std::make_shared<Building>(1, ArenaLayout::LEFT_LANE_X, towerY, 2534, 1, 'T', 7.5f, 50, 10);
++    spawn(board, tower);
++
++    AreaSpell log = makeRoller(2, ArenaLayout::LEFT_LANE_X, ArenaLayout::BRIDGE_Y, 0, 269,
++                               stats.spellRollRange, stats.spellRollWidth,
++                               stats.spellRollSpeed, stats.spellRollKnockback);
++    const int hitTick = static_cast<int>(std::ceil(((towerY - 1.5f) - ArenaLayout::BRIDGE_Y) / stats.spellRollSpeed));
++    for (int i = 0; i < hitTick - 1; ++i) log.update(board);
++    REQUIRE(tower->hp == 2534);           // not yet
++    for (int i = 0; i < 6; ++i) log.update(board);
++    REQUIRE(tower->hp == 2534 - 269);     // reached, once
++    for (int i = 0; i < 10; ++i) log.update(board);
++    REQUIRE_FALSE(log.isAlive());         // the 10.1 roll ends at ~30 ticks
++}
++
+ TEST_CASE("The Log throws edge-caught units SIDEWAYS and centred ones FORWARD", "[area_spell][roll][knockback]") {
+     // The card's tactical point: it splits a group rather than shunting it back
+     // as one block, which a radial pushAway cannot do.

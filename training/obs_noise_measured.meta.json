@@ -1,0 +1,415 @@
+{
+ "made": "2026-11-19 22:15:12",
+ "by": "live_ppo/eval/match_audit.py noise-config",
+ "matches": {
+  "rec_dry1": "B_last",
+  "vid_QD_1suWFNKo": "B_last"
+ },
+ "min_n": 30,
+ "label_free": {
+  "battle_frames": 11373,
+  "reference_tracks": 2533,
+  "unit_frames": 53825
+ },
+ "labels": [
+  "vid_QD_1suWFNKo: 24 frames, 262 units",
+  "vid_iVgmnDX-GPY+vid_uVf1EUszTIM: 99 frames, 966 units"
+ ],
+ "fields": {
+  "scale": {
+   "status": "default",
+   "value": 1.0,
+   "why": "not measured by match_audit"
+  },
+  "scale_range": {
+   "status": "default",
+   "value": null,
+   "why": "not measured by match_audit"
+  },
+  "perception_hz": {
+   "n": 11373,
+   "ci": null,
+   "source": "label-free: 1 / median interval between battle frames",
+   "default": 4.0,
+   "status": "measured",
+   "value": 4.0
+  },
+  "hp_as_live": {
+   "status": "default",
+   "value": false,
+   "why": "not measured by match_audit"
+  },
+  "publish_clean": {
+   "status": "default",
+   "value": false,
+   "why": "not measured by match_audit"
+  },
+  "miss_isolated": {
+   "n": 622,
+   "ci": [
+    0.05490355486549773,
+    0.09874290154247563
+   ],
+   "source": "labels, tracker output: labelled units with no deploy / spell flag and no labelled unit within overlap_radius that the tracker did not report",
+   "default": 0.03,
+   "status": "measured",
+   "value": 0.0756
+  },
+  "miss_deploy": {
+   "n": 146,
+   "ci": [
+    0.08271171399594321,
+    0.21642412935323382
+   ],
+   "source": "labels, tracker output: missed share of units flagged `deploy`",
+   "default": 0.15,
+   "note": "includes units not yet confirmed (the first-seen delay)",
+   "status": "measured",
+   "value": 0.1438
+  },
+  "miss_overlap": {
+   "n": 448,
+   "ci": [
+    0.07423708182368875,
+    0.13928235137181663
+   ],
+   "source": "labels, tracker output: missed share of units with another labelled unit within overlap_radius cells",
+   "default": 0.16,
+   "status": "measured",
+   "value": 0.1071
+  },
+  "miss_spell": {
+   "n": 101,
+   "ci": [
+    0.09676447726389428,
+    0.25677348140219425
+   ],
+   "source": "labels, tracker output: missed share of units flagged `spell`",
+   "default": 0.13,
+   "status": "measured",
+   "value": 0.1683
+  },
+  "miss_mean_frames": {
+   "n": 2592,
+   "ci": [
+    1.8526234567901234,
+    1.9564139660493827
+   ],
+   "source": "label-free: mean run of frames a confirmed track has no box (within a track + stitched re-acquisitions)",
+   "default": 3.0,
+   "note": "within a track only: 1.63 over 2301 runs (cannot exceed 4 frames, the tracker's memory); geometric fit for that cut-off 1.78. Misses at the start or end of a unit's life are not runs here.",
+   "status": "measured",
+   "value": 1.9
+  },
+  "deploy_seconds": {
+   "status": "default",
+   "value": 1.0,
+   "why": "not measured by match_audit"
+  },
+  "overlap_radius": {
+   "status": "default",
+   "value": 1.0,
+   "why": "not measured by match_audit"
+  },
+  "spell_seconds": {
+   "status": "default",
+   "value": 1.0,
+   "why": "not measured by match_audit"
+  },
+  "first_seen_delay_frames": {
+   "n": 2300,
+   "ci": [
+    0.358695652173913,
+    0.4260869565217391
+   ],
+   "source": "label-free: frames from a new track's first box (>= the tracker floor) to the first frame it is emitted; 16 evenly spaced order statistics",
+   "default": [],
+   "note": "mean 0.39 frames, 0.728 of new units emitted at once. A lower bound: frames before the detector's first box need labelled bursts. The default miss_deploy already contains this delay, so with both set the first frames are slightly over-hidden",
+   "status": "measured",
+   "value": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    3
+   ]
+  },
+  "ghost_death_prob": {
+   "status": "default",
+   "value": 1.0,
+   "why": "not measured by match_audit"
+  },
+  "ghost_hold_frames": {
+   "status": "default",
+   "value": [
+    1,
+    2
+   ],
+   "why": "not measured by match_audit"
+  },
+  "spurious_per_unit": {
+   "n": 1107,
+   "ci": [
+    0.03306397514225885,
+    0.06787597797739785
+   ],
+   "source": "labels, tracker output: false boxes that are not ghost-like, per correctly reported unit",
+   "default": 0.02,
+   "note": "all false boxes per reported unit: 0.069; ghost-like (left on a dead unit): 0.019, which the model draws separately (ghost_death_prob)",
+   "status": "measured",
+   "value": 0.0497
+  },
+  "spurious_frames": {
+   "n": 55,
+   "ci": null,
+   "source": "labels, tracker output: frames the false box's track was shown in the replay, 16 order statistics weighted by 1/length (a labelled frame catches a long false track more often than a short one; the model draws one duration per spurious box)",
+   "default": [
+    1,
+    2,
+    3
+   ],
+   "note": "as caught on the labelled frames, unweighted: [1, 1, 1, 3, 9, 17, 32, 80]; mean per false track 2.28 frames. A long-lived false track is a persistent misreading (or a real unit the labels do not have), not a flicker; 16 entries cannot carry that rare long tail, so the model's false boxes are shorter and more numerous than the real ones",
+   "status": "measured",
+   "value": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    2,
+    3,
+    14
+   ]
+  },
+  "spurious_near_unit": {
+   "n": 55,
+   "ci": [
+    0.35185185185185186,
+    0.5946106821106821
+   ],
+   "source": "labels, tracker output: share of those false boxes within 1.5 tiles of a labelled unit",
+   "default": 0.7,
+   "status": "measured",
+   "value": 0.473
+  },
+  "spurious_near_radius": {
+   "status": "default",
+   "value": 1,
+   "why": "not measured by match_audit"
+  },
+  "wrong_side": {
+   "n": 1026,
+   "ci": [
+    0.021212498403596673,
+    0.048098026496152226
+   ],
+   "source": "labels, tracker output: reported units (side certain) on the wrong side",
+   "default": 0.03,
+   "status": "measured",
+   "value": 0.0341
+  },
+  "wrong_side_lifelong": {
+   "n": 27,
+   "ci": [
+    0.6399090909090909,
+    0.9523809523809523
+   ],
+   "source": "labels, tracker output: share of wrong-side units whose track showed that side on >= 90% of its frames",
+   "default": 0.8,
+   "status": "default",
+   "value": 0.8,
+   "measured_value": 0.815,
+   "why": "only 27 samples (< 30); measured value kept for reference"
+  },
+  "wrong_card_form": {
+   "n": 599,
+   "ci": [
+    0.013956799524200017,
+    0.04228331207944432
+   ],
+   "source": "labels, tracker output: wrong form, among reported units whose card has another form",
+   "default": 0.0375,
+   "status": "measured",
+   "value": 0.0267
+  },
+  "wrong_card_lookalike": {
+   "n": 95,
+   "ci": [
+    0.0,
+    0.2
+   ],
+   "source": "labels, tracker output: read as its lookalike, among reported units whose card has one",
+   "default": 0.03,
+   "status": "measured",
+   "value": 0.0842
+  },
+  "wrong_card_other": {
+   "n": 928,
+   "ci": [
+    0.051102741974395585,
+    0.10449027397477088
+   ],
+   "source": "labels, tracker output: read as another card",
+   "default": 0.0075,
+   "status": "measured",
+   "value": 0.0754
+  },
+  "wrong_card_lifelong": {
+   "n": 94,
+   "ci": [
+    0.8403707759699625,
+    0.956149885583524
+   ],
+   "source": "labels, tracker output: share of wrong-card units whose track showed that card on >= 90% of its frames",
+   "default": 0.8,
+   "status": "measured",
+   "value": 0.904
+  },
+  "flip_mean_frames": {
+   "n": 748,
+   "ci": [
+    4.601370320855615,
+    6.334592245989304
+   ],
+   "source": "label-free: mean run of frames the tracker's emitted side or base class differs from the track's final vote",
+   "default": 4.0,
+   "note": "602 of 748 runs start on the track's first emitted frame (wrong at first, corrected by the vote); the model starts transient errors at any time",
+   "status": "measured",
+   "value": 5.41
+  },
+  "lookalike_pairs": {
+   "status": "default",
+   "value": [
+    [
+     "Barbarians",
+     "Elite Barbarians"
+    ],
+    [
+     "Minions",
+     "Mega Minion"
+    ],
+    [
+     "Goblins",
+     "Spear Goblins"
+    ]
+   ],
+   "why": "not measured by match_audit"
+  },
+  "other_neighbours": {
+   "status": "default",
+   "value": 6,
+   "why": "not measured by match_audit"
+  },
+  "pos_bias_sigma": {
+   "n": 1006,
+   "ci": [
+    0.15405656457734443,
+    0.17079422188405413
+   ],
+   "source": "labels, tracker output: the default error shape scaled by 1.078 so its median radial error is the measured 0.322 tiles",
+   "default": 0.15,
+   "note": "the split into per-unit bias, per-frame jitter and tail is the default's, not measured (measured p95 0.868, same cell 0.585)",
+   "status": "measured",
+   "value": 0.1616
+  },
+  "pos_jitter_sigma": {
+   "n": 1006,
+   "ci": [
+    0.17459743985432372,
+    0.19356678480192804
+   ],
+   "source": "labels, tracker output: the default error shape scaled by 1.078 so its median radial error is the measured 0.322 tiles",
+   "default": 0.17,
+   "note": "the split into per-unit bias, per-frame jitter and tail is the default's, not measured (measured p95 0.868, same cell 0.585)",
+   "status": "measured",
+   "value": 0.1832
+  },
+  "pos_tail_prob": {
+   "status": "default",
+   "value": 0.2,
+   "why": "not measured by match_audit"
+  },
+  "pos_tail_sigma": {
+   "n": 1006,
+   "ci": [
+    0.4621696937320333,
+    0.5123826656521624
+   ],
+   "source": "labels, tracker output: the default error shape scaled by 1.078 so its median radial error is the measured 0.322 tiles",
+   "default": 0.45,
+   "note": "the split into per-unit bias, per-frame jitter and tail is the default's, not measured (measured p95 0.868, same cell 0.585)",
+   "status": "measured",
+   "value": 0.4849
+  }
+ },
+ "label_free_reference": {
+  "note": "lower bounds from the frame sequence alone; shown for comparison, not written to the config",
+  "miss_isolated": {
+   "unit_frames": 24977,
+   "tracks": 1488,
+   "rate": 0.031188693598110263,
+   "ci": [
+    0.027590072059810247,
+    0.03488697289184431
+   ]
+  },
+  "miss_deploy (first 1.5 s after confirmation)": {
+   "unit_frames": 15306,
+   "tracks": 2532,
+   "rate": 0.10727819155886581,
+   "ci": [
+    0.1008993126455625,
+    0.11398951803219894
+   ]
+  },
+  "miss_overlap": {
+   "unit_frames": 18423,
+   "tracks": 1929,
+   "rate": 0.10524887369049557,
+   "ci": [
+    0.09816641251080267,
+    0.11297787629085629
+   ]
+  },
+  "miss_spell": {
+   "unit_frames": 2756,
+   "tracks": 735,
+   "rate": 0.15384615384615385,
+   "ci": [
+    0.13443410060337874,
+    0.17319920463499688
+   ]
+  },
+  "spurious_per_unit (confirmed-but-short tracks per shown real unit-frame)": 0.0385982428115016,
+  "spurious_near_unit (those within 1.5 tiles of a real track)": 0.46143617021276595,
+  "transient wrong side (tracker output)": 0.016773162939297124,
+  "transient wrong base class (tracker output)": 0.06753194888178914
+ },
+ "cannot_see": [
+  "A unit the detector never fires on (no box at the tracker floor on any frame): it has no track, so it is in none of these numbers.",
+  "The frames a unit is on screen before its first box and after its last box: a miss at either end of a unit's life is not a gap here. Every miss rate above is therefore a LOWER bound.",
+  "A miss longer than the tracker's memory (4 frames here): the track is dropped and the unit comes back as a new track. Those are only recovered by the stitching rule, which can also join two different units of one class (a Skeleton that died next to one that spawned).",
+  "A class or side error that lasts the unit's whole life: the reference is the track's own final vote, so a unit that is always read wrong agrees with itself. Only transient errors show up here.",
+  "Whether a short-lived or never-confirmed track was a false box or a real unit that died at once.",
+  "Position error (there is no true position without labels)."
+ ]
+}

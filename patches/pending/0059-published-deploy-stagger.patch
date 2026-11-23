@@ -1,0 +1,607 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index ecb112b..55ae79f 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1571,6 +1571,78 @@ carries an Ice Golem and moves a Golem much less, the lane pair on a tower),
+ 20/24 / 4/24 of an overlap, hand-built troops halve it). No existing
+ expectation moved.
+ 
++## 2026-11-22: the units of a played card deploy one published delay apart (patch 0059)
++
++**GAMEPLAY-AFFECTING** for every multi-unit card below (none is in
++`DEFAULT_DECK`; most opponents hold one). Every unit of a card had the same
++deploy time, so five Barbarians or six Royal Recruits started to move and to
++wind up on one tick. The game's CARD records carry `SummonDeployDelay`, and two
++of them `SummonDeployDelaySecond` (FirstLight-Zero card_specs.json, release
++15.535.13). New `include/core/SummonDelays.h`, keyed by registry NAME:
++
++| published | cards |
++|---|---|
++| SummonDeployDelay 100 | Archers, Minions, Barbarians, Spear Goblins, Minion Horde, Guards, Three Musketeers, Goblin Gang (its three Goblins), Elite Barbarians, Royal Recruits, Bats, Zappies, Wall Breakers, Royal Hogs, Skeleton Dragons |
++| SummonDeployDelay 200 | Goblins |
++| SummonDeployDelaySecond 100 | Rascals (the two Girls), Goblinstein (the Doctor) |
++| no such field | Skeletons, Skeleton Army, every one-unit card. Fire Spirit carries 100 with SummonNumber 1, which changes nothing |
++
++Unit k of the card (0, 1, 2, ...) has k delays added to its deploy time; unit
++k of a second group has (k + 1) second-delays added. Barbarians are ready 1.0,
++1.1, 1.2, 1.3, 1.4 s after the play, Goblins 1.0, 1.2, 1.4, 1.6 s, Royal
++Recruits 1.0 to 1.5 s, Rascals' Boy 1.0 and the Girls 1.1 and 1.2 s.
++
++- **The reading is inferred**: the field names are all that is published. That
++  the delay is between consecutive units, and that the first unit keeps the
++  plain deploy time, is the plain reading of "summon deploy delay"; a delay
++  published for Goblinstein's single Doctor has no other meaning than "after
++  the first body". No recording here shows a multi-unit card closely enough to
++  check it (our deck has none; an opponent's squad is not tracked per unit).
++- **Which unit is first is not published.** The order is the registry's
++  `spawnOffsets` order (for most squads front or left first). For a squad
++  walking up a lane this decides which body arrives first by 0.1 s a unit.
++- Goblin Gang publishes no second delay: its Spear Goblins all keep the plain
++  deploy time (they land with the first Goblin).
++- The Evolution records that are resolved in the pack (Archers, Barbarians,
++  Minion Horde, Royal Recruits, Bats, Wall Breakers, Royal Hogs) carry the same
++  100; an Evolution shares the name and with it the row. Evolved Elite
++  Barbarians have no record (`AngryBarbarians_EV1` is NotInUse) and take the
++  plain card's. "Hero X" with no row is X (Hero Goblins: assumed, its record
++  was not read).
++- **Only a card that is played.** `CardFactories::spawn` has a `played` flag
++  that only the registry's `spawnEntity` / `spawnEvolvedEntity` set (so
++  `playCard` and `inject` are staggered alike). The Goblins of a Goblin Barrel
++  or a hut, the Barbarians of a Battle Ram, the Bats of a Night Witch and
++  whatever an ability summons go through the same factory without it and land
++  together: they have no card record of this kind. A first version keyed this
++  on "registry id >= 0"; a child `CardStats` built without an id has id 0, so
++  that would have been wrong silently.
++- `inject(..., deploy_ticks >= 0)` still sets every unit's deploy time outright
++  and so removes the stagger (test hook).
++- The unit records carry a separate `DeployDelay` (400 ms for most units, 300
++  for Musketeer, Hunter and Fisherman). What it is was not established; it is
++  NOT used.
++- `get_card_stats(id)["base"]` reports `summon_deploy_delay_ticks` and
++  `summon_deploy_delay_second_ticks` (0 = none).
++
++Tests: `python_ai/tests/test_deploy_stagger.py` (every row through the bindings
++and on what is spawned for both teams, Skeletons and the Skeleton Army
++together, the second bodies, Goblin Gang, a card played from the hand, a Goblin
++Barrel's Goblins and a Battle Ram's Barbarians not staggered, the inject
++override), `tests/core/test_card_registry.cpp` `[patch0059]` (table, the
++sequences, Evolution and Hero, the same stats spawned without the flag).
++
++One existing expectation moved:
++
++- `tests/core/test_cards_0015.cpp` `[patch0055]` (Evolved Elite Barbarians'
++  Rage): it read "440 lost on one update: one spear each" and "the first
++  barbarian is enraged for exactly 20 updates". Both encoded the two
++  barbarians deploying on the same tick, not a published or recorded value:
++  the spears are now one update apart, 220 each, and the second throw
++  restarts the Rage of both. The published values are still pinned: each
++  spear 220, two spears and no third within 5 s, and both barbarians enraged
++  for exactly 20 updates from the last throw (the 8 Sep 2026 note's 2 s).
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index a5a79a7..9517a50 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -5,6 +5,7 @@
+ #include "ProjectileSpeeds.h"
+ #include "BodySizes.h"
+ #include "Pushback.h"
++#include "SummonDelays.h"
+ #include "Board.h"
+ #include "MeleeTroop.h"
+ #include "RangedTroop.h"
+@@ -330,7 +331,9 @@ inline void spawnSpell(const CardStats& stats, float x, float y, int team, Board
+     board.addEntity(spell);
+ }
+ 
+-inline void spawn(const CardStats& stats, float x, float y, int team, Board& board) {
++// `played`: the card itself is being played (set only by the registry's spawn
++// functions); the published deploy stagger applies to nothing else.
++inline void spawn(const CardStats& stats, float x, float y, int team, Board& board, bool played = false) {
+     const size_t firstPrimary = board.pendingEntityCount();
+     switch (stats.archetype) {
+         case Archetype::MeleeSquad:             spawnMeleeSquad(stats, x, y, team, board); break;
+@@ -344,8 +347,8 @@ inline void spawn(const CardStats& stats, float x, float y, int team, Board& boa
+     // Compound cards (Goblin Giant, Ram Rider, Goblin Machine, Goblin Gang,
+     // Rascals): the second, independently targeting unit spawns at the same
+     // point.
++    const size_t firstSecondary = board.pendingEntityCount();
+     if (stats.secondaryUnit) {
+-        const size_t firstSecondary = board.pendingEntityCount();
+         spawn(*stats.secondaryUnit, x, y, team, board);
+         // Attached secondaries (patch 0046) ride the card's first unit.
+         if (stats.secondaryAttached) {
+@@ -360,6 +363,23 @@ inline void spawn(const CardStats& stats, float x, float y, int team, Board& boa
+             }
+         }
+     }
++    // Published deploy stagger of a played multi-unit card (SummonDelays.h,
++    // patch 0059): unit k of the card deploys k delays after its first, unit
++    // k of a second group (k + 1) second-delays after it.
++    if (const SummonDelays::Row* stagger = played ? SummonDelays::find(stats.name) : nullptr) {
++        int k = 0;
++        for (size_t i = firstPrimary; i < firstSecondary; ++i) {
++            if (auto unit = std::dynamic_pointer_cast<CombatEntity>(board.getPendingEntity(i))) {
++                unit->deployTicksRemaining += (k++) * stagger->ticks;
++            }
++        }
++        k = 1;
++        for (size_t i = firstSecondary; i < board.pendingEntityCount(); ++i) {
++            if (auto unit = std::dynamic_pointer_cast<CombatEntity>(board.getPendingEntity(i))) {
++                unit->deployTicksRemaining += (k++) * stagger->secondTicks;
++            }
++        }
++    }
+ }
+ 
+ } // namespace CardFactories
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index 2e6041c..4d34c49 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -477,7 +477,7 @@ private:
+         def.symbol = stats.symbol;
+         def.isFlying = stats.isFlying;
+         def.spawnEntity = [stats](float x, float y, int team, Board& board) {
+-            CardFactories::spawn(stats, x, y, team, board);
++            CardFactories::spawn(stats, x, y, team, board, true);
+         };
+         def.stats = std::make_shared<const CardStats>(stats);
+         cards[stats.id] = std::move(def);
+@@ -513,13 +513,13 @@ private:
+         def.symbol = baseStats.symbol;
+         def.isFlying = baseStats.isFlying;
+         def.spawnEntity = [baseStats](float x, float y, int team, Board& board) {
+-            CardFactories::spawn(baseStats, x, y, team, board);
++            CardFactories::spawn(baseStats, x, y, team, board, true);
+         };
+         def.isEvolution = true;
+         def.evolutionCycleThreshold = cycleThreshold;
+         def.evolvedUsesGranted = evolvedUses;
+         def.spawnEvolvedEntity = [evolvedStats](float x, float y, int team, Board& board) {
+-            CardFactories::spawn(evolvedStats, x, y, team, board);
++            CardFactories::spawn(evolvedStats, x, y, team, board, true);
+         };
+         def.stats = std::make_shared<const CardStats>(baseStats);
+         def.evolvedStats = std::make_shared<const CardStats>(evolvedStats);
+diff --git a/include/core/SummonDelays.h b/include/core/SummonDelays.h
+new file mode 100644
+index 0000000..bbf1566
+--- /dev/null
++++ b/include/core/SummonDelays.h
+@@ -0,0 +1,75 @@
++#pragma once
++
++#include <string>
++
++// Published deploy stagger of the multi-unit cards. Read by
++// CardFactories::spawn: the units of one PLAYED card do not all finish
++// deploying on the same tick.
++//
++// The game's card records carry `SummonDeployDelay` (milliseconds between one
++// unit of the card and the next) and, for the two cards whose second body is
++// another character, `SummonDeployDelaySecond`. Until patch 0059 every unit of
++// a card had the same deploy time, so five Barbarians or six Royal Recruits
++// began to move and to wind up on one tick.
++//
++// Source: FirstLight-Zero card_specs.json, release 15.535.13, the card
++// records (not the unit records, whose `DeployDelay` is another field and is
++// not used here).
++//
++//   SummonDeployDelay 100: Archers, Minions, Barbarians, Spear Goblins,
++//     Minion Horde, Guards (SkeletonWarriors), Three Musketeers, Goblin Gang,
++//     Elite Barbarians (AngryBarbarians), Royal Recruits, Bats, Zappies
++//     (MiniSparkys), Wall Breakers, Royal Hogs, Skeleton Dragons. The Evolution
++//     records that are resolved in the pack (Archers, Barbarians, Minion Horde,
++//     Royal Recruits, Bats, Wall Breakers, Royal Hogs) carry the same 100.
++//   SummonDeployDelay 200: Goblins.
++//   SummonDeployDelaySecond 100: Rascals (the two Girls), Goblinstein (the
++//     Doctor).
++//   No such field: Skeletons, Skeleton Army, and every one-unit card. Fire
++//     Spirits carries 100 with SummonNumber 1, which changes nothing.
++//
++// THE READING IS INFERRED, the field names are all that is published: unit k
++// of the card (0, 1, 2, ...) finishes its deploy time k delays after the first,
++// and unit k of a second group (k + 1) second-delays after it (a delay
++// published for Goblinstein's single Doctor has no other meaning). Goblin
++// Gang publishes no second delay, so its three Spear Goblins are not
++// staggered. Which unit of a formation is first is not published: the order
++// is the registry's spawnOffsets order.
++//
++// Keyed by registry NAME like LoadTimes.h: an Evolution shares the row and
++// "Hero X" with no row of its own is X (assumed: the Hero records were not
++// read). Applied only to a card that is PLAYED: CardFactories::spawn takes a
++// `played` flag that only the registry's own spawn functions set. The Goblins
++// of a Goblin Barrel or a Goblin Hut, the Barbarians of a Battle Ram and the
++// Bats of a Night Witch are spawned by something else, have no record of this
++// kind and are not staggered, although they share a name with a card that is.
++namespace SummonDelays {
++
++struct Row { const char* name; int ticks; int secondTicks; };
++
++inline constexpr Row ROWS[] = {
++    { "Archers", 1, 0 }, { "Minions", 1, 0 }, { "Barbarians", 1, 0 }, { "Spear Goblins", 1, 0 },
++    { "Minion Horde", 1, 0 }, { "Guards", 1, 0 }, { "Three Musketeers", 1, 0 }, { "Goblin Gang", 1, 0 },
++    { "Elite Barbarians", 1, 0 }, { "Royal Recruits", 1, 0 }, { "Bats", 1, 0 }, { "Zappies", 1, 0 },
++    { "Wall Breakers", 1, 0 }, { "Royal Hogs", 1, 0 }, { "Skeleton Dragons", 1, 0 },
++    { "Goblins", 2, 0 },
++    { "Rascals", 0, 1 }, { "Goblinstein", 0, 1 },
++};
++
++inline const Row* findExact(const std::string& name) {
++    for (const Row& r : ROWS) {
++        if (name == r.name) return &r;
++    }
++    return nullptr;
++}
++
++// The row of a card: its own, or the plain card's for a "Hero X". nullptr for
++// a card with no stagger.
++inline const Row* find(const std::string& name) {
++    if (const Row* r = findExact(name)) return r;
++    static const std::string HERO = "Hero ";
++    if (name.compare(0, HERO.size(), HERO) == 0) return findExact(name.substr(HERO.size()));
++    return nullptr;
++}
++
++}  // namespace SummonDelays
+diff --git a/python_ai/tests/test_deploy_stagger.py b/python_ai/tests/test_deploy_stagger.py
+new file mode 100644
+index 0000000..1019b95
+--- /dev/null
++++ b/python_ai/tests/test_deploy_stagger.py
+@@ -0,0 +1,171 @@
++"""The units of a played multi-unit card deploy one published delay apart
++(patch 0059).
++
++The game's card records carry SummonDeployDelay, the time between one unit of
++the card and the next (FirstLight-Zero card_specs.json, release 15.535.13):
++100 ms for Archers, Minions, Barbarians, Spear Goblins, Minion Horde, Guards,
++Three Musketeers, Goblin Gang, Elite Barbarians, Royal Recruits, Bats, Zappies,
++Wall Breakers, Royal Hogs and Skeleton Dragons; 200 ms for Goblins; none for
++Skeletons and the Skeleton Army. Rascals and Goblinstein carry
++SummonDeployDelaySecond 100 for their second body. The numbers below are the
++published ones, not a copy of an engine constant.
++
++The reading (unit k finishes deploying k delays after the first) is inferred
++from the field name; see the engine notes.
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++import pytest
++
++NOOP = 4
++DECK = [125, 168, 129, 15, 40, 72, 33, 7]
++
++# (card id, published SummonDeployDelay in ms, units of the card)
++STAGGERED = [
++    (1, 100, 2),     # Archers
++    (41, 100, 3),    # Minions
++    (8, 100, 5),     # Barbarians
++    (23, 100, 3),    # Spear Goblins
++    (42, 100, 6),    # Minion Horde
++    (76, 100, 3),    # Guards
++    (80, 100, 3),    # Three Musketeers
++    (17, 100, 2),    # Elite Barbarians
++    (77, 100, 6),    # Royal Recruits
++    (78, 100, 5),    # Bats
++    (79, 100, 3),    # Zappies
++    (83, 100, 2),    # Wall Breakers
++    (82, 100, 4),    # Royal Hogs
++    (65, 100, 2),    # Skeleton Dragons
++    (4, 200, 4),     # Goblins
++]
++TOGETHER = [(24, 3), (12, 15)]   # Skeletons, Skeleton Army: no published delay
++
++
++def _match(deck=DECK):
++    env = E.ClashRoyaleEnv(list(deck), list(deck), 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    return env
++
++
++def _bodies(env, team=0):
++    return [u for u in env.get_units() if not u["tower"] and u["team"] == team]
++
++
++def _offsets(units):
++    """Deploy ticks left, relative to the unit that is ready first."""
++    left = sorted(u["deploy_ticks"] for u in units)
++    return [t - left[0] for t in left]
++
++
++def _inject(card, team=0, deploy_ticks=-1):
++    env = _match()
++    env.inject(card, 9.0, 10.0 if team == 0 else 23.0, team, -1.0, deploy_ticks)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++    return env
++
++
++@pytest.mark.parametrize("card,delay_ms,count", STAGGERED)
++def test_a_card_with_a_published_delay_deploys_its_units_that_far_apart(card, delay_ms, count):
++    ticks = delay_ms // 100
++    base = E.get_card_stats(card)["base"]
++    assert base["summon_deploy_delay_ticks"] == ticks
++    assert base["summon_deploy_delay_second_ticks"] == 0
++    for team in (0, 1):
++        units = [u for u in _bodies(_inject(card, team), team) if u["card_id"] == card]
++        assert len(units) == count
++        assert _offsets(units) == [k * ticks for k in range(count)]
++
++
++@pytest.mark.parametrize("card,count", TOGETHER)
++def test_a_card_with_no_published_delay_lands_together(card, count):
++    assert E.get_card_stats(card)["base"]["summon_deploy_delay_ticks"] == 0
++    units = _bodies(_inject(card))
++    assert len(units) == count
++    assert _offsets(units) == [0] * count
++
++
++def test_one_unit_cards_and_buildings_report_no_delay():
++    for card in (0, 15, 40, 72, 168, 25, 7, 33, 109, 81):
++        base = E.get_card_stats(card)["base"]
++        assert (base["summon_deploy_delay_ticks"], base["summon_deploy_delay_second_ticks"]) == (0, 0), card
++
++
++def test_the_second_body_follows_the_first_by_the_published_second_delay():
++    # Rascals: the Boy, then the two Girls 100 ms apart. Goblinstein: the
++    # Monster, then the Doctor.
++    for card, second in ((113, [1, 2]), (121, [1])):
++        assert E.get_card_stats(card)["base"]["summon_deploy_delay_second_ticks"] == 1
++        units = _bodies(_inject(card))
++        first = [u["deploy_ticks"] for u in units if u["card_id"] == card]
++        others = sorted(u["deploy_ticks"] for u in units if u["card_id"] != card)
++        assert len(first) == 1
++        assert [t - first[0] for t in others] == second
++
++
++def test_goblin_gang_staggers_its_goblins_and_not_its_spear_goblins():
++    # SummonDeployDelay 100 and no SummonDeployDelaySecond.
++    units = _bodies(_inject(112))
++    goblins = [u for u in units if u["card_id"] == 112]
++    spears = [u for u in units if u["card_id"] != 112]
++    assert _offsets(goblins) == [0, 1, 2]
++    assert _offsets(spears) == [0, 0, 0]
++    assert min(u["deploy_ticks"] for u in spears) == min(u["deploy_ticks"] for u in goblins)
++
++
++def test_each_unit_becomes_active_on_its_own_tick():
++    env = _match()
++    env.inject(8, 9.0, 10.0, 0, -1.0, -1)            # Barbarians
++    ready = {}
++    for k in range(1, 21):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        for u in _bodies(env):
++            if u["deploy_ticks"] == 0:
++                ready.setdefault(u["id"], k)
++    assert sorted(ready.values()) == [10, 11, 12, 13, 14]
++
++
++def test_a_card_played_from_the_hand_is_staggered():
++    deck = [8, 77, 82, 80, 42, 17, 78, 4]
++    env = E.ClashRoyaleEnv(list(deck), list(deck), 3600)
++    env.seed(1)
++    env.set_elixir_for_team(0, 10.0)
++    card = env.get_hand()[0]
++    env.step_self_play(0, 9.0, 10.0, NOOP, 0.0, 0.0, 1)
++    units = [u for u in _bodies(env) if u["card_id"] == card]
++    ticks = E.get_card_stats(card)["base"]["summon_deploy_delay_ticks"]
++    assert ticks in (1, 2) and len(units) >= 2
++    assert _offsets(units) == [k * ticks for k in range(len(units))]
++
++
++def test_units_spawned_by_something_else_are_not_staggered():
++    # A Goblin Barrel's Goblins: the barrel is the card, the Goblins are what
++    # it spawns, and no delay is published for them.
++    env = _match()
++    env.inject(109, 9.0, 10.0, 0, -1.0, -1)
++    goblins = []
++    for _ in range(40):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        goblins = _bodies(env)
++        if goblins:
++            break
++    assert len(goblins) == 3
++    assert _offsets(goblins) == [0, 0, 0]
++    # A Battle Ram's Barbarians.
++    env = _match()
++    env.inject(81, 14.5, 24.0, 0, 1.0, 0)            # 1 HP, under the enemy Princess Tower
++    barbarians = []
++    for _ in range(60):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        barbarians = [u for u in _bodies(env) if u["card_id"] != 81]
++        if barbarians:
++            break
++    assert len(barbarians) == 2
++    assert _offsets(barbarians) == [0, 0]
++
++
++def test_an_injected_deploy_time_overrides_the_stagger():
++    # inject(..., deploy_ticks >= 0) is a test hook that sets every unit's
++    # deploy time outright.
++    units = _bodies(_inject(8, deploy_ticks=0))
++    assert [u["deploy_ticks"] for u in units] == [0] * 5
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index 284b58a..98f1e5f 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -89,6 +89,13 @@ py::dict statsDict(const CardStats& s, int depth = 0) {
+     // engine pushes with (patch 0058); a building is never pushed and reports 0.
+     d["published_mass"] = BodySizes::publishedMass(s.name, s.id);
+     d["body_mass"] = s.archetype == Archetype::DefensiveBuilding ? 0.0f : BodySizes::mass(s.name, s.id);
++    // Published deploy stagger of a played multi-unit card (SummonDelays.h,
++    // patch 0059), in ticks between units; 0 = none.
++    {
++        const SummonDelays::Row* stagger = SummonDelays::find(s.name);
++        d["summon_deploy_delay_ticks"] = stagger ? stagger->ticks : 0;
++        d["summon_deploy_delay_second_ticks"] = stagger ? stagger->secondTicks : 0;
++    }
+     d["deploy_ticks"] = s.deployTicks;
+     d["count"] = static_cast<int>(s.spawnOffsets.size());
+     py::list offs;
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index 8efa490..fa47fd2 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -2538,3 +2538,112 @@ TEST_CASE("Two touching troops give way by the other's share of their published
+         REQUIRE(b->position.x == Catch::Approx(5.6f).margin(1e-3));
+     }
+ }
++
++// ---------------------------------------------------------------------------
++// Patch 0059: the published deploy stagger of the multi-unit cards
++// (SummonDeployDelay / SummonDeployDelaySecond of the card records,
++// FirstLight-Zero card_specs.json, release 15.535.13; core/SummonDelays.h).
++// ---------------------------------------------------------------------------
++namespace {
++// Deploy ticks of what `spawnFn` puts on a bare board, in spawn order.
++template <typename SpawnFn>
++std::vector<int> deployTicksOf(SpawnFn&& spawnFn) {
++    Board board;
++    spawnFn(board);
++    board.commitPendingEntities();
++    std::vector<int> out;
++    for (const auto& e : board.getEntities()) {
++        if (auto c = std::dynamic_pointer_cast<CombatEntity>(e)) out.push_back(c->deployTicksRemaining);
++    }
++    return out;
++}
++std::vector<int> playedDeployTicks(int cardId, bool evolved = false, int team = 0) {
++    const CardDefinition* def = CardRegistry::getInstance().getCard(cardId);
++    REQUIRE(def != nullptr);
++    return deployTicksOf([&](Board& board) {
++        if (evolved) def->spawnEvolvedEntity(9.0f, 10.0f, team, board);
++        else def->spawnEntity(9.0f, 10.0f, team, board);
++    });
++}
++}  // namespace
++
++TEST_CASE("the units of a played multi-unit card deploy one published delay apart",
++          "[card_registry][deploy][patch0059]") {
++    auto& reg = CardRegistry::getInstance();
++    using V = std::vector<int>;
++
++    // The table: every row is a registered card with more than one body, and
++    // the delays are the published 100 ms / 200 ms in ticks.
++    for (const auto& row : SummonDelays::ROWS) {
++        INFO(row.name);
++        bool registered = false;
++        for (int id = 0; id <= 200; ++id) {
++            if (const CardDefinition* c = reg.getCard(id)) registered = registered || c->name == row.name;
++        }
++        REQUIRE(registered);
++        REQUIRE((row.ticks > 0) != (row.secondTicks > 0));
++    }
++    REQUIRE(SummonDelays::find("Barbarians")->ticks == 1);
++    REQUIRE(SummonDelays::find("Goblins")->ticks == 2);
++    REQUIRE(SummonDelays::find("Rascals")->secondTicks == 1);
++    REQUIRE(SummonDelays::find("Hero Goblins") == SummonDelays::find("Goblins"));
++    REQUIRE(SummonDelays::find("Skeletons") == nullptr);
++    REQUIRE(SummonDelays::find("Skeleton Army") == nullptr);
++    REQUIRE(SummonDelays::find("Knight") == nullptr);
++    REQUIRE(SummonDelays::find("Goblin Barrel") == nullptr);
++
++    SECTION("100 ms a unit: Barbarians, Elite Barbarians, Royal Recruits, Three Musketeers") {
++        REQUIRE(playedDeployTicks(8) == V{ 10, 11, 12, 13, 14 });
++        REQUIRE(playedDeployTicks(17) == V{ 10, 11 });
++        REQUIRE(playedDeployTicks(77) == V{ 10, 11, 12, 13, 14, 15 });
++        REQUIRE(playedDeployTicks(80) == V{ 10, 11, 12 });
++        // Team 1 the same.
++        REQUIRE(playedDeployTicks(8, false, 1) == V{ 10, 11, 12, 13, 14 });
++    }
++    SECTION("200 ms a unit: Goblins") {
++        REQUIRE(playedDeployTicks(4) == V{ 10, 12, 14, 16 });
++    }
++    SECTION("no published delay: Skeletons and the Skeleton Army land together") {
++        REQUIRE(playedDeployTicks(24) == V{ 10, 10, 10 });
++        REQUIRE(playedDeployTicks(12) == V(15, 10));
++    }
++    SECTION("a second group: Rascals' Girls and Goblinstein's Doctor follow the first body") {
++        REQUIRE(playedDeployTicks(113) == V{ 10, 11, 12 });
++        REQUIRE(playedDeployTicks(121) == V{ 10, 11 });
++        // Goblin Gang publishes no second delay: its Goblins are staggered,
++        // its Spear Goblins are not.
++        REQUIRE(playedDeployTicks(112) == V{ 10, 11, 12, 10, 10, 10 });
++    }
++    SECTION("an Evolution and a Hero share the row of the plain card") {
++        REQUIRE(playedDeployTicks(155, true) == V{ 10, 11, 12, 13, 14 });   // evolved Barbarians
++        REQUIRE(playedDeployTicks(155, false) == V{ 10, 11, 12, 13, 14 });  // their plain form
++        REQUIRE(playedDeployTicks(178, true) == V{ 10, 11 });               // evolved Elite Barbarians
++        REQUIRE(playedDeployTicks(172) == V{ 10, 12, 14, 16 });             // Hero Goblins
++    }
++    SECTION("only a PLAYED card: the same stats spawned by something else land together") {
++        // What a Battle Ram, a Barbarian Hut or a Goblin Barrel does: spawn a
++        // CardStats through CardFactories::spawn without the played flag.
++        const CardStats barbarians = *reg.getCard(8)->stats;
++        REQUIRE(deployTicksOf([&](Board& board) { CardFactories::spawn(barbarians, 9.0f, 10.0f, 0, board); })
++                == V{ 10, 10, 10, 10, 10 });
++        const CardStats goblins = *reg.getCard(4)->stats;
++        REQUIRE(deployTicksOf([&](Board& board) { CardFactories::spawn(goblins, 9.0f, 10.0f, 0, board); })
++                == V{ 10, 10, 10, 10 });
++    }
++    SECTION("a staggered unit starts moving that many ticks after the first") {
++        Board board;
++        reg.getCard(8)->spawnEntity(9.0f, 8.0f, 0, board);
++        board.commitPendingEntities();
++        std::vector<std::shared_ptr<CombatEntity>> barbs;
++        for (const auto& e : board.getEntities()) barbs.push_back(std::dynamic_pointer_cast<CombatEntity>(e));
++        REQUIRE(barbs.size() == 5);
++        std::vector<int> deployedAt(5, -1);
++        for (int t = 1; t <= 20; ++t) {
++            for (auto& b : barbs) b->update(board);
++            for (size_t i = 0; i < barbs.size(); ++i) {
++                if (deployedAt[i] < 0 && barbs[i]->deployTicksRemaining == 0) deployedAt[i] = t;
++            }
++        }
++        REQUIRE(deployedAt == V{ 10, 11, 12, 13, 14 });
++    }
++}
+diff --git a/tests/core/test_cards_0015.cpp b/tests/core/test_cards_0015.cpp
+index 9cb79ad..6ea633d 100644
+--- a/tests/core/test_cards_0015.cpp
++++ b/tests/core/test_cards_0015.cpp
+@@ -200,14 +200,35 @@ TEST_CASE("the registered Evolved Elite Barbarians are enraged for 2 s by a spea
+     REQUIRE(barbs.size() == 2);
+     // One ground troop in the 3-4.5 band of both, too tough to die, harmless.
+     auto foe = m.dummy(9.0f, 12.0f, 1, 100000);
+-    int enragedUpdates = 0, hpAfterThrow = -1;
++    // Until patch 0059 both barbarians finished deploying on one update and
++    // threw on it. The second now deploys the published 100 ms after the first
++    // (SummonDeployDelay), so its spear is one update later. Each spear is
++    // still 220, and the Rage still lasts exactly 20 updates from the throw
++    // that (re)started it.
++    std::vector<int> throwTicks, drops;
++    int enragedAfterLastThrow[2] = { 0, 0 };
++    int lastHp = foe->hp;
+     for (int t = 1; t <= 45; ++t) {
+         m.step();
+-        if (hpAfterThrow < 0 && foe->hp < 100000) hpAfterThrow = foe->hp;
+-        if (barbs[0]->buffTicksRemaining > 0) enragedUpdates++;
++        if (foe->hp < lastHp) {
++            drops.push_back(lastHp - foe->hp);
++            throwTicks.push_back(t);
++        }
++        lastHp = foe->hp;
++        if (throwTicks.size() >= 2) {
++            for (int i = 0; i < 2; ++i)
++                if (barbs[i]->buffTicksRemaining > 0) enragedAfterLastThrow[i]++;
++        }
+     }
+-    REQUIRE(hpAfterThrow == 100000 - 2 * 220);      // one spear each, on the same update; the next is 5 s away
+-    REQUIRE(enragedUpdates == 20);
++    // One spear each; the next is 5 s away. What follows is the pair's
++    // enraged melee on the dummy, not a spear.
++    REQUIRE(drops.size() >= 2);
++    REQUIRE(drops[0] == 220);
++    REQUIRE(drops[1] == 220);
++    REQUIRE(throwTicks[1] - throwTicks[0] == 1);
++    REQUIRE(std::count(drops.begin(), drops.end(), 220) == 2);
++    REQUIRE(enragedAfterLastThrow[0] == 20);
++    REQUIRE(enragedAfterLastThrow[1] == 20);
+ }
+ 
+ TEST_CASE("an evolved Elite Barbarian recharges the spear every 5 s", "[evolution][evo_elite_barbarians][patch0015]") {

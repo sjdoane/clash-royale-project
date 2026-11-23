@@ -1,0 +1,318 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index aef871e..a15c9c2 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -807,6 +807,34 @@ like every other building.
+   `tests/core/test_sight_range.cpp` ("a Crown Tower competes for targets by its
+   body").
+ 
++## 2026-11-22: sight is measured body to body, like attack range (patch 0044)
++
++**GAMEPLAY-AFFECTING.** `CombatEntity::effectiveSightWith` is now
++`sightRange + own radius + target radius`, compared with the centre distance:
++the convention `effectiveRangeTo` always had. The old rule was centre to
++centre with a floor at attack reach.
++
++- Why: the published tables give sight equal to range for the Musketeer
++  (6000 / 6000), Wizard and Cannon (5500 / 5500), so the two are one measure,
++  and range is body to body (the Princess Tower's 7.5 reaching 9.4 was checked
++  against recordings in patch 0033). The floor at attack reach was the engine
++  admitting this for ranged units only. **Inferred from the tables, not stated
++  anywhere as prose.**
++- Effect: a troop sees another troop 0.8 tiles further (0.4 + 0.4 implicit
++  radii), a building 0.4 further, towers unchanged (the floor already gave
++  them their reach). A melee troop with the standard 5.5 now turns for an Ice
++  Golem or Knight dropped in the middle of the arena, 5 tiles to the side of
++  its lane: the kite. In a replay the recorded player's Ice Golem at (9, 15)
++  against Elite Barbarians coming off the bridge at x 2.5 was ignored.
++- The sight clip (patch 0042) is body to body as well, so a clipped
++  building-targeter reaches a Cannon 5.5 + 0.4 + 1.0 = 6.9 to the side: 6 pulls,
++  7 does not (a Balloon, 5.7, does at exactly 7 because this engine's Cannon
++  body is 1.0 against the published 0.6).
++- Still short of the game: troop radii are one implicit 0.4, published ones
++  run 0.5 (Knight, Elite Barbarians) to 0.75 (Giant), 0.7 for the Ice Golem.
++- Tests: `tests/entities/test_combat_entity.cpp` ("sight is measured BODY TO
++  BODY"), `python_ai/tests/test_sight_is_measured_body_to_body.py`.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/SightClips.h b/include/core/SightClips.h
+index 5b4e92e..6c5d9f3 100644
+--- a/include/core/SightClips.h
++++ b/include/core/SightClips.h
+@@ -28,7 +28,8 @@
+ // READING (inferred, not published as prose): the sight disc is cut down to a
+ // box. A building is in sight only if it is within SightRange AND no further
+ // than SightRange - SightClipSide to the side (x) AND no further than
+-// SightRange - SightClip along the arena (y). That makes every clipped troop's
++// SightRange - SightClip along the arena (y), all body to body like sight
++// itself (patch 0044). That makes every clipped troop's
+ // sideways reach 5.0-5.7 tiles: the distance from a lane to the middle of the
+ // arena. It is the rule players know: a building in the middle pulls a Hog or a
+ // Giant from either lane, one placed towards the far lane does not, although
+diff --git a/include/entities/BuildingTargeter.h b/include/entities/BuildingTargeter.h
+index b3464d1..956dac9 100644
+--- a/include/entities/BuildingTargeter.h
++++ b/include/entities/BuildingTargeter.h
+@@ -44,11 +44,11 @@ protected:
+ 
+             // The nearest building in sight wins, and towers compete on equal
+             // terms, as in the real game. Ranked by footprint distance
+-            // (Entity::getTargetingRadius); the sight gate uses
+-            // effectiveSightWith on centre distance, as in
++            // (Entity::getTargetingRadius); the sight gate is
++            // effectiveSightWith against the centre distance, as in
+             // CombatEntity::findTarget.
+             const float rank = dist - entity->getTargetingRadius();
+-            if (rank <= effectiveSightWith(myRadius, *entity) && withinSightClip(*entity)
++            if (dist <= effectiveSightWith(myRadius, *entity) && withinSightClip(myRadius, *entity)
+                 && rank < minSightDistance) {
+                 minSightDistance = rank;
+                 closestInSight = entity;
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index bae07aa..d50c0fe 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -1073,34 +1073,30 @@ protected:
+         return effectiveSightWith(ownEffectiveRadius(), *target);
+     }
+ 
+-    // Sight is strict centre-to-centre: a Hog Rider's 9.5 means 9.5 tiles
+-    // centre to centre, as the published ranges do. Radii answer a hitbox
+-    // question, not a vision one.
++    // Sight is measured the way attack range is (effectiveRangeTo): body to
++    // body, so the centre distance a unit sees at is its catalogued sight plus
++    // both radii. The published tables only make sense that way: Musketeer
++    // 6000 / 6000, Wizard and Cannon 5500 / 5500 give sight equal to range, and
++    // a unit can hit exactly what it can see. Measured centre to centre (as
++    // here before patch 0044, with a floor at attack reach to stop ranged units
++    // idling) a melee troop saw 0.8 tiles less than the game's: an Ice Golem
++    // or Knight dropped in the middle, 5.5 tiles to the side and a few ahead,
++    // did not pull a lane push the way it does in play.
+     //
+-    // One floor: attack reach is surface-to-surface (effectiveRangeTo), so a
+-    // unit whose reach exceeds its sight could hit what it cannot acquire and
+-    // would stand idle. Sight is therefore floored at the unit's own attack
+-    // reach. The floor binds only where attackRange is close to sightRange
+-    // (towers, Musketeer-likes); for long-sight cards sightRange wins outright.
+-    // Without it, two Musketeers would stop out of each other's sight.
++    // A unit whose raw sight is below its raw range (none in the catalogue;
++    // test_combat_entity.cpp builds one) stays blind past its sight.
+     //
+     // Takes the attacker's radius as a parameter so findTarget computes it
+-    // once.
++    // once. Compare with the CENTRE distance.
+     float effectiveSightWith(float myRadius, const Entity& target) const {
+-        const float attackReach = attackRange + myRadius + effectiveRadiusOf(target);
+-        // Only for a card whose raw sightRange covers its raw attackRange,
+-        // which the catalogue guarantees. Otherwise the unit stays blind past
+-        // its sight, as test_combat_entity.cpp pins.
+-        if (sightRange >= attackRange && attackReach > sightRange) return attackReach;
+-        return sightRange;
++        return sightRange + myRadius + effectiveRadiusOf(target);
+     }
+ 
+-    // The published sight clip (SightClips.h). Measured to the target's
+-    // footprint, as findTarget ranks; the unit's own reach is far inside the
+-    // box, so there is nothing to floor.
+-    bool withinSightClip(const Entity& target) const {
++    // The published sight clip (SightClips.h), body to body like the sight
++    // itself.
++    bool withinSightClip(float myRadius, const Entity& target) const {
+         if (sightClip <= 0.0f && sightClipSide <= 0.0f) return true;
+-        const float r = target.getTargetingRadius();
++        const float r = myRadius + effectiveRadiusOf(target);
+         if (sightClipSide > 0.0f
+             && std::fabs(target.position.x - position.x) - r > sightRange - sightClipSide) return false;
+         if (sightClip > 0.0f
+@@ -1141,9 +1137,9 @@ protected:
+             }
+             // The tower tracking above serves only the fallback. Ranked by
+             // footprint distance (Entity::getTargetingRadius); the sight gate
+-            // uses centre distance.
++            // is body to body (effectiveSightWith).
+             const float rank = dist - entity->getTargetingRadius();
+-            if (rank <= effectiveSightWith(myRadius, *entity) && withinSightClip(*entity)
++            if (dist <= effectiveSightWith(myRadius, *entity) && withinSightClip(myRadius, *entity)
+                 && rank < minSightDistance) {
+                 minSightDistance = rank;
+                 closestInSight = entity;
+diff --git a/python_ai/tests/test_sight_clip_of_building_targeters.py b/python_ai/tests/test_sight_clip_of_building_targeters.py
+index eb5d24c..1f3208c 100644
+--- a/python_ai/tests/test_sight_clip_of_building_targeters.py
++++ b/python_ai/tests/test_sight_clip_of_building_targeters.py
+@@ -59,7 +59,7 @@ def _first_target(attacker, cannon_x, cannon_y=12.0, ticks=420):
+ def test_a_balloon_is_clipped_sideways_only():
+     # Balloon: SightClipSide 2000 on 7700 (5.7 to the side), no forward clip.
+     assert _first_target(BALLOON, 9, 14.0) == "cannon"
+-    assert _first_target(BALLOON, 10, 14.0) == "tower"
++    assert _first_target(BALLOON, 11, 14.0) == "tower"
+ 
+ 
+ def test_the_clip_values_are_the_published_ones():
+diff --git a/python_ai/tests/test_sight_is_measured_body_to_body.py b/python_ai/tests/test_sight_is_measured_body_to_body.py
+new file mode 100644
+index 0000000..3f4131c
+--- /dev/null
++++ b/python_ai/tests/test_sight_is_measured_body_to_body.py
+@@ -0,0 +1,68 @@
++"""Sight is measured body to body, like attack range (patch 0044).
++
++The published tables give sight equal to range for the Musketeer (6000 / 6000),
++Wizard and Cannon (5500 / 5500): a unit can hit exactly what it can see, so the
++two are one measure, and range is body to body (attacker radius + target
++radius on top of the number; the Princess Tower's 7.5 reaching 9.4 was checked
++against recordings in patch 0033). Before this patch sight was centre to
++centre, so a melee troop with the standard 5.5 saw 0.8 tiles short. The play
++it broke is the kite: an Ice Golem or Knight dropped in the middle of the
++arena, 5.5 tiles to the side of a lane push and a little ahead of it, is 6+
++tiles away centre to centre and was ignored.
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++
++NOOP = 4
++ELITE_BARBARIANS, MINI_PEKKA, ICE_GOLEM = 17, 5, 40
++OURS = [129, 168, 125, 15, 40, 72, 33, 7]
++
++
++def _kite(attacker, x, y, delay=15, ticks=300, window=50):
++    """Team 1 drops `attacker` at its left bridge (x 3); `delay` ticks later
++    team 0 plays an Ice Golem at (x, y). -> (did an attacker unit target the
++    Golem within `window` ticks of the play, ticks from the play to the first
++    damage on the Princess Tower or None)."""
++    deck = [attacker] + [c for c in (4, 12, 112, 61, 20, 14, 26, 24) if c != attacker][:7]
++    env = E.ClashRoyaleEnv(list(OURS), deck, 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    env.set_elixir_for_team(0, 10.0)
++    env.set_elixir_for_team(1, 10.0)
++    assert env.set_hand_for_team(0, [ICE_GOLEM, 168, 125, 15])
++    assert env.set_hand_for_team(1, deck[:4])
++    before = env.get_tower_hp(0, 1)
++    env.step_self_play(NOOP, 0.0, 0.0, 0, 3.0, 15.0, delay)
++    env.step_self_play(0, float(x), float(y), NOOP, 0.0, 0.0, 1)
++    pulled, first_damage = False, None
++    for t in range(ticks):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        if t < window:
++            units = env.get_units()
++            golem = {u["id"] for u in units if u["team"] == 0 and u["name"] == "Ice Golem"}
++            if any(u["team"] == 1 and u["target_id"] in golem for u in units):
++                pulled = True
++        if first_damage is None and env.get_tower_hp(0, 1) < before:
++            first_damage = t
++            break
++    return pulled, first_damage
++
++
++def test_an_ice_golem_in_the_middle_pulls_a_lane_push():
++    # Golem at x 8, 5 tiles to the side of the lane and level with the push as
++    # it comes off the bridge: 6.0 tiles centre to centre at its nearest,
++    # inside 5.5 + 0.4 + 0.4 = 6.3, outside a centre-to-centre 5.5.
++    # The pull buys time: the tower is first hit seconds later than with the
++    # Golem out of the way.
++    for attacker in (ELITE_BARBARIANS, MINI_PEKKA):
++        alone = _kite(attacker, 16, 2)[1]
++        pulled, first = _kite(attacker, 8, 13)
++        assert pulled, attacker
++        assert first is None or first >= alone + 20, (attacker, first, alone)
++
++
++def test_sight_still_ends():
++    # Two tiles further out the Golem is 7.5+ tiles away and nobody turns.
++    for attacker in (ELITE_BARBARIANS, MINI_PEKKA):
++        pulled, _ = _kite(attacker, 11, 13)
++        assert not pulled, attacker
+diff --git a/tests/core/test_sight_range.cpp b/tests/core/test_sight_range.cpp
+index d0c0b94..49985d4 100644
+--- a/tests/core/test_sight_range.cpp
++++ b/tests/core/test_sight_range.cpp
+@@ -12,7 +12,9 @@
+ #include <set>
+ 
+ // --- sight vs attack reach ---
+-// Attack reach is measured surface to surface (effectiveRangeTo: tower vs troop
++// Since patch 0044 sight is measured like attack reach, surface to surface, so
++// this invariant holds by construction and these cases guard it. History:
++// attack reach was surface to surface (effectiveRangeTo: tower vs troop
+ // 7.5 + 1.5 + 0.4 = 9.4), sight centre to centre (7.5). Without a floor, a
+ // Princess Tower could attack a Musketeer standing at 8.0 but never see her,
+ // and she would destroy it without taking damage; in the real game the
+@@ -411,10 +413,8 @@ TEST_CASE("an Evolution's evolved form keeps its base form's sight range",
+ 
+ 
+ // --- target selection: nearest building, strict sight ---
+-// 1. Sight is strict centre-to-centre: a Hog Rider's 9.5 means 9.5 against a
+-//    Cannon. One floor survives: sight never falls below the unit's own attack
+-//    reach, for cards whose raw sight covers their raw range (otherwise the
+-//    free-siege case at the top returns).
++// 1. Sight is measured like attack range, body to body (patch 0044): a Battle
++//    Ram's 6.5 reaches a Cannon whose centre is 6.5 + 0.4 + 1.0 = 7.9 away.
+ //
+ // 2. The nearest building wins, Crown Towers included: a building-targeter
+ //    walks at whichever building is closest.
+@@ -511,11 +511,11 @@ TEST_CASE("a Crown Tower competes for targets by its body, like any building",
+ }
+ 
+ TEST_CASE("sight still bounds acquisition at the raw catalogued range",
+-          "[targeting][sight][centre_to_centre]") {
++          "[targeting][sight][body_to_body]") {
+     // Rule 1 alone. At y = 20 the tower is 14.0 away, so the Cannon is always
+     // the nearest building and only sight can refuse it. The Battle Ram
+-    // publishes no sight clip, so its 6.5 is a plain disc. The gate uses
+-    // footprint distance, so a Cannon (radius 1.0) is refused past 7.5 centre.
++    // publishes no sight clip, so its 6.5 is a plain disc. Body to body, a
++    // Cannon (radius 1.0) is refused past 6.5 + 0.4 + 1.0 = 7.9 centre.
+     REQUIRE(driftAt(81, 20.0f, 8.0f) > -0.05f);   // never towards the Cannon
+     REQUIRE(driftAt(81, 20.0f, 7.0f) < -0.3f);
+ }
+@@ -523,7 +523,7 @@ TEST_CASE("sight still bounds acquisition at the raw catalogued range",
+ TEST_CASE("a published sight clip cuts the sideways reach of a building-targeter",
+           "[targeting][sight][sight_clip]") {
+     // SightClips.h: Hog Rider 9.5 sight, side clip 4.0, so a building pulls it
+-    // from at most 5.5 to the side (footprint; 6.5 centre for a Cannon). The
++    // from at most 5.5 to the side (body to body; 6.9 centre for a Cannon). The
+     // Giant's 7.5 with a 2.0 clip gives the same 5.5.
+     const int card = GENERATE(15, 2);
+     INFO("card id " << card);
+diff --git a/tests/entities/test_combat_entity.cpp b/tests/entities/test_combat_entity.cpp
+index 6b2fe0b..d65120c 100644
+--- a/tests/entities/test_combat_entity.cpp
++++ b/tests/entities/test_combat_entity.cpp
+@@ -75,15 +75,16 @@ TEST_CASE("findTarget never picks an enemy beyond sightRange, even if it's the o
+     REQUIRE(attacker->attackCount == 0); // never acquired, though within attackRange
+ }
+ 
+-TEST_CASE("sight is measured CENTRE-TO-CENTRE against the raw sightRange",
+-        "[combat_entity][targeting][sight_range][centre_to_centre]") {
+-    // Sight is strict centre-to-centre: 5.5 means 5.5. Bounded from both sides:
+-    // a uniformly blind engine fails the second REQUIRE, a radius-inflated one
+-    // the first.
++TEST_CASE("sight is measured BODY TO BODY, like attack range",
++        "[combat_entity][targeting][sight_range][body_to_body]") {
++    // Patch 0044: 5.5 means 5.5 between the two bodies, so 5.5 + 0.4 + 0.4 =
++    // 6.3 between centres for two troops, the convention attack range always
++    // had. Bounded from both sides: a centre-to-centre engine fails the second
++    // REQUIRE, one that sees further the first.
+     Board board;
+ 
+-    SECTION("just OUTSIDE the raw sightRange: not acquired") {
+-        auto enemy = std::make_shared<DummyEntity>(1, 0.0f, 6.0f, 1000, 1);
++    SECTION("just OUTSIDE sight plus both radii: not acquired") {
++        auto enemy = std::make_shared<DummyEntity>(1, 0.0f, 6.5f, 1000, 1);
+         spawn(board, enemy);
+         auto attacker = std::make_shared<StationaryCombatant>(
+             2, 0.0f, 0.0f, 100, 0, 20.0f, 50, 10);
+@@ -91,8 +92,8 @@ TEST_CASE("sight is measured CENTRE-TO-CENTRE against the raw sightRange",
+         REQUIRE(attacker->attackCount == 0);
+     }
+ 
+-    SECTION("just INSIDE the raw sightRange: acquired") {
+-        auto enemy = std::make_shared<DummyEntity>(1, 0.0f, 5.4f, 1000, 1);
++    SECTION("just INSIDE sight plus both radii: acquired") {
++        auto enemy = std::make_shared<DummyEntity>(1, 0.0f, 6.1f, 1000, 1);
+         spawn(board, enemy);
+         auto attacker = std::make_shared<StationaryCombatant>(
+             2, 0.0f, 0.0f, 100, 0, 20.0f, 50, 10);

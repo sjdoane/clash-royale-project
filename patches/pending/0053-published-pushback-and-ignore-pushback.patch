@@ -1,0 +1,423 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index d14f3b9..51d755c 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1181,6 +1181,59 @@ flagged row in the table), `python_ai/tests/test_published_stun_and_slow_duratio
+ Not found in the published data: `ResetHitTimerWhenNoTarget` (Little Prince
+ only) is not modelled.
+ 
++## 2026-11-22: knockback follows the published Pushback and IgnorePushback (patch 0053)
++
++**GAMEPLAY-AFFECTING.** The game data (FirstLight-Zero card_specs.json /
++projectiles.json, release 15.535.13) gives every knockback a distance
++(`Pushback`, thousandths of a tile), marks a few as `PushbackAll`, and marks
++the units an ordinary knockback does not move (`IgnorePushback`). The engine
++pushed every non-building with every knockback, a Golem as far as a Skeleton.
++
++| | published | engine before | now |
++|---|---|---|---|
++| Fireball | 1000 | 1.0 | 1.0 |
++| Rocket | 1800 | 1.0 | **1.8** |
++| Giant Snowball (and its Evolution's base form) | 1800 | 1.0 | **1.8** |
++| The Log | 700, PushbackAll | 0.7, moves everything on the ground | same |
++| Barbarian Barrel | none | none | none |
++
++`include/core/Pushback.h` holds the 20 registry names published with
++`IgnorePushback` (Bowler, Cannon Cart, Dark Prince, Electro Giant, Elixir
++Golem, Giant, Giant Skeleton, Goblin Giant, Goblin Machine, Goblinstein,
++Golem, Lava Hound, Mega Knight, Mighty Miner, P.E.K.K.A., Prince, Royal Giant,
++Rune Giant, Skeleton King, Sparky); Evolutions share the name, "Hero X" falls
++back to X. `CardFactories::applyCardMetadata` sets
++`CombatEntity::pushbackImmune`, `Entity::ignoresPushback()` reports it and
++`pushAway` (the radial knockback of every `AreaSpell`) returns before moving
++such a unit, so it is not interrupted either (`onKnockedBack`: a Prince hit by
++a Fireball keeps his charge; hit by The Log he loses it, as before).
++`pushAlong`, the rolling throw, is the PushbackAll kind and ignores the flag.
++`get_card_stats` reports `ignores_pushback`.
++
++Consequences to know: every radial knockback in the engine is now the ordinary
++kind, including the ones whose distance is not sourced (Giant Skeleton's bomb
++1.0, Evolved Cannon's barrage 1.0, Mighty Miner's bomb 1.8): none of them moves
++a Giant any more. Pulls (Tornado, Evolved Snowball) are unchanged; whether
++IgnorePushback units resist them is not in the table.
++
++NOT modelled, published: the Bowler's boulder (BowlerProjectile 1000), Mega
++Knight's landing (MegaKnightAppear 1000), Goblin Demolisher's death blast
++(2000), Monk's third hit (1800, PushbackAll) and the Hero Musketeer turret's
++knockback shot (1000) push nothing in the engine (no knockback on the troop
++attack path). "Goblinstein" in the table is the Monster; the Doctor shares the
++registry name and with it the flag, which is not published for him. The hero
++forms of Goblins and Tombstone carry an IgnorePushback on a nested unit that
++was not resolved.
++
++Tests: `tests/core/test_card_registry.cpp` `[patch0053]` (Fireball 1.0, Rocket
++1.8, Snowball 1.8 on a Knight, a Giant beside him hit and not moved; The Log
++moves both 0.7; the table's rows are registered cards, Evolved P.E.K.K.A. and
++Hero Giant inherit, Golemite / Lava Pup / Monk / Hog Rider do not),
++`python_ai/tests/test_published_stun_and_slow_durations.py` (the immune set and
++the three spell distances through `get_card_stats`),
++`python_ai/tests/test_knockback_resets_charge.py` (a Fireball no longer costs a
++Prince his charge; a Giant Snowball costs a Battle Ram its charge).
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index e89cc35..3b11226 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -3,6 +3,7 @@
+ #include "LoadTimes.h"
+ #include "SightClips.h"
+ #include "ProjectileSpeeds.h"
++#include "Pushback.h"
+ #include "Board.h"
+ #include "MeleeTroop.h"
+ #include "RangedTroop.h"
+@@ -88,6 +89,7 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     }
+     // Published speed of the card's shot (ProjectileSpeeds.h, patch 0049).
+     entity->shotTilesPerTick = ProjectileSpeeds::tilesPerTick(stats.name);
++    entity->pushbackImmune = Pushback::ignores(stats.name);
+     entity->transformAtHpFraction = stats.transformAtHpFraction;
+     entity->transformCheckMaxHp = stats.hp;
+     entity->transformLifetimeTicks = stats.transformLifetimeTicks;
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index ef6ff22..b4aac86 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -736,7 +736,7 @@ private:
+             .withSpellOnHit(std::make_shared<FreezeOnHit>(5, 0.0f)) /* published: ZapFreeze 500 ms */
+             /* audit 0003: wiki Zap, level 11; Crown Tower damage: CrownTowerDamage.h */);
+         add(spell(30, "Rocket", 6.0f, 2.0f, 1485, 15, 'r')
+-            .withKnockback(1.0f) /* audit 0003: wiki Rocket, level 11; Crown Tower damage: CrownTowerDamage.h */
++            .withKnockback(1.8f) /* published RocketSpell Pushback 1800 (was 1.0) */ /* audit 0003: wiki Rocket, level 11; Crown Tower damage: CrownTowerDamage.h */
+             .withThrownFromKingTower(350));
+         add(spell(31, "Lightning", 6.0f, 3.5f, 1057, 5, 'j')
+             .withSpellOnHit(std::make_shared<FreezeOnHit>(5, 0.0f)) /* published: ZapFreeze 500 ms */
+@@ -1085,7 +1085,7 @@ private:
+         // === Spells (expansion) ===
+         add(spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+             .withSpellOnHit(std::make_shared<FreezeOnHit>(30, 0.65f) /* published: IceWizardSlowDown 3000 ms, the Ice Wizard's own slow (was 15 ticks at 0.5) */)
+-            .withKnockback(1.0f) /* audit 0003: wiki Giant Snowball, level 11; Crown Tower damage: CrownTowerDamage.h */
++            .withKnockback(1.8f) /* published SnowballSpell Pushback 1800 (was 1.0) */ /* audit 0003: wiki Giant Snowball, level 11; Crown Tower damage: CrownTowerDamage.h */
+             .withThrownFromKingTower(800));
+         // Barbarian Barrel: rolls 4.5 tiles at width 2.6 (published), and its
+         // Barbarian spawns where the barrel stops. No knockback: the real
+@@ -1674,7 +1674,7 @@ private:
+         addEvolution(158,
+             spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+                 .withSpellOnHit(std::make_shared<FreezeOnHit>(30, 0.65f) /* published: IceWizardSlowDown 3000 ms, the Ice Wizard's own slow (was 15 ticks at 0.5) */)
+-                .withKnockback(1.0f) /* audit 0003: wiki Giant Snowball, level 11; Crown Tower damage: CrownTowerDamage.h */
++                .withKnockback(1.8f) /* published SnowballSpell Pushback 1800 (was 1.0) */ /* audit 0003: wiki Giant Snowball, level 11; Crown Tower damage: CrownTowerDamage.h */
+                 .withThrownFromKingTower(800),
+             spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+                 .withSpellOnHit(std::make_shared<FreezeOnHit>(40, 0.7f))
+diff --git a/include/core/Pushback.h b/include/core/Pushback.h
+new file mode 100644
+index 0000000..d61514c
+--- /dev/null
++++ b/include/core/Pushback.h
+@@ -0,0 +1,71 @@
++#pragma once
++
++#include <string>
++
++// Published knockback immunity. Read by CardFactories::applyCardMetadata
++// (CombatEntity::pushbackImmune), honoured by pushAway (Entity.h).
++//
++// The game's unit records carry `IgnorePushback`; its projectile records carry
++// `Pushback` (thousandths of a tile) and, on a few, `PushbackAll`. A knockback
++// moves every unit it hits except one that ignores pushback, unless the
++// knockback is a PushbackAll. Until patch 0053 the engine pushed every
++// non-building with every knockback: a Fireball shoved a Golem a tile back.
++//
++// Published knockbacks (release 15.535.13):
++//   FireballSpell 1000, RocketSpell 1800, SnowballSpell 1800,
++//   LogProjectileRolling 700 PushbackAll, BowlerProjectile 1000,
++//   MegaKnightAppear 1000, GoblinDemolisherDeathProjectile 2000,
++//   MonkPushback 1800 PushbackAll, BarbLog none.
++// In the engine the radial area knockbacks (AreaSpell::knockback, pushAway)
++// are the ordinary kind; the rolling throw (pushAlong: The Log) is the
++// PushbackAll kind and moves everything on the ground.
++//
++// Source: FirstLight-Zero card_specs.json, release 15.535.13, the summoned
++// unit of each card. Keyed by registry NAME like LoadTimes.h: an Evolution
++// shares the row (the evolved unit records of P.E.K.K.A., Royal Giant, Mega
++// Knight and Goblin Giant carry the flag too) and "Hero X" falls back to X.
++// What a card spawns under another name (Golemite, Elixir Golemite, Lava Pup)
++// has no flag and no row. "Goblinstein" is the Monster; the Doctor shares the
++// registry name and so the row, which is not published for him.
++namespace Pushback {
++
++inline const char* const* table(int& count) {
++    static const char* const rows[] = {
++        "Bowler",
++        "Cannon Cart",       // MovingCannon
++        "Dark Prince",
++        "Electro Giant",
++        "Elixir Golem",      // ElixirGolem1: the whole Golem only
++        "Giant",
++        "Giant Skeleton",
++        "Goblin Giant",
++        "Goblin Machine",
++        "Goblinstein",
++        "Golem",
++        "Lava Hound",
++        "Mega Knight",
++        "Mighty Miner",
++        "P.E.K.K.A.",
++        "Prince",
++        "Royal Giant",
++        "Rune Giant",        // GiantBuffer
++        "Skeleton King",
++        "Sparky",            // ZapMachine
++    };
++    count = static_cast<int>(sizeof(rows) / sizeof(rows[0]));
++    return rows;
++}
++
++// Whether a card's unit ignores ordinary knockbacks.
++inline bool ignores(const std::string& name) {
++    int count = 0;
++    const char* const* rows = table(count);
++    for (int i = 0; i < count; ++i) {
++        if (name == rows[i]) return true;
++    }
++    static const std::string heroPrefix = "Hero ";
++    if (name.compare(0, heroPrefix.size(), heroPrefix) == 0) return ignores(name.substr(heroPrefix.size()));
++    return false;
++}
++
++} // namespace Pushback
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index 05f3b4e..968166d 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -412,6 +412,9 @@ public:
+     // RangedBuildingTargeter). From the published speed in ProjectileSpeeds.h;
+     // 1.5 is the engine's old constant, kept by units without a row.
+     float shotTilesPerTick = 1.5f;
++    // Published IgnorePushback (Pushback.h; set by CardFactories).
++    bool pushbackImmune = false;
++    bool ignoresPushback() const override { return pushbackImmune; }
+ 
+     // HP-threshold transform (Cannon Cart: at <= 50% hp it grounds itself and
+     // self-destructs after a fixed lifespan). The fraction is of
+diff --git a/include/entities/Entity.h b/include/entities/Entity.h
+index cf3f21b..ba741e9 100644
+--- a/include/entities/Entity.h
++++ b/include/entities/Entity.h
+@@ -136,6 +136,10 @@ public:
+         (void)byOldId;
+     }
+ 
++    // Published IgnorePushback (Pushback.h): an ordinary knockback (pushAway)
++    // does not move this. A PushbackAll (pushAlong: The Log) still does.
++    virtual bool ignoresPushback() const { return false; }
++
+     // Called by pushAway / pushAlong after they have moved this entity: a
+     // knockback is an interruption, not just a displacement (CombatEntity
+     // drops a charge that was building).
+@@ -177,9 +181,11 @@ inline void mirrorToOppositeLane(Entity& entity, int boardWidth) {
+ }
+ 
+ // Moves `entity` exactly `distance` tiles directly away from `point`
+-// (knockback).
++// (knockback). The ordinary kind: a unit published with IgnorePushback stays
++// where it is, and is not interrupted either.
+ inline void pushAway(Entity& entity, const Vector2D& point, float distance) {
+     if (exemptFromForcedMovement(entity)) return;
++    if (entity.ignoresPushback()) return;
+     if (distance <= 0.0f) return; // see pullToward
+     float dist = entity.position.distanceTo(point);
+     if (dist <= 0.01f) return; // coincident: no direction
+@@ -189,7 +195,8 @@ inline void pushAway(Entity& entity, const Vector2D& point, float distance) {
+ }
+ 
+ // Moves `entity` `distance` tiles along an explicit direction, with the same
+-// guards. For the rolling spells' lateral throw: where a unit is caught across
++// guards except the last: the rolling throw is published PushbackAll and moves
++// a unit that ignores ordinary knockbacks. For the rolling spells' lateral throw: where a unit is caught across
+ // the corridor decides its direction, which a radial push from the log's centre
+ // cannot express. The direction need not be normalised; zero length is a no-op.
+ inline void pushAlong(Entity& entity, float dirX, float dirY, float distance) {
+diff --git a/python_ai/tests/test_knockback_resets_charge.py b/python_ai/tests/test_knockback_resets_charge.py
+index 438ec7a..98f4d4b 100644
+--- a/python_ai/tests/test_knockback_resets_charge.py
++++ b/python_ai/tests/test_knockback_resets_charge.py
+@@ -9,7 +9,7 @@ import clash_royale_env as E
+ 
+ ID = {E.get_card_info(c)["name"]: c for c in E.get_all_card_ids()}
+ NOOP = 4
+-OURS = [15, 6, 25, 40, 24, 72, 33, 7]                  # holds The Log and Fireball
++OURS = [15, 6, 25, 40, 100, 72, 33, 7]                 # holds The Log and Fireball
+ THEIRS = [ID["Goblin Barrel"], 4, 12, 112, 61, 20, ID["Prince"], 2]
+ LEFT_X = 3.0
+ 
+@@ -59,7 +59,21 @@ def test_a_log_far_from_the_tower_leaves_him_room_to_charge_again():
+     assert dealt == 2 * plain
+ 
+ 
+-def test_a_fireball_knockback_costs_him_the_charge_too():
++def test_a_fireball_does_not_move_a_prince_and_his_charge_survives():
++    """Patch 0053. The Prince is published with IgnorePushback: an ordinary
++    knockback (Fireball 1000) neither moves nor interrupts him. The Log is a
++    PushbackAll and does (the tests above)."""
+     plain, _ = _first_tower_hit(start_y=10.5)
+     dealt, _ = _first_tower_hit(16.0, ID["Fireball"], (LEFT_X, 10.0), 25)
++    assert dealt == 2 * plain
++
++
++def test_an_ordinary_knockback_costs_a_battle_ram_its_charge():
++    """The Battle Ram has no IgnorePushback: a Giant Snowball (Pushback 1800)
++    throws it back and it has to run its distance again."""
++    plain, _ = _first_tower_hit(start_y=10.5, charger="Battle Ram")
++    charged, _ = _first_tower_hit(start_y=16.0, charger="Battle Ram")
++    assert charged == 2 * plain
++    # Thrown late enough to land when the Ram is inside its last three tiles.
++    dealt, _ = _first_tower_hit(16.0, ID["Giant Snowball"], (LEFT_X, 10.0), 30, charger="Battle Ram")
+     assert dealt == plain
+diff --git a/python_ai/tests/test_published_stun_and_slow_durations.py b/python_ai/tests/test_published_stun_and_slow_durations.py
+index 341f795..5ada876 100644
+--- a/python_ai/tests/test_published_stun_and_slow_durations.py
++++ b/python_ai/tests/test_published_stun_and_slow_durations.py
+@@ -63,3 +63,27 @@ def test_only_the_unit_published_with_load_first_hit_lands_unloaded():
+     assert sorted(set(unloaded)) == ["Sparky"]
+     sparky = E.get_card_stats(60)["base"]
+     assert sparky["attack_cooldown_ticks"] == 40 and sparky["load_ticks"] == 30
++
++
++# Patch 0053: the units published with IgnorePushback (release 15.535.13).
++IGNORE_PUSHBACK = {
++    "Bowler", "Cannon Cart", "Dark Prince", "Electro Giant", "Elixir Golem", "Giant", "Giant Skeleton",
++    "Goblin Giant", "Goblin Machine", "Goblinstein", "Golem", "Lava Hound", "Mega Knight", "Mighty Miner",
++    "P.E.K.K.A.", "Prince", "Royal Giant", "Rune Giant", "Skeleton King", "Sparky",
++}
++# Published Pushback of the spells, thousandths of a tile.
++SPELL_PUSHBACK = {"Fireball": 1000, "Rocket": 1800, "Giant Snowball": 1800}
++
++
++def test_knockback_immunity_and_distances_follow_the_published_fields():
++    immune = set()
++    for cid in E.get_all_card_ids():
++        stats = E.get_card_stats(cid)
++        name = stats["name"]
++        if stats["base"].get("ignores_pushback"):
++            immune.add(name[5:] if name.startswith("Hero ") else name)
++        if name in SPELL_PUSHBACK:
++            assert round(stats["base"]["spell_knockback"] * 1000) == SPELL_PUSHBACK[name], name
++    assert immune == IGNORE_PUSHBACK
++    # The Log: LogProjectileRolling 700, PushbackAll.
++    assert round(E.get_card_stats(33)["base"]["roll_knockback"] * 1000) == 700
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index ef4f258..9a2b130 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -56,6 +56,7 @@ py::dict statsDict(const CardStats& s, int depth = 0) {
+     d["attack_cooldown_ticks"] = s.attackCooldown;
+     d["load_ticks"] = LoadTimes::forName(s.name);   // published load time
+     d["lands_unloaded"] = LoadTimes::landsUnloaded(s.name);   // published LoadFirstHit
++    d["ignores_pushback"] = Pushback::ignores(s.name);        // published IgnorePushback
+     // What a unit of this card winds up before its first hit on a target in
+     // range (CardFactories::applyCardMetadata): hit speed minus load time.
+     d["first_hit_windup_ticks"] = s.loadTicksOverride >= 0
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index c429418..dccca42 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -2198,6 +2198,94 @@ TEST_CASE("A unit with the published LoadFirstHit lands unloaded; every other un
+     }
+ }
+ 
++namespace {
++// Casts spell `cardId` for team 0 and runs it alone until it is spent.
++void castAndResolve(Board& board, int cardId, float x, float y) {
++    CardRegistry::getInstance().getCard(cardId)->spawnEntity(x, y, 0, board);
++    board.commitPendingEntities();
++    auto spell = board.getEntities().back();
++    for (int i = 0; i < 300 && spell->isAlive(); ++i) {
++        spell->update(board);
++        board.commitPendingEntities();
++    }
++}
++
++// An enemy unit of `cardId` standing at (x, y), and how far a spell moved it.
++std::shared_ptr<CombatEntity> enemyAt(Board& board, int cardId, float x, float y) {
++    CardRegistry::getInstance().getCard(cardId)->spawnEntity(x, y, 1, board);
++    board.commitPendingEntities();
++    auto unit = std::dynamic_pointer_cast<CombatEntity>(board.getEntities().back());
++    unit->position = { x, y };
++    return unit;
++}
++}
++
++TEST_CASE("An ordinary knockback moves a unit its published distance and leaves a unit that ignores pushback",
++          "[card_registry][knockback][patch0053]") {
++    // Published Pushback (thousandths of a tile): Fireball 1000, Rocket 1800,
++    // Giant Snowball 1800. Published IgnorePushback: Giant, Golem, P.E.K.K.A.,
++    // Prince and the rest of Pushback.h.
++    struct Row { int spell; const char* name; float distance; };
++    const Row rows[] = {
++        { 7,   "Fireball",       1.0f },
++        { 30,  "Rocket",         1.8f },   // was 1.0
++        { 100, "Giant Snowball", 1.8f },   // was 1.0
++    };
++    for (const Row& r : rows) {
++        INFO(r.name);
++        Board board;
++        auto knight = enemyAt(board, 0, 5.0f, 20.5f);
++        auto giant = enemyAt(board, 2, 6.0f, 20.5f);
++        REQUIRE_FALSE(knight->ignoresPushback());
++        REQUIRE(giant->ignoresPushback());
++        const int giantHp = giant->hp;
++        castAndResolve(board, r.spell, 5.5f, 20.0f);
++        REQUIRE(giant->hp < giantHp);                                   // hit,
++        REQUIRE(giant->position.x == Catch::Approx(6.0f));              // not moved
++        REQUIRE(giant->position.y == Catch::Approx(20.5f));
++        const float moved = knight->position.distanceTo(Vector2D{ 5.0f, 20.5f });
++        REQUIRE(moved == Catch::Approx(r.distance).margin(0.01));
++    }
++}
++
++TEST_CASE("The Log is a PushbackAll: it moves a Giant too", "[card_registry][knockback][patch0053]") {
++    Board board;
++    auto knight = enemyAt(board, 0, 5.0f, 20.5f);
++    auto giant = enemyAt(board, 2, 6.0f, 20.5f);
++    castAndResolve(board, 33, 5.5f, 18.0f);
++    // 0.7 tiles each, along the roll and out to the side they were caught on.
++    REQUIRE(knight->position.distanceTo(Vector2D{ 5.0f, 20.5f }) == Catch::Approx(0.7f).margin(0.01));
++    REQUIRE(giant->position.distanceTo(Vector2D{ 6.0f, 20.5f }) == Catch::Approx(0.7f).margin(0.01));
++    REQUIRE(knight->position.y > 20.5f);
++    REQUIRE(giant->position.y > 20.5f);
++}
++
++TEST_CASE("Knockback immunity: the published units, their Evolutions and Heroes, and nothing they spawn",
++          "[card_registry][knockback][patch0053]") {
++    auto& reg = CardRegistry::getInstance();
++    int count = 0;
++    const char* const* rows = Pushback::table(count);
++    REQUIRE(count == 20);
++    for (int i = 0; i < count; ++i) {
++        INFO(rows[i]);
++        bool found = false;
++        for (int id = 0; id < 400 && !found; ++id) {
++            const auto* c = reg.getCard(id);
++            found = c && c->name == rows[i];
++        }
++        REQUIRE(found);
++    }
++    REQUIRE(Pushback::ignores("Hero Giant"));
++    REQUIRE(Pushback::ignores("Hero Dark Prince"));
++    REQUIRE(Pushback::ignores(reg.getCard(148)->name));   // Evolved P.E.K.K.A.
++    REQUIRE(Pushback::ignores(reg.getCard(169)->name));   // Hero Giant
++    for (const char* name : { "Knight", "Hog Rider", "Ice Golem", "Balloon", "Golemite", "Elixir Golemite",
++                              "Lava Pup", "Elite Barbarians", "Hero Knight", "Monk" }) {
++        INFO(name);
++        REQUIRE_FALSE(Pushback::ignores(name));
++    }
++}
++
+ TEST_CASE("Switching between targets in range keeps the hit-speed rhythm; a new engagement winds up again",
+           "[card_registry][load_time]") {
+     // Knight: hit speed 1.2 s, first hit 0.5 s. Two targets in reach.

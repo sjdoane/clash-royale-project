@@ -1,0 +1,735 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 8083b51..a26184e 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -887,6 +887,57 @@ ran ahead of it at Very Fast and were shot first.
+   the rider. A Clone of a riding unit keeps the original carrier's id.
+ - Tests: `python_ai/tests/test_attached_riders_ride_their_carrier.py`.
+ 
++## 2026-11-22: published Crown Tower damage as one rule (patch 0047)
++
++**GAMEPLAY-AFFECTING.** New `include/core/CrownTowerDamage.h`: every
++`CrownTowerDamagePercent` row of the published game data (FirstLight-Zero
++card_specs.json / projectiles.json, release 15.535.13) whose card the engine
++has, keyed by registry NAME (Evolutions inherit), applied in
++`CardRegistry::add` / `addEvolution`. The covered card rows no longer carry a
++`.withCrownTowerDamage(N)` literal; do not add one back, change the table.
++
++| card | published | level-11 damage | on a Crown Tower before | now |
++|---|---|---|---|---|
++| Miner (hit) | -80 | 194 | 194 | 38 |
++| Fireball | -75 | 689 | 159 | 172 |
++| Arrows (per wave) | -80 | 123 | 31 | 25 |
++| Rocket | -77 | 1485 | 371 | 342 |
++| Lightning (per strike) | -75 | 1057 | 286 | 264 |
++| Zap | -75 | 192 | 48 | 48 |
++| Zap Evolution (per pulse) | base row | 192 | 58 | 48 |
++| Giant Snowball | -75 | 179 | 45 | 45 |
++| Giant Snowball Evolution | base row | 179 | 54 | 45 |
++| The Log | -87 | 269 | 35 | 35 |
++| Electro Wizard / Hero deploy zap | -100 | 118 | 118 | 0 |
++| Goblin Machine rocket (unit -24) | -50 | 304 | 304 | 152 |
++
++- Spells: `spellCrownTowerDamage = round(damage x (100 + percent) / 100)`.
++  Units: `crownTowerHitMultiplier`, which melee already honoured; a ranged
++  unit's factor now travels on its `Projectile` (`crownTowerFactor`) and scales
++  the direct hit. Splash from a projectile is not scaled (no covered card needs
++  it).
++- NOT in the release extract, left as the registry had them: Poison,
++  Earthquake, Tornado, Goblin Curse, Vines, Void, Barbarian Barrel, Hero
++  Barbarian Barrel, Royal Delivery (their reductions live in the buff table),
++  Mega Knight's landing, Goblin Drill's surfacing. Freeze has a row (-75, 58
++  base damage) but deals no damage in the engine. Evolution records
++  (Zap_EV1, SnowballSpell_EV1) are not resolved in the extract: an Evolution
++  uses its base card's row.
++- Teacher (`python_ai/opponents/teacher.py`): with the Miner at 101 tower HP
++  per elixir, a deck that also holds Wall Breakers (302) resolves to Wall
++  Breakers (`miner_poison_control`, `wall_breakers_cycle`; the two tests say
++  why). So that the Miner does not become a troop that is only offered cells
++  on its own half, `_cells_for` gives any deploy-anywhere troop that takes
++  tower HP the cell beside the weaker enemy tower first, whatever its role
++  (`_skips_the_bridge`). Measured over 4 matches per deck against the 2.6
++  deck: Miner plays / beside an enemy tower 30/29 and 31/31 before; 20/0 and
++  50/0 with the damage alone; 20/17 and 50/29 with the rule.
++- The reward's Fireball lethal window follows (`card_probes.damage_spell`:
++  159 -> 172; Lightning 286 -> 264).
++- Tests: `python_ai/tests/test_published_crown_tower_damage.py`,
++  `python_ai/tests/test_teacher_still_mines.py`, a Miner case in
++  `tests/core/test_card_registry.cpp`.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index fcde4c4..be1e244 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -8,6 +8,7 @@
+ #include "Board.h"
+ #include "CardStats.h"
+ #include "CardFactories.h"
++#include "CrownTowerDamage.h"
+ #include "FreezeOnHit.h"
+ #include "SpawnOnDeath.h"
+ #include "AreaDamageOnDeath.h"
+@@ -452,7 +453,9 @@ private:
+         return troop(-42, "Souldier", 0.0f, Archetype::MeleeSquad, 81, 0.7f, 1.2f, 133, 18, 'Q');
+     }
+ 
+-    void add(const CardStats& stats) {
++    void add(const CardStats& registered) {
++        // Published Crown Tower reductions (CrownTowerDamage.h, patch 0047).
++        const CardStats stats = CrownTowerDamage::applied(registered);
+         CardDefinition def;
+         def.id = stats.id;
+         def.name = stats.name;
+@@ -487,6 +490,8 @@ private:
+     // PlayerState::EvolutionSlotState).
+     void addEvolution(int evolutionId, CardStats baseStats, CardStats evolvedStats,
+             int cycleThreshold, int evolvedUses) {
++        CrownTowerDamage::apply(baseStats);
++        CrownTowerDamage::apply(evolvedStats);
+         CardDefinition def;
+         def.id = evolutionId;
+         def.name = baseStats.name;
+@@ -714,17 +719,17 @@ private:
+         // 0.6 s to 2.0 s, a real Barrel 2.8 s to an enemy Princess Tower).
+         // Arrows: 3 volleys of 123, not one 369 hit. The flight is to the
+         // first volley; its speed is published only (not measured here).
+-        add(spell(3, "Arrows", 3.0f, 3.5f, 123, 10, '*').withRepeats(3, 2).withCrownTowerDamage(31) /* audit 0003: wiki Arrows, level 11 */
++        add(spell(3, "Arrows", 3.0f, 3.5f, 123, 10, '*').withRepeats(3, 2) /* audit 0003: wiki Arrows, level 11; Crown Tower damage: CrownTowerDamage.h */
+             .withThrownFromKingTower(1100));
+         add(spell(7, "Fireball", 4.0f, 2.5f, 689, 10, 'O')
+             .withKnockback(1.0f)
+-            .withCrownTowerDamage(159) // audit 0003: wiki Fireball, level 11 (25% since 1/6/2026)
++            // audit 0003: wiki Fireball, level 11; Crown Tower damage: CrownTowerDamage.h
+             .withThrownFromKingTower(600));
+-        add(spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z').withCrownTowerDamage(48) /* audit 0003: wiki Zap, level 11 */);
++        add(spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z') /* audit 0003: wiki Zap, level 11; Crown Tower damage: CrownTowerDamage.h */);
+         add(spell(30, "Rocket", 6.0f, 2.0f, 1485, 15, 'r')
+-            .withKnockback(1.0f).withCrownTowerDamage(371) /* audit 0003: wiki Rocket, level 11 */
++            .withKnockback(1.0f) /* audit 0003: wiki Rocket, level 11; Crown Tower damage: CrownTowerDamage.h */
+             .withThrownFromKingTower(350));
+-        add(spell(31, "Lightning", 6.0f, 3.5f, 1057, 5, 'j').withCrownTowerDamage(286) /* audit 0003: wiki Lightning, level 11 */);
++        add(spell(31, "Lightning", 6.0f, 3.5f, 1057, 5, 'j') /* audit 0003: wiki Lightning, level 11; Crown Tower damage: CrownTowerDamage.h */);
+         // Poison: 92 damage every second for 8 s; whoever stands in it takes
+         // each pulse. A Crown Tower takes 21 per pulse (168 in all: official
+         // June 2026 notes, fixed in game on 26 Aug), and enemy troops inside
+@@ -751,8 +756,7 @@ private:
+         add(spell(33, "The Log", 2.0f, 3.9f, 269, 8, 'o')
+             .withGroundOnly()
+             .withRollingSweep(10.1f, 3.9f, 0.34f, 0.7f)
+-            .withRollBodyDepth(1.2f)
+-            .withCrownTowerDamage(35)); // audit 0003: wiki The Log, level 11 (13% since 1/6/2026)
++            .withRollBodyDepth(1.2f)); // audit 0003: wiki The Log, level 11; Crown Tower damage: CrownTowerDamage.h
+ 
+         // --- the 2026 roster expansion (ids 46+) ---
+         // Every remaining non-Champion, non-Evolution, non-Tower-Troop card,
+@@ -1066,7 +1070,7 @@ private:
+         // === Spells (expansion) ===
+         add(spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+             .withSpellOnHit(std::make_shared<FreezeOnHit>(15, 0.5f))
+-            .withKnockback(1.0f).withCrownTowerDamage(45) /* audit 0003: wiki Giant Snowball, level 11 */
++            .withKnockback(1.0f) /* audit 0003: wiki Giant Snowball, level 11; Crown Tower damage: CrownTowerDamage.h */
+             .withThrownFromKingTower(800));
+         // Barbarian Barrel: rolls 4.5 tiles at width 2.6 (published), and its
+         // Barbarian spawns where the barrel stops. No knockback: the real
+@@ -1249,8 +1253,8 @@ private:
+         // Zap ("Triple Shock"): three zaps instead of one. The growing radius
+         // between zaps is not modelled; the 3-tick gap is not sourced.
+         addEvolution(124,
+-            spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z').withCrownTowerDamage(48) /* audit 0003: wiki Zap, level 11 */,
+-            spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z').withRepeats(3, 3).withCrownTowerDamage(58) /* audit 0003: wiki Zap/Evolution, level 11 */,
++            spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z') /* audit 0003: wiki Zap, level 11; Crown Tower damage: CrownTowerDamage.h */,
++            spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z').withRepeats(3, 3) /* audit 0003: wiki Zap/Evolution, level 11; Crown Tower damage: CrownTowerDamage.h */,
+             2, 1);
+ 
+         // Skeletons ("Never-ending Horde"): see evolvedSkeletonChildStats.
+@@ -1647,11 +1651,11 @@ private:
+         addEvolution(158,
+             spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+                 .withSpellOnHit(std::make_shared<FreezeOnHit>(15, 0.5f))
+-                .withKnockback(1.0f).withCrownTowerDamage(45) /* audit 0003: wiki Giant Snowball, level 11 */
++                .withKnockback(1.0f) /* audit 0003: wiki Giant Snowball, level 11; Crown Tower damage: CrownTowerDamage.h */
+                 .withThrownFromKingTower(800),
+             spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+                 .withSpellOnHit(std::make_shared<FreezeOnHit>(40, 0.7f))
+-                .withKnockback(-4.5f).withCrownTowerDamage(54) /* audit 0003: wiki Giant Snowball/Evolution, level 11 */
++                .withKnockback(-4.5f) /* audit 0003: wiki Giant Snowball/Evolution, level 11; Crown Tower damage: CrownTowerDamage.h */
+                 .withThrownFromKingTower(800),
+             2, 1);
+ 
+diff --git a/include/core/CrownTowerDamage.h b/include/core/CrownTowerDamage.h
+new file mode 100644
+index 0000000..d014306
+--- /dev/null
++++ b/include/core/CrownTowerDamage.h
+@@ -0,0 +1,115 @@
++#pragma once
++
++#include <cmath>
++#include <cstring>
++#include <memory>
++#include "CardStats.h"
++
++// Published reduced damage to Crown Towers (patch 0047).
++//
++// The game's data tables give some damage sources a `CrownTowerDamagePercent`
++// (a negative percentage: -80 means a Crown Tower takes 20% of the damage).
++// This is every row of release 15.535.13 (FirstLight-Zero card_specs.json and
++// projectiles.json) whose card the engine has, applied by ONE rule in
++// CardRegistry::add / addEvolution. Nothing else in the registry may carry a
++// literal for these cards.
++//
++//   record (table)                 percent   engine card, what it scales
++//   Miner (character)                -80     Miner: his hits
++//   FireballSpell (projectile)       -75     Fireball
++//   ArrowsSpell (projectile)         -80     Arrows, per wave
++//   RocketSpell (projectile)         -77     Rocket
++//   LighningSpell (projectile)       -75     Lightning, per strike
++//   Zap (area effect)                -75     Zap
++//   SnowballSpell (projectile)       -75     Giant Snowball
++//   LogProjectileRolling             -87     The Log
++//   ElectroWizardZap (area effect)  -100     Electro Wizard's deploy zap
++//   GoblinMachineRocketProjectile    -50     Goblin Machine's rocket (unit -24)
++//
++// Before this table the spells carried hand-entered absolute values, several
++// of them at older percentages (Fireball 159 = 23%, Arrows 31 = 25%, Rocket
++// 371 = 25%, Lightning 286 = 27%, the Zap and Giant Snowball Evolutions at
++// 30%), and the Miner had none: he hit Crown Towers for his full 194.
++//
++// NOT in the release table, so left as the registry has them: Poison,
++// Earthquake, Tornado, Goblin Curse, Vines, Void, Barbarian Barrel, Royal
++// Delivery (their reductions live in the buff table, which the release
++// extract does not include). Freeze has a row (-75) but no damage in the
++// engine. The Evolution forms (Zap_EV1, SnowballSpell_EV1) are not resolved in
++// the extract; an Evolution inherits its base card's row, as in SightClips.h.
++//
++// Rounding: nearest, on the level-11 value (269 x 13% = 34.97 -> 35, the
++// figure the registry already had for The Log from the wiki). A unit's hits go
++// through CombatEntity::crownTowerHitFactor, which truncates (194 -> 38); a
++// ranged unit's factor travels on its Projectile and scales the direct hit.
++namespace CrownTowerDamage {
++
++enum class Kind { Hit, Spell, SpawnEffect };
++
++struct Row {
++    const char* name;   // registry NAME, so Evolutions inherit the row
++    Kind kind;
++    int percent;        // published CrownTowerDamagePercent
++    int onlyUnitId;     // 0 = every unit of that name; else that CardStats id
++};
++
++inline const Row* table(int& count) {
++    static const Row rows[] = {
++        { "Miner",          Kind::Hit,         -80,   0 },
++        { "Fireball",       Kind::Spell,       -75,   0 },
++        { "Arrows",         Kind::Spell,       -80,   0 },
++        { "Rocket",         Kind::Spell,       -77,   0 },
++        { "Lightning",      Kind::Spell,       -75,   0 },
++        { "Zap",            Kind::Spell,       -75,   0 },
++        { "Giant Snowball", Kind::Spell,       -75,   0 },
++        { "The Log",        Kind::Spell,       -87,   0 },
++        { "Electro Wizard", Kind::SpawnEffect, -100,  0 },
++        // The Hero is the same card record with a hero form; it shares the
++        // deploy zap (one ElectroWizardZap area effect in the release).
++        { "Hero Electro Wizard", Kind::SpawnEffect, -100, 0 },
++        { "Goblin Machine", Kind::Hit,         -50, -24 },
++    };
++    count = static_cast<int>(sizeof(rows) / sizeof(rows[0]));
++    return rows;
++}
++
++inline int scaled(int damage, int percent) {
++    return static_cast<int>(std::lround(damage * (100 + percent) / 100.0));
++}
++
++// Applies every matching row to `stats` and to its secondary unit.
++inline void apply(CardStats& stats) {
++    int count = 0;
++    const Row* rows = table(count);
++    for (int i = 0; i < count; ++i) {
++        const Row& row = rows[i];
++        if (stats.name != row.name) continue;
++        if (row.onlyUnitId != 0 && stats.id != row.onlyUnitId) continue;
++        const bool isSpell = stats.archetype == Archetype::Spell;
++        switch (row.kind) {
++            case Kind::Hit:
++                if (!isSpell) stats.crownTowerHitMultiplier = (100 + row.percent) / 100.0f;
++                break;
++            case Kind::Spell:
++                if (isSpell) stats.spellCrownTowerDamage = scaled(stats.damage, row.percent);
++                break;
++            case Kind::SpawnEffect:
++                if (stats.spawnEffectDamage > 0) {
++                    stats.spawnEffectCrownTowerDamage = scaled(stats.spawnEffectDamage, row.percent);
++                }
++                break;
++        }
++    }
++    if (stats.secondaryUnit) {
++        auto unit = std::make_shared<CardStats>(*stats.secondaryUnit);
++        apply(*unit);
++        stats.secondaryUnit = std::move(unit);
++    }
++}
++
++inline CardStats applied(CardStats stats) {
++    apply(stats);
++    return stats;
++}
++
++} // namespace CrownTowerDamage
+diff --git a/include/entities/Projectile.h b/include/entities/Projectile.h
+index 1bcf7f1..9e83c5f 100644
+--- a/include/entities/Projectile.h
++++ b/include/entities/Projectile.h
+@@ -45,6 +45,11 @@ private:
+     bool splashAppliesOnHit = false;
+ 
+ public:
++    // Published Crown Tower reduction of the shooter (CrownTowerDamage.h,
++    // patch 0047): the factor its direct hit is scaled by when the target is a
++    // Crown Tower. 1 = full damage. Set by RangedTroop when it fires.
++    float crownTowerFactor = 1.0f;
++
+     Projectile(int id, float x, float y, int team, std::weak_ptr<Entity> target, float speed, int damage,
+         std::vector<std::shared_ptr<IOnHitEffect>> onHitEffects = {},
+         bool returnsToSender = false, int returnDelayTicks = 0,
+@@ -118,9 +123,11 @@ public:
+ 
+ private:
+     void applyHit(Board& board, const std::shared_ptr<Entity>& t) {
+-        t->takeDamage(damage);
++        const int dealt = (t->isTower() && crownTowerFactor != 1.0f)
++            ? static_cast<int>(damage * crownTowerFactor) : damage;
++        t->takeDamage(dealt);
+         board.statsEvents.notifyDamageDealt(
+-            { attackerId, team, attackerCardId, t->id, t->cardId, t->team, damage, board.currentTick, t->isTower() });
++            { attackerId, team, attackerCardId, t->id, t->cardId, t->team, dealt, board.currentTick, t->isTower() });
+         // On-hit effects (e.g. Ice Wizard's freeze) land on arrival, and only
+         // against a CombatEntity.
+         if (!onHitEffects.empty()) {
+diff --git a/include/entities/RangedTroop.h b/include/entities/RangedTroop.h
+index 7a59dad..df32c79 100644
+--- a/include/entities/RangedTroop.h
++++ b/include/entities/RangedTroop.h
+@@ -31,6 +31,7 @@ protected:
+             board.allocateId(), position.x, position.y, team, target, 1.5f, getCurrentDamage(), onHitEffects,
+             boomerang, boomerangReturnDelayTicks, id, cardId, splashRadius, lineSplash, lineSplashRange,
+             splashAppliesOnHit);
++        arrow->crownTowerFactor = crownTowerHitFactor(*target);
+         board.addEntity(arrow);
+     }
+ };
+\ No newline at end of file
+diff --git a/python_ai/opponents/teacher.py b/python_ai/opponents/teacher.py
+index a8f1ec6..d3c3d3c 100644
+--- a/python_ai/opponents/teacher.py
++++ b/python_ai/opponents/teacher.py
+@@ -1186,6 +1186,13 @@ class UtilityTeacher:
+         # support our most advanced unit. An anti-air card meets a flying
+         # building-targeter first, since nothing else can.
+         cells = []
++        if self._skips_the_bridge(card_id):
++            # A deploy-anywhere troop that is not the deck's resolved win
++            # condition (a Miner beside Wall Breakers) still has its own route
++            # to a tower: offer the cell beside the weaker enemy tower first,
++            # then the defensive cell. Without this it would only ever be
++            # offered a cell on its own half, which wastes what the card is.
++            cells.extend(self._beside_tower_cells(card_id, obs)[:1])
+         tx, ty = self._deepest_threat(obs)
+         ax, ay = self._air_siege_threat(obs)
+         if ax is not None and card_probes.damages_air(card_id):
+@@ -1202,6 +1209,15 @@ class UtilityTeacher:
+                           float(tactics.BRIDGE_ROW)))
+         return cells[:k]
+ 
++    def _skips_the_bridge(self, card_id):
++        """A troop the engine lets us place on the enemy half, and that takes
++        tower HP from there (measured, as for a win condition).
++        """
++        info = E.get_card_info(card_id)
++        return (bool(info.get("deploy_anywhere", False))
++                and not info["is_building"] and not info["is_spell"]
++                and wincon_damage_per_elixir(card_id) >= WINCON_MIN_DAMAGE_PER_ELIXIR)
++
+     def _siege_cells(self, obs):
+         """Where a Mortar or X-Bow must stand to threaten anything: the
+         furthest-forward row (one row back is worth nothing).
+diff --git a/python_ai/tests/test_damage_spell_is_deck_derived.py b/python_ai/tests/test_damage_spell_is_deck_derived.py
+index e8a9aeb..b14fa10 100644
+--- a/python_ai/tests/test_damage_spell_is_deck_derived.py
++++ b/python_ai/tests/test_damage_spell_is_deck_derived.py
+@@ -234,9 +234,10 @@ def test_the_26_deck_resolves_to_exactly_the_constants_it_used_to_hardcode():
+     """
+     cid, damage, cost = card_probes.damage_spell(HOG_26)
+     assert cid == W.FIREBALL_CARD_ID
+-    # The probe measures the TOWER: 159 Crown Tower damage since patch 0003
+-    # (wiki Fireball, level 11). The troop figure is unchanged.
+-    assert damage == 159.0
++    # The probe measures the TOWER: 172 Crown Tower damage since patch 0047
++    # (published -75%: 689 x 25%; a hand-entered 159 before). The troop figure
++    # is unchanged.
++    assert damage == 172.0
+     assert W.FIREBALL_DAMAGE == 689.0
+     assert cost == W.FIREBALL_COST == 4.0   # the retired SPELL_SOLVENCY_RESERVE
+ 
+diff --git a/python_ai/tests/test_deck_contract.py b/python_ai/tests/test_deck_contract.py
+index 1d6a3be..6aea425 100644
+--- a/python_ai/tests/test_deck_contract.py
++++ b/python_ai/tests/test_deck_contract.py
+@@ -48,9 +48,9 @@ def test_a_deck_without_fireball_keys_the_spell_terms_to_its_own_spell():
+     assert spell_lines, text(report)
+     lvl, msg = spell_lines[0]
+     assert lvl == "INFO" and "Lightning" in msg, msg
+-    # 286 is Lightning's Crown Tower damage (card-stats audit, patch 0003:
+-    # wiki Lightning, level 11); before the patch towers took the full 1057.
+-    assert "286" in msg and "6 elixir" in msg, msg
++    # 264 is Lightning's Crown Tower damage (published -75%: 1057 x 25%,
++    # CrownTowerDamage.h, patch 0047; a hand-entered 286 before).
++    assert "264" in msg and "6 elixir" in msg, msg
+ 
+ 
+ def test_a_deck_with_no_damaging_spell_warns_that_the_spell_terms_are_off():
+diff --git a/python_ai/tests/test_published_crown_tower_damage.py b/python_ai/tests/test_published_crown_tower_damage.py
+new file mode 100644
+index 0000000..05adb59
+--- /dev/null
++++ b/python_ai/tests/test_published_crown_tower_damage.py
+@@ -0,0 +1,127 @@
++"""Published reduced Crown Tower damage, applied as one rule (patch 0047).
++
++The game-data table (FirstLight-Zero card_specs.json and projectiles.json,
++release 15.535.13) gives some damage sources a `CrownTowerDamagePercent`.
++`include/core/CrownTowerDamage.h` holds every such row whose card the engine
++has and `CardRegistry::add` / `addEvolution` apply it, so no card row carries
++its own literal. Level-11 damage is the registry's (level-1 base x 2.56).
++
++Before the patch: the Miner hit Crown Towers for his full 194 (38 published),
++Fireball took 159 (172), Arrows 31 a wave (25), Rocket 371 (342), Lightning 286
++(264), the Zap and Giant Snowball Evolutions 58 and 54 (48 and 45, the base
++card's row; the release does not resolve a separate Evolution record), and the
++Goblin Machine's rocket its full 304 (152).
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++import pytest
++
++NOOP = 4
++OURS = [129, 168, 125, 15, 40, 72, 33, 7]
++
++# card id -> (published percent, level-11 damage per application, Crown Tower damage)
++SPELLS = {
++    3: (-80, 123, 25),      # Arrows, per wave
++    7: (-75, 689, 172),     # Fireball
++    29: (-75, 192, 48),     # Zap
++    30: (-77, 1485, 342),   # Rocket
++    31: (-75, 1057, 264),   # Lightning, per strike
++    33: (-87, 269, 35),     # The Log
++    100: (-75, 179, 45),    # Giant Snowball
++}
++
++
++@pytest.mark.parametrize("card", sorted(SPELLS))
++def test_a_spell_row_is_the_published_share_of_the_registry_damage(card):
++    percent, damage, tower = SPELLS[card]
++    base = E.get_card_stats(card)["base"]
++    assert base["damage"] == damage
++    assert tower == round(damage * (100 + percent) / 100.0)
++    assert base["spell_crown_tower_damage"] == tower
++
++
++def test_an_evolution_inherits_its_base_cards_row():
++    seen = 0
++    for evo in E.get_evolution_card_ids():
++        stats = E.get_card_stats(evo)
++        for form in ("base", "evolved"):
++            row = stats.get(form)
++            if not row or row["id"] not in SPELLS or row["archetype"] != stats["base"]["archetype"]:
++                continue
++            if row["spell_crown_tower_damage"] < 0:
++                continue
++            percent, _damage, _tower = SPELLS[row["id"]]
++            assert row["spell_crown_tower_damage"] == round(row["damage"] * (100 + percent) / 100.0), (evo, form)
++            seen += 1
++    assert seen >= 4   # Zap and Giant Snowball, base and evolved form
++
++
++def test_the_electro_wizards_deploy_zap_does_nothing_to_a_crown_tower():
++    for card in (35, 186):
++        base = E.get_card_stats(card)["base"]
++        assert base["spawn_effect_damage"] > 0
++        assert base["spawn_effect_crown_tower_damage"] == 0
++
++
++def _env(card, defender=None):
++    deck = [card] + [c for c in (4, 12, 112, 61, 20, 14, 26, 0) if c != card][:7]
++    env = E.ClashRoyaleEnv(list(defender or OURS), deck, 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    env.set_elixir_for_team(1, 10.0)
++    assert env.set_hand_for_team(1, deck[:4])
++    env.set_tower_hit_log(True)
++    return env
++
++
++def _tower_hits(env, ticks):
++    """Damage of every hit a team-0 Crown Tower takes in `ticks`, in order."""
++    for _ in range(ticks):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++    # (tick, attacker_team, attacker_card_id, attacker_id, target_team, target_id, amount)
++    return [h[6] for h in env.get_tower_hits() if h[4] == 0]
++
++
++@pytest.mark.parametrize("card,expected", [
++    (7, [172]), (30, [342]), (3, [25, 25, 25]), (29, [48]), (100, [45]),
++])
++def test_a_spell_cast_on_a_princess_tower_takes_the_published_amount(card, expected):
++    env = _env(card)
++    # team 1's frame: its enemy's left Princess Tower is at (3, 27)
++    env.step_self_play(NOOP, 0.0, 0.0, 0, 3.0, 27.0, 1)
++    assert _tower_hits(env, 80) == expected
++
++
++def test_the_miner_hits_a_crown_tower_for_a_fifth_and_a_building_in_full():
++    env = _env(52)
++    env.step_self_play(NOOP, 0.0, 0.0, 0, 3.0, 25.0, 1)
++    hits = _tower_hits(env, 120)
++    assert len(hits) >= 5 and set(hits) == {38}      # 194 x 20%, truncated
++
++    cannon = [129, 168, 125, 15, 40, 72, 33, 7]
++    env = _env(52, cannon)
++    env.set_elixir_for_team(0, 10.0)
++    assert env.set_hand_for_team(0, cannon[:4])
++    env.step_self_play(0, 8.0, 10.0, NOOP, 0.0, 0.0, 15)
++    building = next(u for u in env.get_units() if u["team"] == 0 and u["building"] and not u["tower"])
++    env.step_self_play(NOOP, 0.0, 0.0, 0, 6.0, 23.0, 1)   # two tiles from it
++    losses, hp = [], building["hp"]
++    for _ in range(150):      # he burrows there first
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        now = next((u["hp"] for u in env.get_units() if u["id"] == building["id"]), None)
++        if now is None:
++            break
++        # a building also decays every tick; a Miner hit is the large step
++        if hp - now > 50:
++            losses.append(hp - now)
++        hp = now
++    assert losses and all(190 <= d <= 200 for d in losses), losses
++
++
++def test_the_goblin_machines_rocket_takes_half_from_a_crown_tower():
++    env = _env(55)
++    env.step_self_play(NOOP, 0.0, 0.0, 0, 3.0, 15.0, 1)
++    hits = _tower_hits(env, 400)
++    assert 152 in hits            # the rocket: 304 x 50%
++    assert 304 not in hits
++    assert 212 in hits            # the body's own hits are not reduced
+diff --git a/python_ai/tests/test_teacher_deck_generalisation.py b/python_ai/tests/test_teacher_deck_generalisation.py
+index 88b25d9..5db431b 100644
+--- a/python_ai/tests/test_teacher_deck_generalisation.py
++++ b/python_ai/tests/test_teacher_deck_generalisation.py
+@@ -73,20 +73,25 @@ def test_a_spell_that_spawns_bodies_becomes_the_win_condition(pool, by_name):
+ 
+ 
+ def test_decks_that_already_had_a_win_condition_are_untouched(pool, by_name):
+-    """The decks that resolved a win condition under the old cost ranking. Three
++    """The decks that resolved a win condition under the old cost ranking. One
+     moved with the damage-ranked resolver, to the card a human names the deck
+-    after (Miner over Wall Breakers, Balloon over Lava Hound); the rest are
+-    unchanged.
++    after (Balloon over Lava Hound); the rest are unchanged.
++
++    The two decks that hold both a Miner and Wall Breakers resolve to Wall
++    Breakers since patch 0047: the resolver ranks by tower HP taken alone per
++    elixir, and the Miner's published Crown Tower damage is a fifth of his hit
++    (38, not 194), so he measures 101 per elixir against the Wall Breakers'
++    302. He stays a route to the tower (test_teacher_still_mines.py).
+     """
+     expected = {
+         "hog_26_mirror": "Hog Rider",
+         "three_musketeers_bridge": "Battle Ram",
+         "rg_fisherman_cycle": "Royal Giant",
+-        "miner_poison_control": "Miner",
++        "miner_poison_control": "Wall Breakers",
+         "royal_hogs_furnace": "Royal Hogs",
+         "giant_double_dragon": "Giant",
+         "pekka_bridge_spam": "Battle Ram",
+-        "wall_breakers_cycle": "Miner",
++        "wall_breakers_cycle": "Wall Breakers",
+         "golem_beatdown": "Golem",
+         "lavaloon": "Balloon",
+         "mega_knight_ram": "Battle Ram",
+diff --git a/python_ai/tests/test_teacher_still_mines.py b/python_ai/tests/test_teacher_still_mines.py
+new file mode 100644
+index 0000000..e528b26
+--- /dev/null
++++ b/python_ai/tests/test_teacher_still_mines.py
+@@ -0,0 +1,91 @@
++"""The Miner stays a card the teacher sends at a tower (patch 0047).
++
++With the published Crown Tower reduction the Miner takes 101 tower HP per
++elixir alone, and a deck that also holds Wall Breakers (302) resolves to those
++as its win condition. Without a rule for it that would have made the Miner a
++plain troop, which `_cells_for` only ever offers a cell on its own half: over 4
++matches of each deck below the teacher then played 20 and 50 Miners and not one
++of them at an enemy tower (29 of 30 and 31 of 31 before the correction).
++
++The rule is general: a troop the engine lets us place on the enemy half, and
++that takes tower HP from there, is offered the cell beside the weaker enemy
++tower whatever role the deck gives it.
++"""
++import os
++import sys
++
++import numpy as np
++import pytest
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
++    os.path.abspath(__file__)))))
++
++import python_ai  # noqa: E402,F401
++import clash_royale_env as E  # noqa: E402
++from python_ai import engine_constants as EC  # noqa: E402
++from python_ai.opponents import teacher as T  # noqa: E402
++from python_ai.opponents.deck_pool import load_pool  # noqa: E402
++
++MINER = 52
++MATCHES = 3
++
++
++@pytest.fixture(scope="module")
++def pool():
++    return {d.name: list(d.card_ids) for d in load_pool()}
++
++
++def _miner_plays(deck, opponent, seed):
++    """(plays, plays beside an enemy Crown Tower) of the Miner by team 0."""
++    env = E.ClashRoyaleEnv(deck, opponent, 3600)
++    env.seed(seed)
++    env.reset()
++    ours = T.UtilityTeacher(deck, team=0, seed=seed)
++    ours.reset()
++    theirs = T.UtilityTeacher(opponent, team=1, seed=seed + 1000)
++    theirs.reset()
++    towers = [(float(int(EC.LEFT_LANE_X)), float(EC.princess_y(1))),
++              (float(int(EC.RIGHT_LANE_X)), float(EC.princess_y(1)))]
++    plays = beside = 0
++    while not env.is_game_over():
++        o0 = np.asarray(env.get_observation_for_team(0), np.float32)
++        o1 = np.asarray(env.get_observation_for_team(1), np.float32)
++        hand = list(env.get_hand_for_team(0))
++        a0 = ours.act(env, o0)
++        a1 = theirs.act(env, o1)
++        if a0[0] < len(hand) and hand[a0[0]] == MINER:
++            plays += 1
++            beside += any(abs(a0[1] - tx) <= 2.0 and abs(a0[2] - ty) <= 5.0
++                          for tx, ty in towers)
++        env.step_self_play(a0[0], a0[1], a0[2], a1[0], a1[1], a1[2], 10)
++    return plays, beside
++
++
++@pytest.mark.parametrize("deck_name", ["miner_poison_control", "wall_breakers_cycle"])
++def test_the_teacher_still_sends_its_miner_at_an_enemy_tower(pool, deck_name):
++    deck = pool[deck_name]
++    roles = T.card_roles(deck)
++    assert roles[MINER] != "wincon", "the premise: the deck resolves to another card"
++    plays = beside = 0
++    for seed in range(MATCHES):
++        p, b = _miner_plays(deck, pool["hog_26_mirror"], seed)
++        plays += p
++        beside += b
++    # regularly: at least twice a match, and at least two Miners in five
++    assert beside >= 2 * MATCHES, (plays, beside)
++    assert beside * 5 >= plays * 2, (plays, beside)
++
++
++def test_a_deploy_anywhere_troop_is_offered_the_cell_beside_the_tower(pool):
++    deck = pool["wall_breakers_cycle"]
++    t = T.UtilityTeacher(deck, team=0, horizon_ticks=0, k_cells=2)
++    t.reset()
++    env = E.ClashRoyaleEnv(deck, deck, 3600)
++    env.reset()
++    obs = np.asarray(env.get_observation_for_team(0), np.float32)
++    cells = t._cells_for(t.roles[MINER], MINER, obs)
++    assert cells and cells[0][1] > float(EC.princess_y(1)) - 6.0, cells
++    # control: a troop that must cross the bridge is not
++    walker = next(c for c, r in t.roles.items()
++                  if r in ("melee", "ranged") and c != MINER)
++    assert all(y <= 17.0 for _x, y in t._cells_for(t.roles[walker], walker, obs))
+diff --git a/python_ai/tests/test_teacher_wincon_resolver.py b/python_ai/tests/test_teacher_wincon_resolver.py
+index 1a3af83..98c7a87 100644
+--- a/python_ai/tests/test_teacher_wincon_resolver.py
++++ b/python_ai/tests/test_teacher_wincon_resolver.py
+@@ -26,7 +26,15 @@ EXPECTED_POOL = {
+     "classic_log_bait_inferno": "Goblin Barrel",
+     "graveyard_control": "Graveyard",
+     "lavaloon": "Balloon",
+-    "miner_poison_control": "Miner",
++    # Wall Breakers, not Miner, since patch 0047. The resolver ranks a deck's
++    # routes to a tower by the tower HP each takes alone per elixir. The Miner
++    # used to hit Crown Towers for his full 194; the published figure is a
++    # fifth of that (CrownTowerDamagePercent -80: 38 a hit), which puts him at
++    # 101 HP per elixir against the Wall Breakers' 302. A deck that holds both
++    # therefore resolves to Wall Breakers, which is what the corrected numbers
++    # say. The Miner is still sent at the tower: see
++    # test_teacher_still_mines.py.
++    "miner_poison_control": "Wall Breakers",
+     "xbow_30_cycle": "X-Bow",
+     "mortar_cycle": "Mortar",
+     "golem_beatdown": "Golem",
+diff --git a/tests/core/test_card_levels.cpp b/tests/core/test_card_levels.cpp
+index ed0c4fd..6acb505 100644
+--- a/tests/core/test_card_levels.cpp
++++ b/tests/core/test_card_levels.cpp
+@@ -97,6 +97,8 @@ TEST_CASE("a spell's crown-tower damage follows its team's level", "[card_levels
+         return hp0 - game.getTowerHp(1, 1);
+     };
+     const int at11 = fireballOnTower(11);
+-    REQUIRE(at11 == 159);   // audit 0003: wiki Fireball crown-tower damage, level 11
+-    REQUIRE(fireballOnTower(15) == CardLevels::scale(159, 15));
++    // Published CrownTowerDamagePercent -75 (CrownTowerDamage.h, patch 0047):
++    // 689 x 25% = 172. It was a hand-entered 159 (23%) before.
++    REQUIRE(at11 == 172);
++    REQUIRE(fireballOnTower(15) == CardLevels::scale(172, 15));
+ }
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index c7d183a..68e82c2 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -1200,6 +1200,35 @@ TEST_CASE("Goblin Barrel drops 3 Goblins directly at the target, dealing no sepa
+     REQUIRE(goblinCount == 3);
+ }
+ 
++TEST_CASE("The Miner deals a fifth of his damage to a Crown Tower and all of it to anything else", "[card_registry][patch0047]") {
++    // Published CrownTowerDamagePercent -80 (CrownTowerDamage.h): 194 -> 38 at level 11.
++    auto firstHitOn = [](bool crownTower) {
++        Board board;
++        std::shared_ptr<Entity> victim;
++        if (crownTower) {
++            victim = std::make_shared<Tower>(board.allocateId(), 9.0f, 20.0f, 3052, 1, 0.0f, 0, 8, 'P');
++        } else {
++            victim = std::make_shared<Building>(board.allocateId(), 9.0f, 20.0f, 3052, 1, 'C', 0.0f, 0, 10, 0);
++        }
++        board.addEntity(victim);
++        CardRegistry::getInstance().getCard(52)->spawnEntity(9.0f, 18.0f, 0, board);
++        board.commitPendingEntities();
++        const int before = victim->hp;
++        for (int tick = 1; tick <= 60 && victim->hp == before; ++tick) {
++            board.currentTick = tick;
++            board.commitPendingEntities(tick);
++            for (const auto& e : board.getEntities()) if (e->isAlive()) e->update(board);
++            board.commitPendingEntities(tick);
++            board.resolveCollisions();
++            board.cleanDeadEntities(tick);
++        }
++        return before - victim->hp;
++    };
++    REQUIRE(firstHitOn(true) == 38);
++    REQUIRE(firstHitOn(false) == 194);
++}
++
++
+ TEST_CASE("Goblin Barrel lands one Goblin beyond the target and two short of it, for either side", "[card_registry][spell][spawn][patch0037]") {
+     // Published spawn offsets (x 0 / 500 / -500, y 500 apart); the recording of
+     // 2026-11-20 shows which way round: on a Princess Tower one Goblin lands

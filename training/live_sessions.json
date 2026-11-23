@@ -1,0 +1,9 @@
+{
+ "note": "Live sessions used as replay opponents (training/live_ghost_build.py). The newest session is the held-out one (split val); when a new session is recorded, add it as val and move the previous val session to train.",
+ "sessions": [
+  {"id": "s1", "run": "20261123-004549", "opp_from": "20261123-030217", "split": "train"},
+  {"id": "s2", "run": "20261123-091124", "split": "train"},
+  {"id": "s3", "run": "20261123-101008", "split": "train"},
+  {"id": "s4", "run": "20261123-104801", "split": "val"}
+ ]
+}

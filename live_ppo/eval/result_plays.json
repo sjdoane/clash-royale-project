@@ -1,0 +1,65 @@
+{
+ "rec": {
+  "every": 1,
+  "n_lab": 9,
+  "n_det": 9,
+  "tp": 9,
+  "fp": [],
+  "fn": [],
+  "latency": [
+   [
+    "Hog Rider",
+    0.5,
+    2.0
+   ],
+   [
+    "Ice Spirit",
+    0.0,
+    1.5
+   ],
+   [
+    "Archer Queen",
+    3.0,
+    4.5
+   ],
+   [
+    "Elite Barbarians",
+    0.0,
+    1.5
+   ],
+   [
+    "Goblin Gang",
+    -0.75,
+    0.75
+   ],
+   [
+    "Hog Rider",
+    0.0,
+    2.0
+   ],
+   [
+    "Tesla",
+    0.0,
+    1.5
+   ],
+   [
+    "Archer Queen",
+    3.75,
+    5.25
+   ],
+   [
+    "Elite Barbarians",
+    -0.5,
+    1.0
+   ]
+  ],
+  "spent": 38.0,
+  "gt_spent": 38.0,
+  "negative": [
+   [
+    305,
+    -0.28571428571428825
+   ]
+  ]
+ }
+}

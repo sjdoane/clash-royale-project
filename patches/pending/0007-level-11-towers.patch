@@ -1,0 +1,245 @@
+diff --git a/include/core/ClashEnv.h b/include/core/ClashEnv.h
+index 11cbab1..90d72b3 100644
+--- a/include/core/ClashEnv.h
++++ b/include/core/ClashEnv.h
+@@ -73,7 +73,8 @@ public:
+     // highest registered id.
+     static constexpr int NUM_CARD_IDS = CARD_ID_COUNT;
+     static constexpr float MAX_TROOP_HP = 4256.0f;
+-    static constexpr float MAX_BUILDING_HP = 4008.0f;
++    // The level-11 King's hp, so a full King still reads 1.0.
++    static constexpr float MAX_BUILDING_HP = static_cast<float>(CrownTower::KING_HP);
+ 
+     // Normalisers for the attribute channels, from the registry's real spread.
+     // Every attribute is clamped to 1.0, so an outlier card saturates rather
+diff --git a/include/core/GameManager.h b/include/core/GameManager.h
+index 9af86cd..f5cb11f 100644
+--- a/include/core/GameManager.h
++++ b/include/core/GameManager.h
+@@ -671,8 +671,10 @@ public:
+         playerOpponent.initializeDeck(oppDeckConfig, rng);
+ 
+         // Tower positions from ArenaLayout.h.
+-        addTower(ArenaLayout::CENTER_X, ArenaLayout::kingY(0), 4008, 0, 7.0f, 90, 10, 'R', "King Tower");
+-        addTower(ArenaLayout::CENTER_X, ArenaLayout::kingY(1), 4008, 1, 7.0f, 90, 10, 'R', "King Tower");
++        addTower(ArenaLayout::CENTER_X, ArenaLayout::kingY(0), CrownTower::KING_HP, 0, 7.0f,
++                 CrownTower::KING_DAMAGE, CrownTower::KING_COOLDOWN_TICKS, 'R', "King Tower");
++        addTower(ArenaLayout::CENTER_X, ArenaLayout::kingY(1), CrownTower::KING_HP, 1, 7.0f,
++                 CrownTower::KING_DAMAGE, CrownTower::KING_COOLDOWN_TICKS, 'R', "King Tower");
+ 
+         // Princess Towers, from the configured Tower Troop.
+         addTower(ArenaLayout::LEFT_LANE_X,  ArenaLayout::princessY(0), 0, "Princess Tower", towerTroopStats(aiTowerTroop));
+diff --git a/include/core/TimeoutRules.h b/include/core/TimeoutRules.h
+index 2153229..5a43d83 100644
+--- a/include/core/TimeoutRules.h
++++ b/include/core/TimeoutRules.h
+@@ -28,8 +28,8 @@ public:
+             return { true, aliveCount[0] < aliveCount[1] ? 0 : 1 };
+         }
+         // 2. Equal counts: the lower weakest tower loses, by ABSOLUTE hp. The
+-        //    real game compares percentages, and with King 4008 vs Princess
+-        //    2534 the two often disagree; absolute is a deliberate divergence.
++        //    real game compares percentages, and with King 4824 vs Princess
++        //    3052 the two often disagree; absolute is a deliberate divergence.
+         if (weakestHp[0] != weakestHp[1]) {
+             return { true, weakestHp[0] < weakestHp[1] ? 0 : 1 };
+         }
+diff --git a/include/core/TowerTroops.h b/include/core/TowerTroops.h
+index d2a0667..ff9062c 100644
+--- a/include/core/TowerTroops.h
++++ b/include/core/TowerTroops.h
+@@ -3,9 +3,24 @@
+ #include "RoyalChefBuffEffect.h"
+ #include <memory>
+ 
++// Crown Tower stats at level 11, the level the registry's card stats are
++// (Clash Royale wiki, Princess Tower and King's Tower level tables). They were
++// level 9 (2534 / 4008 hp, 90 damage) against level-11 troops, so every tower
++// was about 17% weaker than the troops attacking it.
++// perception/UPSTREAM_REQUESTS.md item 41.
++namespace CrownTower {
++    constexpr int LEVEL = 11;
++    constexpr int PRINCESS_HP = 3052;
++    constexpr int PRINCESS_DAMAGE = 109;
++    constexpr int PRINCESS_COOLDOWN_TICKS = 8;   // 0.8 s
++    constexpr int KING_HP = 4824;
++    constexpr int KING_DAMAGE = 109;
++    constexpr int KING_COOLDOWN_TICKS = 10;      // 1.0 s
++}
++
+ // The four selectable Tower Troops; one replaces both Princess Towers for the
+-// match (GameManager::addTower, reset). None is the default and keeps the
+-// engine's original stats (2534 hp / 90 dmg / 8-tick cooldown / 7.5 range).
++// match (GameManager::addTower, reset). None is the default: the plain
++// Princess Tower (CrownTower, 7.5 range).
+ enum class TowerTroopType {
+     None,
+     TowerPrincess,
+@@ -50,7 +65,8 @@ inline CardStats towerTroopStats(TowerTroopType type) {
+             break;
+         case TowerTroopType::None:
+         default:
+-            stats.hp = 2534; stats.attackRange = 7.5f; stats.damage = 90; stats.attackCooldown = 8;
++            stats.hp = CrownTower::PRINCESS_HP; stats.attackRange = 7.5f;
++            stats.damage = CrownTower::PRINCESS_DAMAGE; stats.attackCooldown = CrownTower::PRINCESS_COOLDOWN_TICKS;
+             break;
+     }
+     return stats;
+diff --git a/perception/bridge/sim_driver.py b/perception/bridge/sim_driver.py
+index 4983c6c..896bd86 100644
+--- a/perception/bridge/sim_driver.py
++++ b/perception/bridge/sim_driver.py
+@@ -78,7 +78,7 @@ REBUILD_MAX_DRAWS = 50000
+ 
+ # ClashEnv::MAX_BUILDING_HP, the building channels' normaliser. Read from the
+ # engine at runtime; this is the type-checker fallback.
+-_FALLBACK_MAX_BUILDING_HP = 4008.0
++_FALLBACK_MAX_BUILDING_HP = 4824.0  # CrownTower::KING_HP (patch 0007)
+ 
+ # PlayerState's deckQueue length, deck (8) minus hand (4): the confirmed deals
+ # needed to pin the opening queue order.
+diff --git a/python_ai/opponents/teacher.py b/python_ai/opponents/teacher.py
+index 1076d45..a8f1ec6 100644
+--- a/python_ai/opponents/teacher.py
++++ b/python_ai/opponents/teacher.py
+@@ -403,7 +403,7 @@ def resolve_win_condition(deck, building_targeters):
+         return None
+     # Ranked by absolute tower damage, then per elixir. Per elixir first would
+     # favour the cheapest card, since the probe saturates at one Princess
+-    # (2534).
++    # (3052).
+     return max(scored, key=lambda t: (t[0], t[1], -t[2]))[2]
+ 
+ 
+diff --git a/python_ai/tests/test_rewards_weights.py b/python_ai/tests/test_rewards_weights.py
+index bc32ea6..3ae3b2c 100644
+--- a/python_ai/tests/test_rewards_weights.py
++++ b/python_ai/tests/test_rewards_weights.py
+@@ -77,9 +77,9 @@ def test_fireballs_damage_and_cost_are_read_from_the_registry():
+ 
+ 
+ def test_the_own_tower_total_is_read_from_a_fresh_board_not_written_out():
+-    """2*2534 + 4008 = 9076 today, and tower HP is what a balance pass moves.
++    """2*3052 + 4824 = 10928 (level-11 Crown Towers, patch 0007), and tower HP is what a balance pass moves.
+     """
+-    assert EC.OWN_TOWER_HP_TOTAL == pytest.approx(9076.0)
++    assert EC.OWN_TOWER_HP_TOTAL == pytest.approx(10928.0)
+ 
+ 
+ def test_the_env_overridable_weights_are_the_ones_meant_to_be_ablated():
+diff --git a/python_ai/tests/test_teacher_wincon_resolver.py b/python_ai/tests/test_teacher_wincon_resolver.py
+index b87d0a0..1a3af83 100644
+--- a/python_ai/tests/test_teacher_wincon_resolver.py
++++ b/python_ai/tests/test_teacher_wincon_resolver.py
+@@ -112,9 +112,10 @@ def test_a_goblin_drill_is_measured_and_played_beside_the_enemy_tower():
+     import numpy as np
+     from python_ai import engine_constants as EC
+     assert teacher._wincon_eligible(GOBLIN_DRILL, False)
+-    # 1000, not 2000: the Drill lives 10 s since patch 0003 (wiki Goblin
+-    # Drill, level 11), not the old 30 s default; it still measures ~1600.
+-    assert teacher.wincon_damage_per_elixir(GOBLIN_DRILL) * 4.0 > 1000.0
++    # 600: the Drill lives 10 s since patch 0003 (wiki Goblin Drill, level
++    # 11), and since patch 0007 the Princess Tower is level 11 (109 dmg every
++    # 0.8 s), so it measures 924 (1404 against the old level-9 tower).
++    assert teacher.wincon_damage_per_elixir(GOBLIN_DRILL) * 4.0 > 600.0
+     deck = [GOBLIN_DRILL, 3, 29, 0, 1, 24, 41, 25]
+     t = teacher.UtilityTeacher(deck, team=0)
+     env = E.ClashRoyaleEnv(deck, deck, 3600)
+diff --git a/tests/core/test_game_manager.cpp b/tests/core/test_game_manager.cpp
+index 11ce5d6..5074329 100644
+--- a/tests/core/test_game_manager.cpp
++++ b/tests/core/test_game_manager.cpp
+@@ -21,7 +21,7 @@ TEST_CASE("GameManager construction sets up exactly the 6 expected towers", "[ga
+     // roster: six towers, their hp and names, in spawn order.
+     REQUIRE(entities[0]->symbol == 'R');
+     REQUIRE(entities[0]->team == 0);
+-    REQUIRE(entities[0]->hp == 4008);
++    REQUIRE(entities[0]->hp == CrownTower::KING_HP);
+     REQUIRE(entities[0]->name == "King Tower");
+     REQUIRE(entities[0]->position.x == Catch::Approx(ArenaLayout::CENTER_X));
+     REQUIRE(entities[0]->position.y == Catch::Approx(ArenaLayout::kingY(0)));
+@@ -36,7 +36,7 @@ TEST_CASE("GameManager construction sets up exactly the 6 expected towers", "[ga
+ 
+     REQUIRE(entities[2]->symbol == 'P');
+     REQUIRE(entities[2]->team == 0);
+-    REQUIRE(entities[2]->hp == 2534);
++    REQUIRE(entities[2]->hp == CrownTower::PRINCESS_HP);
+     REQUIRE(entities[2]->name == "Princess Tower");
+     REQUIRE(entities[2]->position.x == Catch::Approx(ArenaLayout::LEFT_LANE_X));
+     REQUIRE(entities[2]->position.y == Catch::Approx(ArenaLayout::princessY(0)));
+diff --git a/tests/core/test_king_activation.cpp b/tests/core/test_king_activation.cpp
+index 8c41f95..6cf0156 100644
+--- a/tests/core/test_king_activation.cpp
++++ b/tests/core/test_king_activation.cpp
+@@ -12,7 +12,7 @@
+ 
+ namespace {
+ 
+-constexpr int KING_HP = 4008;
++constexpr int KING_HP = CrownTower::KING_HP;
+ 
+ // Where an enemy dummy stands relative to the King, satisfying both bounds:
+ //   inside  the King's reach    7.0 + 2.0 (King r) + 0.4 (troop r) = 9.4
+diff --git a/tests/core/test_tower_troops.cpp b/tests/core/test_tower_troops.cpp
+index b0b37f1..699e00b 100644
+--- a/tests/core/test_tower_troops.cpp
++++ b/tests/core/test_tower_troops.cpp
+@@ -2,17 +2,18 @@
+ #include "test_helpers.h"
+ #include "TowerTroops.h"
+ #include "GameManager.h"
++#include "ClashEnv.h"
+ #include "CombatEntity.h"
+ #include "MeleeTroop.h"
+ #include "RoyalChefBuffEffect.h"
+ #include <memory>
+ 
+-TEST_CASE("towerTroopStats(None) exactly reproduces this engine's original hardcoded Princess Tower",
++TEST_CASE("towerTroopStats(None) is the plain level-11 Princess Tower",
+         "[tower_troops]") {
+     CardStats stats = towerTroopStats(TowerTroopType::None);
+-    REQUIRE(stats.hp == 2534);
++    REQUIRE(stats.hp == CrownTower::PRINCESS_HP);
+     REQUIRE(stats.attackRange == Catch::Approx(7.5f));
+-    REQUIRE(stats.damage == 90);
++    REQUIRE(stats.damage == CrownTower::PRINCESS_DAMAGE);
+     REQUIRE(stats.attackCooldown == 8);
+ }
+ 
+@@ -51,7 +52,7 @@ TEST_CASE("GameManager defaults to TowerTroopType::None -- existing behavior byt
+     for (const auto& e : game.getBoard().getEntities()) {
+         if (e->name == "Princess Tower") {
+             princessCount++;
+-            REQUIRE(e->hp == 2534);
++            REQUIRE(e->hp == CrownTower::PRINCESS_HP);
+         }
+     }
+     REQUIRE(princessCount == 4);
+@@ -108,3 +109,14 @@ TEST_CASE("the Royal Chef feeds an ally once, not compounding forever",
+     INFO("hp after one serving = " << afterFirst << ", after six = " << ally->hp);
+     REQUIRE(ally->hp == afterFirst);
+ }
++
++TEST_CASE("Crown Towers are level 11, the level of the registry's card stats", "[tower_troops][level]") {
++    // Clash Royale wiki level tables (UPSTREAM item 41). Level 9 was 2534 / 4008 / 90.
++    REQUIRE(CrownTower::LEVEL == 11);
++    REQUIRE(CrownTower::PRINCESS_HP == 3052);
++    REQUIRE(CrownTower::PRINCESS_DAMAGE == 109);
++    REQUIRE(CrownTower::KING_HP == 4824);
++    REQUIRE(CrownTower::KING_DAMAGE == 109);
++    // The building normaliser follows the King, so a full King still reads 1.0.
++    REQUIRE(ClashEnv::MAX_BUILDING_HP == Catch::Approx(static_cast<float>(CrownTower::KING_HP)));
++}
+diff --git a/tools/lab/lab_cli.cpp b/tools/lab/lab_cli.cpp
+index 135254f..2cf45e7 100644
+--- a/tools/lab/lab_cli.cpp
++++ b/tools/lab/lab_cli.cpp
+@@ -57,7 +57,7 @@ static int probe() {
+     if (s < 0) return 1;
+     const int c = cellIndex(e, 11, 9);
+     expect(c >= 0, "cell (11,9) is legal for the Cannon");
+-    expect(e.d0(s) == 2534.0f, "no defence: 2534 (whole Princess Tower), got " + std::to_string(e.d0(s)));
++    expect(e.d0(s) == 3052.0f, "no defence: 3052 (whole Princess Tower), got " + std::to_string(e.d0(s)));
+     const float at0 = e.rolloutAtTick(s, c, 0), at20 = e.rolloutAtTick(s, c, 20),
+                 at33 = e.rolloutAtTick(s, c, 33);
+     expect(at0 == 0.0f, "Cannon (11,9) at once: 0, got " + std::to_string(at0));

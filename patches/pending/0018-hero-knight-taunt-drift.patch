@@ -1,0 +1,69 @@
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index bdbe540..6ae443e 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -1773,11 +1773,12 @@ private:
+                     .withOffsets({ {-0.5f, -0.5f}, {0.5f, -0.5f}, {-0.5f, 0.5f}, {0.5f, 0.5f} }))));
+ 
+         // Hero Knight (base: id 0). "Triumphant Taunt" (2 elixir, single use
+-        // since the 4 Aug 2026 notes; was a 25 s cooldown): a shield, and enemies within 6.5 tiles must attack him for
+-        // 5 s (HeroKnightTauntEffect). The shield amount (~half his hp) is not
+-        // sourced.
++        // since the 4 Aug 2026 notes; was a 25 s cooldown): a 512 hp shield,
++        // and enemies within 7.5 tiles must attack him for 5 s
++        // (HeroKnightTauntEffect; wiki Knight/Hero, Triumphant Taunt table).
++        // Patch 0018: was an unsourced 880 shield and 6.5 tiles.
+         add(troop(166, "Hero Knight", 3.0f, Archetype::MeleeSquad, 1766, SPEED_MEDIUM, 1.2f, 202, 12, 'K')
+-            .withHeroAbility(2.0f, 0, std::make_shared<HeroKnightTauntEffect>(880, 50, 6.5f), 1));
++            .withHeroAbility(2.0f, 0, std::make_shared<HeroKnightTauntEffect>(512, 50, 7.5f), 1));
+ 
+         // Hero Wizard (base: id 11). "Fiery Flight" (1 elixir, single use
+         // since the 4 Aug 2026 notes; was a 20 s cooldown):
+diff --git a/tests/core/test_cards_0018.cpp b/tests/core/test_cards_0018.cpp
+new file mode 100644
+index 0000000..72d214e
+--- /dev/null
++++ b/tests/core/test_cards_0018.cpp
+@@ -0,0 +1,42 @@
++#include <catch_amalgamated.hpp>
++#include "test_helpers.h"
++#include "Board.h"
++#include "GameManager.h"
++#include "CardRegistry.h"
++#include "CombatEntity.h"
++#include "Tower.h"
++#include <memory>
++
++// Patch 0018: stat drift on cards from earlier patches, against the wiki.
++
++TEST_CASE("Hero Knight's Triumphant Taunt: a 512 shield, enemies within 7.5 tiles taunted for 5 s",
++        "[hero][hero_knight][patch0018]") {
++    GameManager game({ 0, 166, 2, 3, 4, 5, 6, 7 }, { 0, 1, 2, 3, 4, 5, 6, 7 });
++    game.seed(1);
++    game.reset();
++    Board& board = game.getBoard();
++    for (const auto& e : board.getEntities())
++        if (auto t = std::dynamic_pointer_cast<Tower>(e)) t->sleep();
++
++    REQUIRE(game.setHand(0, { 166, 2, 3, 4 }));
++    game.setElixir(0, 10.0f);
++    REQUIRE(game.playCard(0, 166, 9.0f, 8.0f));
++    for (int i = 0; i <= DEPLOY_TIME_TICKS; ++i) game.step();
++    std::shared_ptr<CombatEntity> knight;
++    for (const auto& e : board.getEntities())
++        if (e->team == 0 && e->name == "Hero Knight") knight = std::dynamic_pointer_cast<CombatEntity>(e);
++    REQUIRE(knight != nullptr);
++
++    const Vector2D at = knight->position;
++    auto inside = std::make_shared<StationaryCombatant>(board.allocateId(), at.x, at.y + 7.3f, 5000, 1, 0.5f, 0, 1000);
++    auto outside = std::make_shared<StationaryCombatant>(board.allocateId(), at.x, at.y - 7.8f, 5000, 1, 0.5f, 0, 1000);
++    spawn(board, inside);
++    spawn(board, outside);
++
++    game.setElixir(0, 10.0f);
++    REQUIRE(game.activateChampionAbility(0, 1));
++    REQUIRE(knight->shieldHp == 512);
++    REQUIRE(inside->forcedTargetEntityId == knight->id);
++    REQUIRE(inside->forcedTargetTicksRemaining == 50);
++    REQUIRE(outside->forcedTargetEntityId != knight->id);
++}

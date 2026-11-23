@@ -1,0 +1,21 @@
+diff --git a/python_ai/opponents/teacher.py b/python_ai/opponents/teacher.py
+index f028c69..1076d45 100644
+--- a/python_ai/opponents/teacher.py
++++ b/python_ai/opponents/teacher.py
+@@ -120,7 +120,15 @@ def _probe_env():
+     """An empty board, both sides holding some legal deck."""
+     global _PROBE_DECK
+     if _PROBE_DECK is None:
+-        _PROBE_DECK = list(E.get_all_card_ids())[:HAND_SIZE * 2]
++        # Champions and Heroes are legal only in deck slots 1 and 2
++        # (CardRegistry::validateDeckSlots), and the registry happens to list
++        # the Hero cards first, so the first eight ids put a Hero in slot 0
++        # and GameManager refuses the deck. Build the probe deck from
++        # ordinary cards only.
++        ids = [c for c in E.get_all_card_ids()
++               if not (E.get_card_info(c)["is_champion"]
++                       or E.get_card_info(c)["is_hero"])]
++        _PROBE_DECK = ids[:HAND_SIZE * 2]
+     env = CE(_PROBE_DECK, _PROBE_DECK, 3600)
+     env.reset()
+     return env

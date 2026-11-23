@@ -1,0 +1,257 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 2c0c753..d14f3b9 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1151,6 +1151,36 @@ time. Compared with every `FreezeOnHit` in the registry:
+ - Tests: `python_ai/tests/test_published_stun_and_slow_durations.py`,
+   `tests/core/test_card_registry.cpp` (`[patch0051]`).
+ 
++## 2026-11-22: a unit published with LoadFirstHit lands unloaded (patch 0052)
++
++**GAMEPLAY-AFFECTING** (Sparky only today). The brief asked whether "units
++count as loaded on landing" is the real rule. It is, with one published
++exception. The unit records of release 15.535.13 carry a `LoadFirstHit` flag
++and exactly one unit has it: ZapMachine (Sparky; hit speed 4000, load time
++3000). RoyaleAPI's "The Secret Stats" article describes the same thing: a troop
++enters the arena with its load time already served and owes only its first-hit
++time (hit speed minus load time); Sparky is the one troop that does not, and
++has to charge in full after landing.
++
++`LoadTimes::Row::loadFirstHit` holds the flag (name-keyed, so an Evolution or
++Hero of such a card would inherit it), `CardFactories::applyCardMetadata`
++copies it to `CombatEntity::landsUnloaded`, and `CombatEntity::update` starts a
++whole hit speed on the tick the deploy time ends. From there the ordinary rule
++applies: the cooldown runs down with or without a target, and a new engagement
++winds up for the first-hit time, so the first shot comes
++max(hit speed - time since landing, first hit) after a target is in range.
++Sparky dropped on a target used to fire 1.0 s after her deploy time; now 4.0 s.
++`get_card_stats` reports `lands_unloaded`.
++
++Tests: `tests/core/test_card_registry.cpp` `[patch0052]` (dropped on a target
++40 updates then every 40; 2 s of walking leaves 2 s; loaded after 4.5 s she
++owes the 1.0 s first hit; a Musketeer still fires her 0.7 s first hit; one
++flagged row in the table), `python_ai/tests/test_published_stun_and_slow_durations.py`
++(only Sparky reports `lands_unloaded`).
++
++Not found in the published data: `ResetHitTimerWhenNoTarget` (Little Prince
++only) is not modelled.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index 5379b37..e89cc35 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -140,6 +140,12 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     // multiplier) is not copied from stats.
+     applyOnHit(entity, stats);
+     if (stats.initialCooldownTicks > 0) entity->seedCooldown(stats.initialCooldownTicks);
++    // Published LoadFirstHit (LoadTimes.h): the unit lands unloaded, so its
++    // first hit is a whole hit speed after its deploy time at the earliest.
++    // Walking loads it as after any hit. CombatEntity::update starts the
++    // count when the deploy time ends; the seed covers a unit without one.
++    entity->landsUnloaded = LoadTimes::landsUnloaded(stats.name);
++    if (entity->landsUnloaded) entity->seedCooldown(stats.attackCooldown);
+     if (stats.passiveDamageReduction < 1.0f) entity->applyCurse(stats.passiveDamageReduction, 999999);
+ }
+ 
+diff --git a/include/core/LoadTimes.h b/include/core/LoadTimes.h
+index 1330b08..e921b8f 100644
+--- a/include/core/LoadTimes.h
++++ b/include/core/LoadTimes.h
+@@ -61,6 +61,12 @@ struct Row {
+     // Executioner's covers his axe's flight out and back). 0 = the card's
+     // attackCooldown is the published hit speed.
+     int hitSpeedTicks = 0;
++    // Published LoadFirstHit: the unit lands UNLOADED and has to load before
++    // its first hit like before any other. Every other unit lands loaded.
++    // One unit in release 15.535.13 has it (ZapMachine); RoyaleAPI's "secret
++    // stats" article says the same: troops enter the arena preloaded, Sparky
++    // is the only one that does not.
++    bool loadFirstHit = false;
+ };
+ 
+ inline const Row* table(int& count) {
+@@ -147,7 +153,7 @@ inline const Row* table(int& count) {
+         { "Skeleton Dragons", 16, Source::FLZ }, // SkeletonDragons 1600 ms
+         { "Skeleton King", 13, Source::FLZ }, // SkeletonKing 1300 ms
+         { "Skeletons", 6, Source::FLZ }, // Skeletons 600 ms
+-        { "Sparky", 30, Source::CRAPI }, // ZapMachine 3000 ms
++        { "Sparky", 30, Source::CRAPI, 0, true }, // ZapMachine 3000 ms, LoadFirstHit
+         { "Spear Goblins", 11, Source::FLZ }, // SpearGoblins 1100 ms
+         { "Tesla", 7, Source::FLZ }, // Tesla 700 ms
+         { "Three Musketeers", 7, Source::FLZ }, // ThreeMusketeers 700 ms
+@@ -186,6 +192,12 @@ inline const Row* find(const std::string& name) {
+     return nullptr;
+ }
+ 
++// Whether a card lands unloaded (published LoadFirstHit).
++inline bool landsUnloaded(const std::string& name) {
++    const Row* row = find(name);
++    return row && row->loadFirstHit;
++}
++
+ // The published load time of a card, 0 if it has no row.
+ inline int forName(const std::string& name) {
+     const Row* row = find(name);
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index dead913..05f3b4e 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -106,6 +106,10 @@ public:
+     // and a new unit has not been stunned. The implicit copy carries it, so
+     // snapshots keep the exact remaining deploy time.
+     int deployTicksRemaining = 0;
++    // Published LoadFirstHit: the unit comes out of its deploy time with a
++    // whole hit speed to wait, where every other unit comes out loaded
++    // (LoadTimes.h; set by CardFactories).
++    bool landsUnloaded = false;
+     // First-hit wind-up (LoadTimes.h: hit speed minus the published load
+     // time): after a target comes into range, wind up this many ticks before
+     // the first hit. 0 = hit at once.
+@@ -833,7 +837,12 @@ public:
+ 
+         // Above: bookkeeping that runs while deploying. Below: action, which a
+         // deploying unit takes none of.
+-        if (deploying) return;
++        if (deploying) {
++            // Published LoadFirstHit: the hit speed starts when the deploy
++            // time ends (set here, below this tick's cooldown decrement).
++            if (deployTicksRemaining == 0 && landsUnloaded) currentCooldown = static_cast<float>(attackCooldown);
++            return;
++        }
+ 
+         if (fullHp <= 0) fullHp = hp;
+         if (selfPeriodicEffect && selfPeriodicIntervalTicks > 0) {
+diff --git a/python_ai/tests/test_published_stun_and_slow_durations.py b/python_ai/tests/test_published_stun_and_slow_durations.py
+index 05716f7..341f795 100644
+--- a/python_ai/tests/test_published_stun_and_slow_durations.py
++++ b/python_ai/tests/test_published_stun_and_slow_durations.py
+@@ -48,3 +48,18 @@ def test_a_stun_is_a_full_stop_and_the_ice_wizards_slow_is_one_strength():
+     ice_wizard = E.get_card_stats(34)["base"]["on_hit"]["slow_factor"]
+     snowball = E.get_card_stats(100)["base"]["spell_on_hit"]["slow_factor"]
+     assert ice_wizard == snowball
++
++
++def test_only_the_unit_published_with_load_first_hit_lands_unloaded():
++    """Patch 0052. Release 15.535.13 has `LoadFirstHit` on one unit, ZapMachine
++    (Sparky): she lands unloaded and waits a whole hit speed. Every other unit
++    lands loaded and owes only its first-hit time."""
++    unloaded = []
++    for cid in E.get_all_card_ids():
++        stats = E.get_card_stats(cid)
++        for form in ("base", "evolved"):
++            if stats.get(form) and stats[form].get("lands_unloaded"):
++                unloaded.append(stats["name"])
++    assert sorted(set(unloaded)) == ["Sparky"]
++    sparky = E.get_card_stats(60)["base"]
++    assert sparky["attack_cooldown_ticks"] == 40 and sparky["load_ticks"] == 30
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index 04d051f..ef4f258 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -55,6 +55,7 @@ py::dict statsDict(const CardStats& s, int depth = 0) {
+     d["damage"] = s.damage;
+     d["attack_cooldown_ticks"] = s.attackCooldown;
+     d["load_ticks"] = LoadTimes::forName(s.name);   // published load time
++    d["lands_unloaded"] = LoadTimes::landsUnloaded(s.name);   // published LoadFirstHit
+     // What a unit of this card winds up before its first hit on a target in
+     // range (CardFactories::applyCardMetadata): hit speed minus load time.
+     d["first_hit_windup_ticks"] = s.loadTicksOverride >= 0
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index d4ebfd8..c429418 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -2113,6 +2113,91 @@ TEST_CASE("A stun in the middle of a fight costs its own length and nothing more
+     REQUIRE(updatesUntilHit(knight, dummy, board) == 12);
+ }
+ 
++namespace {
++// Updates `unit` until it lets a projectile go, returning how many updates
++// that took; -1 if it never does within `limit`.
++int updatesUntilShot(const std::shared_ptr<CombatEntity>& unit, Board& board, int limit = 100) {
++    auto shots = [&board]() {
++        int n = 0;
++        for (const auto& e : board.getEntities()) if (std::dynamic_pointer_cast<Projectile>(e)) ++n;
++        return n;
++    };
++    const int before = shots();
++    for (int i = 1; i <= limit; ++i) {
++        unit->update(board);
++        board.commitPendingEntities();
++        if (shots() > before) return i;
++    }
++    return -1;
++}
++
++std::shared_ptr<CombatEntity> placeAlone(Board& board, int cardId, float x, float y) {
++    CardRegistry::getInstance().getCard(cardId)->spawnEntity(x, y, 0, board);
++    board.commitPendingEntities();
++    auto unit = std::dynamic_pointer_cast<CombatEntity>(board.getEntities().back());
++    unit->position = { x, y };
++    return unit;
++}
++}
++
++TEST_CASE("A unit with the published LoadFirstHit lands unloaded; every other unit lands loaded",
++          "[card_registry][load_time][patch0052]") {
++    // Sparky (ZapMachine): hit speed 4.0 s, load time 3.0 s, LoadFirstHit.
++    // Musketeer: hit speed 1.0 s, load time 0.3 s (first hit 0.7 s), no flag.
++    REQUIRE(LoadTimes::landsUnloaded("Sparky"));
++    REQUIRE_FALSE(LoadTimes::landsUnloaded("Musketeer"));
++    REQUIRE_FALSE(LoadTimes::landsUnloaded("Knight"));
++    // The flag is the only one of its kind in the table.
++    int count = 0, flagged = 0;
++    const LoadTimes::Row* rows = LoadTimes::table(count);
++    for (int i = 0; i < count; ++i) if (rows[i].loadFirstHit) ++flagged;
++    REQUIRE(flagged == 1);
++
++    SECTION("dropped next to a target, Sparky fires a whole hit speed after her deploy time") {
++        Board board;
++        auto target = std::make_shared<DummyEntity>(900, 5.0f, 8.0f, 100000, 1);
++        spawn(board, target);
++        auto sparky = placeAlone(board, 60, 5.0f, 5.0f);
++        REQUIRE(sparky->landsUnloaded);
++        REQUIRE(sparky->loadTicks == 10);
++        advancePastDeploy(sparky, board);
++        // 40 ticks of hit speed. It used to be the 1.0 s first hit alone
++        // (the 11th update).
++        REQUIRE(updatesUntilShot(sparky, board) == 40);
++        // And then every hit speed.
++        REQUIRE(updatesUntilShot(sparky, board) == 40);
++    }
++    SECTION("the load runs while she walks: 2 s without a target leaves 2 s") {
++        Board board;
++        auto sparky = placeAlone(board, 60, 5.0f, 5.0f);
++        advancePastDeploy(sparky, board);
++        for (int i = 0; i < 20; ++i) sparky->update(board);
++        sparky->position = { 5.0f, 5.0f };
++        auto target = std::make_shared<DummyEntity>(900, 5.0f, 8.0f, 100000, 1);
++        spawn(board, target);
++        REQUIRE(updatesUntilShot(sparky, board) == 20);
++    }
++    SECTION("once loaded she fires her 1.0 s first hit after finding a target") {
++        Board board;
++        auto sparky = placeAlone(board, 60, 5.0f, 5.0f);
++        advancePastDeploy(sparky, board);
++        for (int i = 0; i < 45; ++i) sparky->update(board);
++        sparky->position = { 5.0f, 5.0f };
++        auto target = std::make_shared<DummyEntity>(900, 5.0f, 8.0f, 100000, 1);
++        spawn(board, target);
++        REQUIRE(updatesUntilShot(sparky, board) == 11);
++    }
++    SECTION("a Musketeer dropped next to a target fires her 0.7 s first hit") {
++        Board board;
++        auto target = std::make_shared<DummyEntity>(900, 5.0f, 8.0f, 100000, 1);
++        spawn(board, target);
++        auto musketeer = placeAlone(board, 6, 5.0f, 5.0f);
++        REQUIRE_FALSE(musketeer->landsUnloaded);
++        advancePastDeploy(musketeer, board);
++        REQUIRE(updatesUntilShot(musketeer, board) == 8);
++    }
++}
++
+ TEST_CASE("Switching between targets in range keeps the hit-speed rhythm; a new engagement winds up again",
+           "[card_registry][load_time]") {
+     // Knight: hit speed 1.2 s, first hit 0.5 s. Two targets in reach.

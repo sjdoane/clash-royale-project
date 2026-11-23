@@ -1,0 +1,173 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 30be3ce..92bf85c 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1311,6 +1311,61 @@ Test: `tests/core/test_cards_0015.cpp` `[patch0055]` (the registered evolved
+ pair throws one spear each at a troop in the band and is enraged for exactly
+ 20 updates).
+ 
++## 2026-11-22: the Hog 2.6 offence checked end to end, tests only (patch 0056)
++
++No behaviour change. The simulated Hog 2.6 side scores 0.51 crowns a match
++against a real 0.71, so the Hog Rider and its usual support were checked
++against the published table (release 15.535.13) and the two recordings of
++2026-11-20 (`runs/live/20261120-093139`, `20261120-185026`; tower numerals
++read from the saved frames, positions from the detection boxes at about 21
++pixels a row). `python_ai/tests/test_hog_26_offence_timeline.py` pins the
++result.
++
++What agrees:
++
++| | recordings | published | engine |
++|---|---|---|---|
++| landing to first movement | 1.0 s (n=13) | DeployTime 1000 | 10 ticks |
++| first movement to first hit, Hog on the bridge corner (16, 15) | 4.2-4.5 s (n=5) | | 4.2 s (moves tick 11, hits tick 53) |
++| speed on the straight stretch | 2.24-2.36 real tiles/s (n=5) | Speed 120 | 2.65 engine tiles/s over a stretch one row longer (12 rows for the real 11) |
++| hit interval | 1.59, 1.64, 1.69 s | HitSpeed 1600 | 16 ticks |
++| damage a hit | 317 | 317 at level 11 | 317 |
++| river jump | straight diagonal from the placement tile | JumpEnabled | straight line, river ignored |
++| Ice Spirit on a tower | not measurable | Freeze 1100 ms, no tower reduction | arrows 11 ticks late, 110 |
++| Fireball / The Log on a tower | | -75% (159 after the 8 Sep 2026 note) / -87% (35) | 159 / 35 |
++
++A lone Hog against a lone Princess Tower lands 7 hits here (ticks 53 to 149,
++dead at tick 153 after 16 arrows). Neither recording has an unanswered Hog to
++compare with, and the seventh hit has a 0.4 s margin, so the test asks for six.
++
++What does not agree, and is NOT changed:
++
++- **A Hog placed beside an Ice Golem pushes it in the real game.** In
++  `20261120-185026` the Ice Golem went down on (15, 15) and the Hog on
++  (16, 15) 1.06 s later. The Golem (Slow, 0.94 tiles/s) then covered 3.3 rows
++  in 1.8 s with the Hog behind it, stayed about one row ahead of the Hog until
++  row 19.6, and the Hog's first hit came 0.6 s late (7.51 s after the tap
++  against 6.84-7.06). The published bodies explain it: CollisionRadius 600
++  and 700, so two units one tile apart already overlap, and the faster one
++  shoves the slower one along (Mass 4 against 6). The Golem is therefore the
++  first body inside the tower's range and takes the arrows. Here every troop
++  has the one implicit radius 0.4 (`Entity::IMPLICIT_TROOP_RADIUS`), the two
++  never touch, the Hog runs ahead and is shot from its first step: with the
++  Golem played 1.1 s before the Hog the Hog still lands 7 hits and takes all
++  16 arrows, while a Golem that really is ahead (played 3 s before) gives it
++  11 hits. That is the largest gap found on the offence side.
++- Fixing it means published per-card radii for bodies, a push that respects
++  mass, and the same radii in reach (`effectiveRangeTo` and
++  `effectiveSightWith` are range + own radius + target radius, both 0.4
++  today), or melee troops with range 0.5 could not reach a body of radius
++  0.75. Every melee and ranged engagement distance moves with it. Not
++  attempted in this batch.
++- Live play only: a tap takes about 1.5 s to become a landing unit (0.39 s
++  for the gesture, then about 1.1 s before the drop-in animation starts;
++  n=13 Hog placements). The engine and the replays start the 1.0 s deploy at
++  the play. A policy acting live is that much later than the same policy in
++  the simulator.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/python_ai/tests/test_hog_26_offence_timeline.py b/python_ai/tests/test_hog_26_offence_timeline.py
+new file mode 100644
+index 0000000..67625c8
+--- /dev/null
++++ b/python_ai/tests/test_hog_26_offence_timeline.py
+@@ -0,0 +1,101 @@
++"""The Hog 2.6 offence, end to end, against published values and two recordings.
++
++Patch 0056 changes no behaviour. It pins what was checked when the simulated
++Hog 2.6 side was found to score too few crowns, so that a later change to
++movement, tower range or the first hit shows up here:
++
++- Hog Rider (game file: hit speed 1600, load time 1000, speed 120, range 800;
++  317 a hit at level 11). In the two recordings of 2026-11-20 a Hog placed on
++  the bridge corner (engine tile 16, 15) started moving 1.0 s after it landed
++  and the first numeral change on the Princess Tower came 4.2-4.5 s after that,
++  then every 1.59-1.69 s, 317 each.
++- Ice Spirit (projectile: Freeze, BuffTime 1100, no Crown Tower reduction): a
++  tower loses 1.1 s of shooting and takes the full 110.
++- Fireball on a Princess Tower 159 (the 8 Sep 2026 note), The Log 35 (-87%).
++
++What is NOT pinned because the engine does not have it: a Hog placed beside
++an Ice Golem pushes it ahead in the real game (collision radii 0.6 and 0.7, one
++tile apart), so the Golem takes the tower's arrows; here the bodies do not
++touch and the Hog is shot first. See the engine notes, patch 0056.
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++
++NOOP = 4
++HOG, ICE_GOLEM, ICE_SPIRIT, LOG, FIREBALL = 15, 40, 72, 33, 7
++DECK = [125, 168, 129, 15, 40, 72, 33, 7]
++RIGHT_PRINCESS = 2
++
++
++def _match():
++    env = E.ClashRoyaleEnv(list(DECK), list(DECK), 3600)
++    env.seed(1)
++    env.set_tower_hit_log(True)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    return env, env.get_current_tick()
++
++
++def _run(env, schedule, ticks):
++    """Injects team 0 units by tick; returns (tick the Hog first moved, ticks its HP dropped)."""
++    moved, drops, last_pos, last_hp = None, [], None, None
++    for k in range(ticks):
++        for card, x, y in schedule.get(k, []):
++            env.inject(card, x, y, 0, -1.0, -1)
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        hog = [u for u in env.get_units() if u["card_id"] == HOG and u["team"] == 0]
++        if not hog:
++            continue
++        pos, hp = (hog[0]["x"], hog[0]["y"]), hog[0]["hp"]
++        if moved is None and last_pos is not None and pos != last_pos:
++            moved = k + 1
++        if last_hp is not None and hp < last_hp:
++            drops.append(k + 1)
++        last_pos, last_hp = pos, hp
++    return moved, drops
++
++
++def _hits(env, t0, card):
++    return [(h[0] - t0, h[6]) for h in env.get_tower_hits() if h[1] == 0 and h[2] == card]
++
++
++def test_a_lone_hog_from_the_bridge_corner_hits_the_tower_on_the_recorded_timeline():
++    env, t0 = _match()
++    moved, _ = _run(env, {0: [(HOG, 16.0, 15.0)]}, 200)
++    hits = _hits(env, t0, HOG)
++    stats = E.get_card_stats(HOG)["base"]
++    assert moved == stats["deploy_ticks"] + 1 == 11           # 1.0 s deploy
++    first = hits[0][0] - moved
++    assert 40 <= first <= 45                                  # recordings: 4.2-4.5 s
++    gaps = {b[0] - a[0] for a, b in zip(hits, hits[1:])}
++    assert gaps == {stats["attack_cooldown_ticks"]} == {16}   # 1.6 s, recordings 1.59-1.69
++    assert {amount for _, amount in hits} == {stats["damage"]} == {317}
++    assert len(hits) >= 6                                     # 16 arrows of 109 kill it
++
++
++def test_an_ice_spirit_costs_the_tower_its_published_1_1_s_and_takes_full_damage():
++    alone, t0 = _match()
++    _, plain = _run(alone, {0: [(HOG, 16.0, 15.0)]}, 130)
++    env, t0 = _match()
++    _, frozen = _run(env, {0: [(HOG, 16.0, 15.0)], 5: [(ICE_SPIRIT, 16.0, 15.0)]}, 130)
++    spirit = _hits(env, t0, ICE_SPIRIT)
++    freeze = E.get_card_stats(ICE_SPIRIT)["base"]["on_hit"]
++    assert freeze["type"] == "freeze" and freeze["ticks"] == 11
++    assert [amount for _, amount in spirit] == [110]
++    landed = spirit[0][0]
++    before = [t for t in plain if t <= landed]
++    assert frozen[:len(before)] == before
++    after_plain = [t for t in plain if t > landed]
++    after_frozen = frozen[len(before):]
++    assert after_frozen[:5] == [t + freeze["ticks"] for t in after_plain[:5]]
++
++
++def test_fireball_and_log_chip_a_princess_tower_for_159_and_35():
++    for card, x, y, amount in ((FIREBALL, 14.0, 27.0, 159), (LOG, 14.0, 17.0, 35)):
++        env, t0 = _match()
++        assert env.set_hand_for_team(0, [card, HOG, ICE_GOLEM, ICE_SPIRIT])
++        env.set_elixir_for_team(0, 10.0)
++        before = env.get_tower_hp(1, RIGHT_PRINCESS)
++        env.step_self_play(0, x, y, NOOP, 0.0, 0.0, 1)
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 80)
++        assert before - env.get_tower_hp(1, RIGHT_PRINCESS) == amount
++        assert [a for _, a in _hits(env, t0, card)] == [amount]

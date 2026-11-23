@@ -1,0 +1,339 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 609ae29..ab4b90e 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -692,6 +692,21 @@ not end early is unchanged (62.5% -> 62.2%).
+   crowns against a real 0.69). Why it does is NOT explained; these patches add
+   to it, they did not start it.
+ 
++## 2026-11-22: forensic bindings: get_units, tower-hit log (patch 0039)
++
++Read-only bindings for replay forensics and scenario tests; no behaviour
++change (replay parity on 3000 matches is identical with and without them).
++
++- `ClashRoyaleEnv.get_units()`: every living unit, building and tower as a
++  dict (id, card_id, name, team, x, y, hp, shield_hp, flying, building, tower,
++  target_id, deploy_ticks, freeze_ticks, freeze_factor, cooldown, awake,
++  targetable), board coordinates. It shows both sides' exact state: not an
++  observation.
++- `set_tower_hit_log(True)` / `get_tower_hits()`: every hit on a Crown Tower
++  since the reset as (tick, attacker_team, attacker_card_id, attacker_id,
++  target_team, target_id, amount). Off by default (`TowerHitLogCollector`).
++- Test: `python_ai/tests/test_forensic_bindings.py`.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/ClashEnv.h b/include/core/ClashEnv.h
+index ee19538..2fc47a6 100644
+--- a/include/core/ClashEnv.h
++++ b/include/core/ClashEnv.h
+@@ -969,6 +969,51 @@ public:
+         return out;
+     }
+ 
++    // --- forensics: every body on the board, and the tower-hit log ---
++    // Read-only. One row per living unit, building and tower (projectiles and
++    // spells are not bodies): who it is, where, how healthy, what it is locked
++    // on and whether it can act. Coordinates are board coordinates (team 0's
++    // frame). For replay forensics and scenario tests, not for a policy: it
++    // shows the opponent's exact state.
++    struct UnitView {
++        int id;
++        int cardId;
++        std::string name;
++        int team;
++        float x;
++        float y;
++        int hp;
++        int shieldHp;
++        bool flying;
++        bool building;
++        bool tower;
++        int targetId;          // CombatEntity::getCurrentTargetId, -1 for none
++        int deployTicks;       // ticks of deploy time left
++        int freezeTicks;       // longest freeze or slow in force
++        float freezeFactor;    // 0 = stunned, < 1 = slowed, 1 = free
++        float cooldown;        // ticks until the next attack may start
++        bool awake;            // false only for a dormant King Tower
++        bool targetable;       // false while invisible (Royal Ghost, a cloak)
++    };
++    std::vector<UnitView> getUnits() const {
++        std::vector<UnitView> out;
++        for (const auto& entity : game.getBoard().getEntities()) {
++            if (!entity->isAlive()) continue;
++            const auto* c = dynamic_cast<const CombatEntity*>(entity.get());
++            if (!c) continue;
++            const auto* tower = dynamic_cast<const Tower*>(entity.get());
++            out.push_back({ c->id, c->cardId, c->name, c->team, c->position.x, c->position.y, c->hp,
++                            c->shieldHp, c->isFlying, c->isBuilding(), c->isTower(), c->getCurrentTargetId(),
++                            c->deployTicksRemaining, c->freezeTicks, c->freezeSlow, c->getCurrentCooldown(),
++                            tower ? tower->isAwake() : true, c->isTargetable() });
++        }
++        return out;
++    }
++    // Every hit on a Crown Tower since the reset, in order, once turned on
++    // (off by default: see TowerHitLogCollector). The setting survives reset().
++    void setTowerHitLog(bool enabled) { game.setTowerHitLogEnabled(enabled); }
++    const std::vector<DamageDealtEvent>& getTowerHits() const { return game.getStatistics().towerHitLog(); }
++
+     // The elixir phase in force (1.0 / 2.0 / 3.0), so readers need not know the
+     // boundary ticks.
+     float getElixirMultiplier() const { return game.getElixirMultiplier(); }
+diff --git a/include/core/GameManager.h b/include/core/GameManager.h
+index 886afec..534f25a 100644
+--- a/include/core/GameManager.h
++++ b/include/core/GameManager.h
+@@ -323,6 +323,9 @@ public:
+     Board& getBoard() { return board; }
+     const Board& getBoard() const { return board; }
+     const MatchStatistics& getStatistics() const { return stats; }
++    // The tower-hit log is the one piece of MatchStatistics a caller
++    // configures (MatchStatistics::setTowerHitLogEnabled).
++    void setTowerHitLogEnabled(bool value) { stats.setTowerHitLogEnabled(value); }
+ 
+     // A fully independent copy of the match for decision-time search. Every
+     // member is a value type and copies correctly (including rng, so two
+diff --git a/include/core/MatchStatistics.h b/include/core/MatchStatistics.h
+index 0b456d9..b8c2f74 100644
+--- a/include/core/MatchStatistics.h
++++ b/include/core/MatchStatistics.h
+@@ -19,6 +19,9 @@ class MatchStatistics {
+     std::shared_ptr<CardPlayStatsCollector> cardPlay;
+     std::shared_ptr<ChampionAbilityStatsCollector> championAbility;
+     std::shared_ptr<MatchOutcomeCollector> outcome;
++    std::shared_ptr<TowerHitLogCollector> towerHits;
++    // Survives attach(): a caller turns the log on once, for every match after.
++    bool towerHitLogEnabled = false;
+ 
+     static std::string floatStr(float v) {
+         std::ostringstream ss;
+@@ -44,6 +47,8 @@ public:
+         cardPlay = std::make_shared<CardPlayStatsCollector>();
+         championAbility = std::make_shared<ChampionAbilityStatsCollector>();
+         outcome = std::make_shared<MatchOutcomeCollector>();
++        towerHits = std::make_shared<TowerHitLogCollector>();
++        towerHits->setEnabled(towerHitLogEnabled);
+ 
+         subscribeAll(board);
+     }
+@@ -69,6 +74,8 @@ public:
+         copy.championAbility = championAbility
+             ? std::make_shared<ChampionAbilityStatsCollector>(*championAbility) : nullptr;
+         copy.outcome = outcome ? std::make_shared<MatchOutcomeCollector>(*outcome) : nullptr;
++        copy.towerHits = towerHits ? std::make_shared<TowerHitLogCollector>(*towerHits) : nullptr;
++        copy.towerHitLogEnabled = towerHitLogEnabled;
+         copy.subscribeAll(board);
+         return copy;
+     }
+@@ -104,6 +111,18 @@ public:
+     float championAbilityElixirSpent(int team) const { return championAbility ? championAbility->elixirSpent(team) : 0.0f; }
+     int championAbilityActivations(int team) const { return championAbility ? championAbility->activations(team) : 0; }
+ 
++    // The tower-hit log (TowerHitLogCollector): off by default, kept from the
++    // moment it is turned on, cleared with every attach().
++    void setTowerHitLogEnabled(bool value) {
++        towerHitLogEnabled = value;
++        if (towerHits) towerHits->setEnabled(value);
++    }
++    bool isTowerHitLogEnabled() const { return towerHitLogEnabled; }
++    const std::vector<DamageDealtEvent>& towerHitLog() const {
++        static const std::vector<DamageDealtEvent> empty;
++        return towerHits ? towerHits->all() : empty;
++    }
++
+     int loserTeam() const { return outcome ? outcome->loserTeam() : -1; }
+     int matchDurationTicks() const { return outcome ? outcome->matchDurationTicks() : 0; }
+ 
+@@ -160,6 +179,7 @@ private:
+         if (cardPlay) board.statsEvents.subscribe(cardPlay);
+         if (championAbility) board.statsEvents.subscribe(championAbility);
+         if (outcome) board.statsEvents.subscribe(outcome);
++        if (towerHits) board.statsEvents.subscribe(towerHits);
+     }
+ 
+     template <typename MapT>
+diff --git a/include/core/stats/StatsCollectors.h b/include/core/stats/StatsCollectors.h
+index 3e7aad2..2ebda79 100644
+--- a/include/core/stats/StatsCollectors.h
++++ b/include/core/stats/StatsCollectors.h
+@@ -227,3 +227,24 @@ public:
+     int loserTeam() const { return loser; }
+     int matchDurationTicks() const { return durationTicks; }
+ };
++
++// Every hit on a Crown Tower, in order, for forensics (who took a tower down,
++// and with what). Off by default: a match lands a few hundred tower hits per
++// side and GameManager::snapshot() copies every collector, so nothing is kept
++// unless a caller asks (ClashEnv::setTowerHitLog). Bounded, so a caller that
++// forgets to turn it off cannot grow it without limit.
++class TowerHitLogCollector : public IStatsObserver {
++    bool enabled = false;
++    std::vector<DamageDealtEvent> hits;
++
++public:
++    static constexpr size_t MAX_HITS = 16384;
++
++    void setEnabled(bool value) { enabled = value; }
++    bool isEnabled() const { return enabled; }
++    void onDamageDealt(const DamageDealtEvent& e) override {
++        if (!enabled || !e.targetIsTower || hits.size() >= MAX_HITS) return;
++        hits.push_back(e);
++    }
++    const std::vector<DamageDealtEvent>& all() const { return hits; }
++};
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index f57b4a2..a47a0d2 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -1163,6 +1163,10 @@ public:
+     // getDamagePerTick(), collapses it into ramp buckets, so a within-bucket
+     // desync would be invisible.
+     int getTicksOnTarget() const { return ticksOnTarget; }
++    // The locked target's id (-1 for none) and the ticks left before the next
++    // attack may start, for ClashEnv::getUnits (read-only forensics).
++    int getCurrentTargetId() const { return currentTargetId; }
++    float getCurrentCooldown() const { return currentCooldown; }
+ 
+     // Damage per tick, the comparable quantity, including ramp, charge and buff
+     // state.
+diff --git a/python_ai/tests/test_forensic_bindings.py b/python_ai/tests/test_forensic_bindings.py
+new file mode 100644
+index 0000000..5b1b5a1
+--- /dev/null
++++ b/python_ai/tests/test_forensic_bindings.py
+@@ -0,0 +1,76 @@
++"""get_units / set_tower_hit_log / get_tower_hits (patch 0039).
++
++Read-only forensics for replay analysis and scenario tests: every body on the
++board with its target, and every hit on a Crown Tower with the body that dealt
++it. They must not change the simulation.
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++
++NOOP = 4
++HOG = 15
++DECK = [15, 6, 25, 40, 24, 72, 33, 7]
++MIRROR_Y = E.ClashRoyaleEnv.BOARD_HEIGHT - 1
++
++
++def _hog_match(log):
++    env = E.ClashRoyaleEnv(list(DECK), list(DECK), 3600)
++    env.seed(3)
++    if log:
++        env.set_tower_hit_log(True)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    env.set_elixir_for_team(1, 10.0)
++    assert env.set_hand_for_team(1, DECK[:4])
++    env.step_self_play(NOOP, 0.0, 0.0, 0, 3.0, 15.0, 1)     # a Hog at team 1's bridge
++    return env
++
++
++def test_units_lists_every_body_with_its_target():
++    env = _hog_match(True)
++    units = env.get_units()
++    towers = [u for u in units if u["tower"]]
++    assert len(towers) == 6 and all(u["building"] for u in towers)
++    assert sorted(u["team"] for u in towers) == [0, 0, 0, 1, 1, 1]
++    kings = [u for u in towers if "King" in u["name"]]
++    assert len(kings) == 2 and not any(u["awake"] for u in kings)
++    hogs = [u for u in units if u["card_id"] == HOG]
++    assert len(hogs) == 1
++    hog = hogs[0]
++    assert hog["team"] == 1 and hog["deploy_ticks"] > 0 and hog["targetable"]
++    # Board coordinates are team 0's frame: team 1's (3, 15) is the mirror row.
++    assert abs(hog["x"] - 3.0) < 0.6 and abs(hog["y"] - (MIRROR_Y - 15.0)) < 0.6
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 60)
++    by_id = {u["id"]: u for u in env.get_units()}
++    hog = by_id[hog["id"]]
++    left = next(u for u in towers if u["team"] == 0 and "King" not in u["name"] and u["x"] < 8.5)
++    assert hog["target_id"] == left["id"]          # the Hog is locked on the tower it walked to
++    assert by_id[left["id"]]["target_id"] == hog["id"]
++
++
++def test_tower_hits_name_the_attacker_and_add_up_to_the_damage():
++    env = _hog_match(True)
++    before = env.get_tower_hp(0, 1)
++    assert env.get_tower_hits() == []
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 150)
++    hits = env.get_tower_hits()
++    lost = before - env.get_tower_hp(0, 1)
++    assert lost > 0
++    on_left = [h for h in hits if h[4] == 0]
++    assert sum(h[6] for h in on_left) == lost
++    assert {h[2] for h in on_left} == {HOG} and {h[1] for h in on_left} == {1}
++    assert [h[0] for h in hits] == sorted(h[0] for h in hits)
++    # reset() clears the log and keeps the setting
++    env.reset()
++    assert env.get_tower_hits() == []
++
++
++def test_the_log_is_off_by_default_and_changes_nothing():
++    a, b = _hog_match(False), _hog_match(True)
++    for _ in range(30):
++        a.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 10)
++        b.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 10)
++        b.get_units()
++        assert [a.get_tower_hp(t, s) for t in (0, 1) for s in (0, 1, 2)] == \
++               [b.get_tower_hp(t, s) for t in (0, 1) for s in (0, 1, 2)]
++    assert a.get_tower_hits() == []
++    assert len(b.get_tower_hits()) > 0
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index 8ff8169..0d75aa0 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -442,6 +442,53 @@ PYBIND11_MODULE(clash_royale_env, m) {
+              "marks a projectile from the caster's King Tower, whose flight "
+              "depends on the distance (spell_flight_ticks). Read-only; these "
+              "spells are in no observation channel.")
++        .def("get_units", [](const ClashEnv& env) {
++                py::list out;
++                for (const auto& u : env.getUnits()) {
++                    py::dict d;
++                    d["id"] = u.id;
++                    d["card_id"] = u.cardId;
++                    d["name"] = u.name;
++                    d["team"] = u.team;
++                    d["x"] = u.x;
++                    d["y"] = u.y;
++                    d["hp"] = u.hp;
++                    d["shield_hp"] = u.shieldHp;
++                    d["flying"] = u.flying;
++                    d["building"] = u.building;
++                    d["tower"] = u.tower;
++                    d["target_id"] = u.targetId;
++                    d["deploy_ticks"] = u.deployTicks;
++                    d["freeze_ticks"] = u.freezeTicks;
++                    d["freeze_factor"] = u.freezeFactor;
++                    d["cooldown"] = u.cooldown;
++                    d["awake"] = u.awake;
++                    d["targetable"] = u.targetable;
++                    out.append(d);
++                }
++                return out;
++             },
++             "Every living unit, building and tower as a dict {id, card_id, name, "
++             "team, x, y, hp, shield_hp, flying, building, tower, target_id, "
++             "deploy_ticks, freeze_ticks, freeze_factor, cooldown, awake, targetable}, in board "
++             "coordinates (team 0's frame). Read-only forensics: it shows both "
++             "sides' exact state, so it is not an observation.")
++        .def("set_tower_hit_log", &ClashEnv::setTowerHitLog, py::arg("enabled"),
++             "Keep every hit on a Crown Tower from now on (off by default; "
++             "survives reset(), which clears the log).")
++        .def("get_tower_hits", [](const ClashEnv& env) {
++                py::list out;
++                for (const auto& e : env.getTowerHits()) {
++                    out.append(py::make_tuple(e.tick, e.attackerTeam, e.attackerCardId, e.attackerId,
++                                              e.targetTeam, e.targetId, e.amount));
++                }
++                return out;
++             },
++             "Hits on Crown Towers since the reset, in order, as tuples (tick, "
++             "attacker_team, attacker_card_id, attacker_id, target_team, "
++             "target_id, amount). attacker_card_id is the card that dealt it (a "
++             "spawned body carries its own unregistered id); target_id matches "
++             "get_units()'s id. Empty unless set_tower_hit_log(True).")
+         // The elixir phase (1.0 / 2.0 / 3.0) now.
+         .def("get_elixir_multiplier", &ClashEnv::getElixirMultiplier)
+         // Card-cycle tracking (item 24). `inject` bypasses playCard, where the

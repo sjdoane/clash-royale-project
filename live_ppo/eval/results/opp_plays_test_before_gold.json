@@ -1,0 +1,2667 @@
+{
+ "srcs": [
+  "vid_uVf1EUszTIM",
+  "vid_iVgmnDX-GPY"
+ ],
+ "mode": "replay",
+ "metrics": {
+  "all": {
+   "recall": {
+    "k": 59,
+    "n": 89,
+    "p": 0.6629213483146067,
+    "wilson": [
+     0.5597868598433597,
+     0.752573116718871
+    ],
+    "boot": [
+     0.5,
+     0.7037037037037037
+    ]
+   },
+   "card": {
+    "k": 28,
+    "n": 36,
+    "p": 0.7777777777777778,
+    "wilson": [
+     0.6191498017214091,
+     0.882838070251604
+    ],
+    "boot": [
+     0.25,
+     0.9545454545454546
+    ]
+   },
+   "form": {
+    "k": 29,
+    "n": 36,
+    "p": 0.8055555555555556,
+    "wilson": [
+     0.6497163793648479,
+     0.9024702798054665
+    ],
+    "boot": [
+     0.375,
+     1.0
+    ]
+   },
+   "time": {
+    "k": 39,
+    "n": 58,
+    "p": 0.6724137931034483,
+    "wilson": [
+     0.5442381364257336,
+     0.779168761196579
+    ],
+    "boot": [
+     0.5,
+     0.7567567567567568
+    ]
+   },
+   "tile": {
+    "k": 21,
+    "n": 59,
+    "p": 0.3559322033898305,
+    "wilson": [
+     0.2460311586943476,
+     0.48344740327733987
+    ],
+    "boot": [
+     0.2631578947368421,
+     0.5333333333333333
+    ]
+   },
+   "strict": {
+    "k": 15,
+    "n": 89,
+    "p": 0.16853932584269662,
+    "wilson": [
+     0.1048816181698591,
+     0.25962739503111976
+    ],
+    "boot": [
+     0.16666666666666666,
+     0.17391304347826086
+    ]
+   }
+  },
+  "troop": {
+   "recall": {
+    "k": 40,
+    "n": 60,
+    "p": 0.6666666666666666,
+    "wilson": [
+     0.540566298666634,
+     0.7727090578407216
+    ],
+    "boot": [
+     0.4444444444444444,
+     0.75
+    ]
+   },
+   "card": {
+    "k": 10,
+    "n": 18,
+    "p": 0.5555555555555556,
+    "wilson": [
+     0.3371606942825164,
+     0.7544076889861088
+    ],
+    "boot": [
+     0.25,
+     0.8333333333333334
+    ]
+   },
+   "form": {
+    "k": 11,
+    "n": 18,
+    "p": 0.6111111111111112,
+    "wilson": [
+     0.3861866858065617,
+     0.7969500807306884
+    ],
+    "boot": [
+     0.375,
+     1.0
+    ]
+   },
+   "time": {
+    "k": 21,
+    "n": 39,
+    "p": 0.5384615384615384,
+    "wilson": [
+     0.3856918682173881,
+     0.6843335276595165
+    ],
+    "boot": [
+     0.25,
+     0.6
+    ]
+   },
+   "tile": {
+    "k": 20,
+    "n": 40,
+    "p": 0.5,
+    "wilson": [
+     0.35199278797099753,
+     0.6480072120290025
+    ],
+    "boot": [
+     0.47619047619047616,
+     0.5333333333333333
+    ]
+   },
+   "strict": {
+    "k": 14,
+    "n": 60,
+    "p": 0.23333333333333334,
+    "wilson": [
+     0.1443943161843107,
+     0.3543651134039202
+    ],
+    "boot": [
+     0.1111111111111111,
+     0.32142857142857145
+    ]
+   }
+  },
+  "building": {
+   "recall": {
+    "k": 0,
+    "n": 4,
+    "p": 0.0,
+    "wilson": [
+     0.0,
+     0.48990002040399916
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "card": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "form": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "time": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "tile": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "strict": {
+    "k": 0,
+    "n": 4,
+    "p": 0.0,
+    "wilson": [
+     0.0,
+     0.48990002040399916
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   }
+  },
+  "spell": {
+   "recall": {
+    "k": 19,
+    "n": 25,
+    "p": 0.76,
+    "wilson": [
+     0.5656994004476144,
+     0.8850384226967327
+    ],
+    "boot": [
+     0.6666666666666666,
+     0.7727272727272727
+    ]
+   },
+   "card": {
+    "k": 18,
+    "n": 18,
+    "p": 1.0,
+    "wilson": [
+     0.8241154494176252,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "form": {
+    "k": 18,
+    "n": 18,
+    "p": 1.0,
+    "wilson": [
+     0.8241154494176252,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "time": {
+    "k": 18,
+    "n": 19,
+    "p": 0.9473684210526315,
+    "wilson": [
+     0.7536078466345479,
+     0.99064824750947
+    ],
+    "boot": [
+     0.9411764705882353,
+     1.0
+    ]
+   },
+   "tile": {
+    "k": 1,
+    "n": 19,
+    "p": 0.05263157894736842,
+    "wilson": [
+     0.009351752490529969,
+     0.2463921533654521
+    ],
+    "boot": [
+     0.0,
+     0.5
+    ]
+   },
+   "strict": {
+    "k": 1,
+    "n": 25,
+    "p": 0.04,
+    "wilson": [
+     0.007096050386699165,
+     0.19544472405022525
+    ],
+    "boot": [
+     0.0,
+     0.3333333333333333
+    ]
+   }
+  },
+  "spawner": {
+   "recall": {
+    "k": 4,
+    "n": 6,
+    "p": 0.6666666666666666,
+    "wilson": [
+     0.29998832134152864,
+     0.9032306674407831
+    ],
+    "boot": [
+     0.6,
+     1.0
+    ]
+   },
+   "card": {
+    "k": 4,
+    "n": 4,
+    "p": 1.0,
+    "wilson": [
+     0.5100999795960008,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "form": {
+    "k": 4,
+    "n": 4,
+    "p": 1.0,
+    "wilson": [
+     0.5100999795960008,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "time": {
+    "k": 4,
+    "n": 4,
+    "p": 1.0,
+    "wilson": [
+     0.5100999795960008,
+     1.0
+    ],
+    "boot": [
+     1.0,
+     1.0
+    ]
+   },
+   "tile": {
+    "k": 1,
+    "n": 4,
+    "p": 0.25,
+    "wilson": [
+     0.045586062644636216,
+     0.6993639475573634
+    ],
+    "boot": [
+     0.0,
+     1.0
+    ]
+   },
+   "strict": {
+    "k": 1,
+    "n": 6,
+    "p": 0.16666666666666666,
+    "wilson": [
+     0.03005258587173032,
+     0.563509436563646
+    ],
+    "boot": [
+     0.0,
+     1.0
+    ]
+   }
+  },
+  "hidden": {
+   "recall": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "card": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "form": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "time": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "tile": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   },
+   "strict": {
+    "k": 0,
+    "n": 0,
+    "p": NaN,
+    "wilson": [
+     NaN,
+     NaN
+    ],
+    "boot": [
+     NaN,
+     NaN
+    ]
+   }
+  },
+  "simultaneous": {
+   "recall": {
+    "k": 21,
+    "n": 30,
+    "p": 0.7,
+    "wilson": [
+     0.5212387898833981,
+     0.8333543735604105
+    ],
+    "boot": [
+     0.5,
+     0.7142857142857143
+    ]
+   },
+   "card": {
+    "k": 13,
+    "n": 14,
+    "p": 0.9285714285714286,
+    "wilson": [
+     0.6853073044604219,
+     0.9872781138877085
+    ],
+    "boot": [
+     0.9230769230769231,
+     1.0
+    ]
+   },
+   "form": {
+    "k": 12,
+    "n": 14,
+    "p": 0.8571428571428571,
+    "wilson": [
+     0.600580922361363,
+     0.9599069262620787
+    ],
+    "boot": [
+     0.8461538461538461,
+     1.0
+    ]
+   },
+   "time": {
+    "k": 17,
+    "n": 21,
+    "p": 0.8095238095238095,
+    "wilson": [
+     0.599990134607267,
+     0.9233255938482269
+    ],
+    "boot": [
+     0.8,
+     1.0
+    ]
+   },
+   "tile": {
+    "k": 7,
+    "n": 21,
+    "p": 0.3333333333333333,
+    "wilson": [
+     0.17194536432683688,
+     0.5462692434278971
+    ],
+    "boot": [
+     0.3,
+     1.0
+    ]
+   },
+   "strict": {
+    "k": 6,
+    "n": 30,
+    "p": 0.2,
+    "wilson": [
+     0.09504978102401235,
+     0.37306047381027446
+    ],
+    "boot": [
+     0.17857142857142858,
+     0.5
+    ]
+   }
+  },
+  "precision": {
+   "k": 59,
+   "n": 79,
+   "p": 0.7468354430379747,
+   "wilson": [
+    0.6410553271149313,
+    0.8297226395105322
+   ],
+   "boot": [
+    0.6666666666666666,
+    0.7916666666666666
+   ]
+  },
+  "precision_spell": {
+   "p": 0.7307692307692307,
+   "lo": 0.5391659658023868,
+   "hi": 0.8629572447493261,
+   "k": 19,
+   "n": 26
+  },
+  "precision_troop": {
+   "p": 0.7547169811320755,
+   "lo": 0.6243318493782992,
+   "hi": 0.8506723728814543,
+   "k": 40,
+   "n": 53
+  },
+  "time_err_s": {
+   "median": 0.5,
+   "p90": 2.0
+  },
+  "tile_err": {
+   "median": 2.1502092921387894,
+   "p90": 4.315643929312189
+  },
+  "opp_elixir": {
+   "windows": [
+    "vid_uVf1EUszTIM:0"
+   ],
+   "frames": 509,
+   "mae": 2.8939096267190587,
+   "within_1": 0.3241650294695481,
+   "within_0.5": 0.137524557956778
+  },
+  "cycle_block": {
+   "frames": 509,
+   "mean_feature_agreement": 0.9771464981681092,
+   "all_features_ok": 0.011787819253438114
+  },
+  "tolerances": {
+   "time_s": 1.0,
+   "tile": 1.5,
+   "tile_spell": 2.0,
+   "gate_s": 3.0,
+   "gate_tiles": 5.0
+  }
+ },
+ "rows": [
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "id": "0.1",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Night Witch",
+   "matched": true,
+   "dt": 2.0,
+   "dd": 1.9749683541768468,
+   "pred": "Night Witch",
+   "pxy": [
+    11.0,
+    33.0
+   ],
+   "gxy": [
+    9.03,
+    32.86
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": false,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "id": "0.2",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "?",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "id": "0.3",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Elite Barbarians",
+   "matched": true,
+   "dt": 0.5,
+   "dd": 1.011187420807834,
+   "pred": "Elite Barbarians",
+   "pxy": [
+    3.0,
+    18.0
+   ],
+   "gxy": [
+    2.0,
+    17.85
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "id": "0.5",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Golden Knight",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "id": "0.6",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Bomber",
+   "matched": true,
+   "dt": 1.5,
+   "dd": 0.11180339887498884,
+   "pred": "Bomber",
+   "pxy": [
+    10.0,
+    27.0
+   ],
+   "gxy": [
+    10.02,
+    26.89
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": false,
+   "d_ok": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "id": "0.7",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Phoenix",
+   "matched": true,
+   "dt": 2.5,
+   "dd": 1.83611001849018,
+   "pred": "?phoenix-big",
+   "pxy": [
+    2.0,
+    18.0
+   ],
+   "gxy": [
+    3.03,
+    19.520000000000003
+   ],
+   "card_ok": false,
+   "form_ok": true,
+   "t_ok": false,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "id": "0.12",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Golem",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "id": "0.13",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Golden Knight",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "id": "0.15",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Bomber",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "id": "0.x5595",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Poison",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 3.930623360231809,
+   "pred": "Poison",
+   "pxy": [
+    3.0,
+    21.0
+   ],
+   "gxy": [
+    3.07,
+    24.93
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "id": "0.x6900",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Poison",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "id": "0.x7170",
+   "cat": "spell",
+   "spawner": true,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Graveyard",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 1.4244297104455526,
+   "pred": "Graveyard",
+   "pxy": [
+    3.0,
+    0.0
+   ],
+   "gxy": [
+    2.61,
+    1.37
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.0",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 1.0,
+   "dd": 2.0529247428973094,
+   "pred": "?knight",
+   "pxy": [
+    7.0,
+    31.0
+   ],
+   "gxy": [
+    8.04,
+    32.769999999999996
+   ],
+   "t_ok": null,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.1",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Bats",
+   "matched": true,
+   "dt": 1.75,
+   "dd": 2.3653540961133075,
+   "pred": "Bats",
+   "pxy": [
+    15.0,
+    23.0
+   ],
+   "gxy": [
+    17.05,
+    21.82
+   ],
+   "card_ok": true,
+   "form_ok": false,
+   "t_ok": false,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.2",
+   "cat": "building",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.3",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.4",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "?",
+   "matched": true,
+   "dt": 0.25,
+   "dd": 1.1260550608207394,
+   "pred": "Bats",
+   "pxy": [
+    15.0,
+    20.0
+   ],
+   "gxy": [
+    16.06,
+    19.619999999999997
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.5",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.6",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "?",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.7",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "?",
+   "matched": true,
+   "dt": 0.25,
+   "dd": 1.5216109883935516,
+   "pred": "Bats",
+   "pxy": [
+    13.0,
+    26.0
+   ],
+   "gxy": [
+    14.03,
+    24.88
+   ],
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.8",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 1.0,
+   "dd": 0.17262676501632226,
+   "pred": "?knight",
+   "pxy": [
+    9.0,
+    26.0
+   ],
+   "gxy": [
+    9.03,
+    25.83
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.9",
+   "cat": "building",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Cannon",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.10",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 2.25,
+   "dd": 2.78028775489157,
+   "pred": "Mega Minion",
+   "pxy": [
+    13.0,
+    22.0
+   ],
+   "gxy": [
+    13.04,
+    24.78
+   ],
+   "t_ok": false,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.11",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Bats",
+   "matched": true,
+   "dt": 0.8799999999999955,
+   "dd": 3.1505713767505714,
+   "pred": "Bats",
+   "pxy": [
+    16.0,
+    21.0
+   ],
+   "gxy": [
+    16.06,
+    17.85
+   ],
+   "card_ok": true,
+   "form_ok": false,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.12",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "?",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.13",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "?",
+   "matched": true,
+   "dt": -0.2400000000000091,
+   "dd": 0.14035668847618255,
+   "pred": "Skeletons",
+   "pxy": [
+    9.0,
+    33.0
+   ],
+   "gxy": [
+    8.99,
+    32.86
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.14",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": -1.759999999999991,
+   "dd": 2.062425756239481,
+   "pred": "Barbarian Barrel",
+   "pxy": [
+    14.0,
+    18.0
+   ],
+   "gxy": [
+    16.06,
+    17.9
+   ],
+   "t_ok": false,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.15",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "?",
+   "matched": true,
+   "dt": -2.0,
+   "dd": 4.476717547489455,
+   "pred": "Bats",
+   "pxy": [
+    16.0,
+    21.0
+   ],
+   "gxy": [
+    11.59,
+    21.77
+   ],
+   "t_ok": false,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.16",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "?",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.17",
+   "cat": "building",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "?",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.18",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.19",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 1.0,
+   "dd": 2.006638980982878,
+   "pred": "Bats",
+   "pxy": [
+    16.0,
+    30.0
+   ],
+   "gxy": [
+    17.05,
+    31.71
+   ],
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.20",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 2.0,
+   "dd": 2.66326866838477,
+   "pred": "Skeletons",
+   "pxy": [
+    7.0,
+    31.0
+   ],
+   "gxy": [
+    8.99,
+    32.769999999999996
+   ],
+   "t_ok": false,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.21",
+   "cat": "building",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Cannon",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.22",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "?",
+   "matched": true,
+   "dt": 2.0,
+   "dd": 0.14866068747318584,
+   "pred": "Skeletons",
+   "pxy": [
+    12.0,
+    21.0
+   ],
+   "gxy": [
+    12.05,
+    20.86
+   ],
+   "t_ok": false,
+   "d_ok": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.26",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "?",
+   "matched": true,
+   "dt": -0.5,
+   "dd": 1.3103434664239741,
+   "pred": "?knight",
+   "pxy": [
+    14.0,
+    17.0
+   ],
+   "gxy": [
+    15.03,
+    17.81
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.27",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Bats",
+   "matched": true,
+   "dt": 1.5,
+   "dd": 2.6759857996633687,
+   "pred": "Ice Wizard",
+   "pxy": [
+    15.0,
+    18.0
+   ],
+   "gxy": [
+    17.05,
+    19.72
+   ],
+   "card_ok": false,
+   "form_ok": true,
+   "t_ok": false,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.28",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "?",
+   "matched": true,
+   "dt": -0.5,
+   "dd": 0.181107702762748,
+   "pred": "Skeletons",
+   "pxy": [
+    11.0,
+    22.0
+   ],
+   "gxy": [
+    11.02,
+    21.82
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.29",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 1.0309704166463742,
+   "pred": "Bats",
+   "pxy": [
+    15.0,
+    18.0
+   ],
+   "gxy": [
+    16.02,
+    17.85
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.31",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "?",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.34",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 1.5,
+   "dd": 2.9500677958311385,
+   "pred": "Bats",
+   "pxy": [
+    14.0,
+    20.0
+   ],
+   "gxy": [
+    16.02,
+    17.85
+   ],
+   "t_ok": false,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x7950",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Barbarian Barrel",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 4.880092212243534,
+   "pred": "Barbarian Barrel",
+   "pxy": [
+    14.0,
+    21.0
+   ],
+   "gxy": [
+    14.03,
+    25.88
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x8160",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Poison",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 4.023182819609369,
+   "pred": "Poison",
+   "pxy": [
+    14.0,
+    6.0
+   ],
+   "gxy": [
+    13.84,
+    10.02
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x9315",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Barbarian Barrel",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x10545",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Barbarian Barrel",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 4.930010141977397,
+   "pred": "Barbarian Barrel",
+   "pxy": [
+    15.0,
+    22.0
+   ],
+   "gxy": [
+    14.99,
+    26.93
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x11490",
+   "cat": "spell",
+   "spawner": true,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Graveyard",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 4.018967529104956,
+   "pred": "Graveyard",
+   "pxy": [
+    15.0,
+    2.0
+   ],
+   "gxy": [
+    14.61,
+    6.0
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x12015",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Poison",
+   "matched": true,
+   "dt": -1.240000000000009,
+   "dd": 2.962431433805684,
+   "pred": "Poison",
+   "pxy": [
+    14.0,
+    4.0
+   ],
+   "gxy": [
+    13.88,
+    6.96
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": false,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x12495",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Barbarian Barrel",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x12720",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Poison",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 4.071768657475521,
+   "pred": "Poison",
+   "pxy": [
+    14.0,
+    6.0
+   ],
+   "gxy": [
+    13.88,
+    10.07
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x13470",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Barbarian Barrel",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 3.6900000000000013,
+   "pred": "Barbarian Barrel",
+   "pxy": [
+    13.0,
+    22.0
+   ],
+   "gxy": [
+    13.0,
+    25.69
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x14475",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 3.1041262860908216,
+   "pred": "Poison",
+   "pxy": [
+    14.0,
+    3.0
+   ],
+   "gxy": [
+    13.84,
+    6.1
+   ],
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x15480",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Poison",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 4.070196555450363,
+   "pred": "Poison",
+   "pxy": [
+    13.0,
+    6.0
+   ],
+   "gxy": [
+    13.04,
+    10.07
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x15675",
+   "cat": "spell",
+   "spawner": true,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Graveyard",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 4.176529659897078,
+   "pred": "Graveyard",
+   "pxy": [
+    15.0,
+    2.0
+   ],
+   "gxy": [
+    14.53,
+    6.15
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x15825",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Barbarian Barrel",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 4.590098038168684,
+   "pred": "Barbarian Barrel",
+   "pxy": [
+    14.0,
+    20.0
+   ],
+   "gxy": [
+    14.03,
+    24.59
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x16110",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Poison",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 4.011795109424209,
+   "pred": "Poison",
+   "pxy": [
+    14.0,
+    3.0
+   ],
+   "gxy": [
+    13.88,
+    7.01
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x16380",
+   "cat": "spell",
+   "spawner": true,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Graveyard",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x16860",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Barbarian Barrel",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x17175",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Poison",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 3.91184099881373,
+   "pred": "Poison",
+   "pxy": [
+    14.0,
+    4.0
+   ],
+   "gxy": [
+    13.88,
+    7.91
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x17640",
+   "cat": "spell",
+   "spawner": true,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Graveyard",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 4.12248711338192,
+   "pred": "Graveyard",
+   "pxy": [
+    15.0,
+    2.0
+   ],
+   "gxy": [
+    14.57,
+    6.1
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x17670",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Barbarian Barrel",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 4.110194642592975,
+   "pred": "Barbarian Barrel",
+   "pxy": [
+    14.0,
+    18.0
+   ],
+   "gxy": [
+    13.96,
+    22.11
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x18030",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Poison",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 4.15308319203938,
+   "pred": "Poison",
+   "pxy": [
+    14.0,
+    2.0
+   ],
+   "gxy": [
+    13.84,
+    6.15
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x18240",
+   "cat": "spell",
+   "spawner": true,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Graveyard",
+   "matched": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x18405",
+   "cat": "spell",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Barbarian Barrel",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 4.300011627891256,
+   "pred": "Barbarian Barrel",
+   "pxy": [
+    15.0,
+    18.0
+   ],
+   "gxy": [
+    14.99,
+    22.3
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x8685",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Ice Wizard",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.022360679774998216,
+   "pred": "Ice Wizard",
+   "pxy": [
+    17.0,
+    23.0
+   ],
+   "gxy": [
+    16.98,
+    23.01
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x12360",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": true,
+   "card": "Ice Wizard",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.022360679774997422,
+   "pred": "Ice Wizard",
+   "pxy": [
+    9.0,
+    24.0
+   ],
+   "gxy": [
+    8.99,
+    24.02
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "id": "1.x14175",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Ice Wizard",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 0.031622776601684804,
+   "pred": "Ice Wizard",
+   "pxy": [
+    9.0,
+    26.0
+   ],
+   "gxy": [
+    8.99,
+    26.03
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.0",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Bowler",
+   "matched": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.1",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 1.25,
+   "dd": 2.9483893908369665,
+   "pred": "Skeletons",
+   "pxy": [
+    10.0,
+    30.0
+   ],
+   "gxy": [
+    8.99,
+    32.769999999999996
+   ],
+   "t_ok": false,
+   "d_ok": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.2",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Giant",
+   "matched": true,
+   "dt": -1.0,
+   "dd": 2.1502092921387894,
+   "pred": "Royal Giant",
+   "pxy": [
+    3.0,
+    20.0
+   ],
+   "gxy": [
+    3.03,
+    17.85
+   ],
+   "card_ok": false,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.4",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 0.5,
+   "dd": 0.19026297590440575,
+   "pred": "Minions",
+   "pxy": [
+    1.0,
+    18.0
+   ],
+   "gxy": [
+    1.01,
+    17.81
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.5",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Dark Prince",
+   "matched": true,
+   "dt": 0.0,
+   "dd": 1.2199999999999989,
+   "pred": "Dark Prince",
+   "pxy": [
+    2.0,
+    25.0
+   ],
+   "gxy": [
+    2.0,
+    23.78
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.6",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Bowler",
+   "matched": true,
+   "dt": 1.0,
+   "dd": 2.0329535164385795,
+   "pred": "Battle Ram",
+   "pxy": [
+    7.0,
+    31.0
+   ],
+   "gxy": [
+    8.0,
+    32.769999999999996
+   ],
+   "card_ok": false,
+   "form_ok": false,
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.7",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Witch",
+   "matched": true,
+   "dt": -2.75,
+   "dd": 4.3781731349959205,
+   "pred": "Bowler",
+   "pxy": [
+    4.0,
+    22.0
+   ],
+   "gxy": [
+    8.0,
+    23.78
+   ],
+   "card_ok": false,
+   "form_ok": false,
+   "t_ok": false,
+   "d_ok": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.8",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": -3.0,
+   "dd": 4.932443613463818,
+   "pred": "Skeletons",
+   "pxy": [
+    9.0,
+    23.0
+   ],
+   "gxy": [
+    4.79,
+    20.43
+   ],
+   "t_ok": false,
+   "d_ok": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.9",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Dark Prince",
+   "matched": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.10",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Bowler",
+   "matched": true,
+   "dt": 1.0,
+   "dd": 0.75,
+   "pred": "Royal Giant",
+   "pxy": [
+    2.0,
+    28.0
+   ],
+   "gxy": [
+    2.0,
+    28.75
+   ],
+   "card_ok": false,
+   "form_ok": false,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.11",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Minions",
+   "matched": true,
+   "dt": 1.0,
+   "dd": 0.15033296378372765,
+   "pred": "Minions",
+   "pxy": [
+    3.0,
+    18.0
+   ],
+   "gxy": [
+    2.99,
+    17.85
+   ],
+   "card_ok": true,
+   "form_ok": true,
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.12",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 1.25,
+   "dd": 1.2761269529321921,
+   "pred": "Skeletons",
+   "pxy": [
+    6.0,
+    23.0
+   ],
+   "gxy": [
+    7.01,
+    23.78
+   ],
+   "t_ok": false,
+   "d_ok": true
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.13",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 0.25,
+   "dd": 0.28017851452243914,
+   "pred": "Dark Prince",
+   "pxy": [
+    7.0,
+    33.0
+   ],
+   "gxy": [
+    7.01,
+    32.72
+   ],
+   "t_ok": true,
+   "d_ok": true
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.14",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Bowler",
+   "matched": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.16",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Giant",
+   "matched": true,
+   "dt": -2.6200000000000045,
+   "dd": 2.420123963767147,
+   "pred": "Royal Giant",
+   "pxy": [
+    2.0,
+    20.0
+   ],
+   "gxy": [
+    0.97,
+    17.81
+   ],
+   "card_ok": false,
+   "form_ok": false,
+   "t_ok": false,
+   "d_ok": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.17",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.18",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.19",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": -0.5,
+   "dd": 1.5081445554057482,
+   "pred": "Dark Prince",
+   "pxy": [
+    4.0,
+    26.0
+   ],
+   "gxy": [
+    2.99,
+    24.88
+   ],
+   "t_ok": true,
+   "d_ok": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.21",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.22",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Witch",
+   "matched": true,
+   "dt": 1.740000000000009,
+   "dd": 1.2682271089990158,
+   "pred": "Skeletons",
+   "pxy": [
+    9.0,
+    23.0
+   ],
+   "gxy": [
+    8.0,
+    23.78
+   ],
+   "card_ok": false,
+   "form_ok": false,
+   "t_ok": false,
+   "d_ok": true
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.23",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Giant",
+   "matched": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.24",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "Dark Prince",
+   "matched": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "id": "0.25",
+   "cat": "troop",
+   "spawner": false,
+   "hidden": false,
+   "simultaneous": false,
+   "card": "?",
+   "matched": true,
+   "dt": 1.259999999999991,
+   "dd": 1.0210778618695053,
+   "pred": "Minions",
+   "pxy": [
+    2.0,
+    29.0
+   ],
+   "gxy": [
+    2.99,
+    28.75
+   ],
+   "t_ok": false,
+   "d_ok": true
+  }
+ ],
+ "false_positives": [
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "t": 42.88,
+   "pred": "Bats",
+   "xy": [
+    8.0,
+    26.0
+   ],
+   "spell": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "t": 113.62,
+   "pred": "Golem",
+   "xy": [
+    10.0,
+    29.0
+   ],
+   "spell": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:0",
+   "t": 135.88,
+   "pred": "Minions",
+   "xy": [
+    3.0,
+    15.0
+   ],
+   "spell": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "t": 142.0,
+   "pred": "Barbarian Barrel",
+   "xy": [
+    9.0,
+    20.0
+   ],
+   "spell": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "t": 153.5,
+   "pred": "Bats",
+   "xy": [
+    15.0,
+    19.0
+   ],
+   "spell": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "t": 181.38,
+   "pred": "Clone",
+   "xy": [
+    14.0,
+    3.0
+   ],
+   "spell": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "t": 196.12,
+   "pred": "The Log",
+   "xy": [
+    13.0,
+    11.0
+   ],
+   "spell": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "t": 229.12,
+   "pred": "Graveyard",
+   "xy": [
+    15.0,
+    2.0
+   ],
+   "spell": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "t": 235.62,
+   "pred": "Poison",
+   "xy": [
+    14.0,
+    2.0
+   ],
+   "spell": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "t": 238.38,
+   "pred": "Bats",
+   "xy": [
+    16.0,
+    20.0
+   ],
+   "spell": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "t": 242.88,
+   "pred": "Skeletons",
+   "xy": [
+    12.0,
+    27.0
+   ],
+   "spell": false
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "t": 259.88,
+   "pred": "Graveyard",
+   "xy": [
+    15.0,
+    0.0
+   ],
+   "spell": true
+  },
+  {
+   "src": "vid_uVf1EUszTIM",
+   "match": "vid_uVf1EUszTIM:1",
+   "t": 267.88,
+   "pred": "Barbarian Barrel",
+   "xy": [
+    15.0,
+    16.0
+   ],
+   "spell": true
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "t": 27.75,
+   "pred": "Golden Knight",
+   "xy": [
+    4.0,
+    22.0
+   ],
+   "spell": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "t": 39.5,
+   "pred": "Witch",
+   "xy": [
+    12.0,
+    27.0
+   ],
+   "spell": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "t": 117.75,
+   "pred": "Skeletons",
+   "xy": [
+    2.0,
+    18.0
+   ],
+   "spell": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "t": 185.12,
+   "pred": "Bowler",
+   "xy": [
+    2.0,
+    15.0
+   ],
+   "spell": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "t": 208.62,
+   "pred": "Bowler",
+   "xy": [
+    4.0,
+    20.0
+   ],
+   "spell": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "t": 239.62,
+   "pred": "Skeletons",
+   "xy": [
+    2.0,
+    20.0
+   ],
+   "spell": false
+  },
+  {
+   "src": "vid_iVgmnDX-GPY",
+   "match": "vid_iVgmnDX-GPY:0",
+   "t": 254.88,
+   "pred": "Bowler",
+   "xy": [
+    3.0,
+    14.0
+   ],
+   "spell": false
+  }
+ ]
+}

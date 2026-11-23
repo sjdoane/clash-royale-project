@@ -1,0 +1,710 @@
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index 9468d85..70ac33e 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -56,6 +56,9 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     entity->periodicIntervalTicks = stats.periodicIntervalTicks;
+     entity->periodicTicksUntilNext = stats.periodicIntervalTicks; // first fire after one full interval
+     entity->periodicHotIntervalTicks = stats.periodicHotIntervalTicks;
++    entity->selfPeriodicEffect = stats.selfPeriodicEffect;
++    entity->selfPeriodicIntervalTicks = stats.selfPeriodicIntervalTicks;
++    entity->selfPeriodicTicksUntilNext = stats.selfPeriodicFirstTicks;
+     entity->periodicSideOffset = stats.periodicSideOffset;
+     entity->auraRadius = stats.auraRadius;
+     entity->auraMaxTargets = stats.auraMaxTargets;
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index ea8ef74..f0d4e50 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -43,6 +43,7 @@
+ #include "HeroMagicArcherTripleThreatEffect.h"
+ #include "HeroIceGolemSnowstormEffect.h"
+ #include "HeroBarbarianBarrelRerollEffect.h"
++#include "EvolutionSelfEffects.h"
+ 
+ // A registered card. spawnEntity is one of the archetype factories in
+ // CardFactories.h bound to the card's CardStats.
+@@ -913,7 +914,9 @@ private:
+             .withOffsets({ {-0.4f, 0.0f}, {0.4f, 0.0f} })
+             .withSplash(1.5f)
+             .withDieAfterFirstHit().withSightRange(7.0f) /* audit 0003: wiki Wall Breakers, level 11 */);
+-        add(troop(84, "Electro Giant", 7.0f, Archetype::MeleeBuildingTargeter, 3952, SPEED_SLOW, 1.2f, 163, 18, '|')
++        // Damage 184: the official 26 Aug 2026 notes (163 -> 184); the wiki
++        // still lists 163.
++        add(troop(84, "Electro Giant", 7.0f, Archetype::MeleeBuildingTargeter, 3952, SPEED_SLOW, 1.2f, 184, 18, '|')
+             .withSplash(1.5f)
+             .withPeriodicEffect(50, std::make_shared<AreaStunEffect>(2.5f, 5)) /* audit 0003: wiki Electro Giant, level 11 */);
+         add(troop(85, "Suspicious Bush", 2.0f, Archetype::MeleeBuildingTargeter, 81, SPEED_MEDIUM, 0.5f, 256, 14, '}')
+@@ -1529,15 +1532,14 @@ private:
+ 
+         // Barbarians: the base 716 hp, the Evolution's hp bonus cut to 0% by
+         // the official 4 Aug 2026 notes (was +10%, 760). "Blade Rage": +35%
+-        // attack speed for 3 s, refreshed on each attack (0.74 ~= 1/1.35); the
+-        // same notes lengthened it to 5 s, which is not applied here. The
+-        // movement-speed boost is not modelled.
++        // attack speed for 5 s (the same notes: 3 s -> 5 s), refreshed on each
++        // attack (0.74 ~= 1/1.35). The movement-speed boost is not modelled.
+         addEvolution(155,
+             troop(8, "Barbarians", 5.0f, Archetype::MeleeSquad, 716, SPEED_MEDIUM, 0.7f, 192, 14, 'B')
+                 .withOffsets({ {0.0f, 0.0f}, {-0.5f, -0.5f}, {0.5f, -0.5f}, {-0.5f, 0.5f}, {0.5f, 0.5f} }),
+             troop(8, "Barbarians", 5.0f, Archetype::MeleeSquad, 716, SPEED_MEDIUM, 0.7f, 192, 14, 'B')
+                 .withOffsets({ {0.0f, 0.0f}, {-0.5f, -0.5f}, {0.5f, -0.5f}, {-0.5f, 0.5f}, {0.5f, 0.5f} })
+-                .withSelfHasteOnHit(30, 0.74f),
++                .withSelfHasteOnHit(50, 0.74f),
+             1 /* audit 0003: wiki Evolution, level 11: 1 cycle */, 1);
+ 
+         // Lumberjack: the ghost (lumberjackGhostStats) composed with the Rage
+@@ -1643,6 +1645,51 @@ private:
+                 .withRampGracePeriod(90) /* audit 0003: wiki Inferno Dragon, level 11 */,
+             2, 1);
+ 
++        // --- Evolutions added in patch 0015 (ids 177-179) ---
++        // Base stats are the base card's registration verbatim; the ability
++        // runs on the self-periodic hook (EvolutionSelfEffects.h).
++
++        // Giant ("Rage Trail", released 2 Nov 2026; wiki Giant/Evolution): 1
++        // cycle. At 50% health he starts leaving rage every 1.433 s (14 ticks)
++        // lasting 1.5 s, radius 2 tiles growing 0.5 per attack to 3.5. Rage
++        // multiplier 1.35, as the Rage spell (id 108).
++        addEvolution(177,
++            troop(2, "Giant", 5.0f, Archetype::MeleeBuildingTargeter, 3968, SPEED_SLOW, 1.2f, 253, 15, 'G').withSightRange(7.5f),
++            troop(2, "Giant", 5.0f, Archetype::MeleeBuildingTargeter, 3968, SPEED_SLOW, 1.2f, 253, 15, 'G').withSightRange(7.5f)
++                .withSelfPeriodicEffect(1, 14, std::make_shared<EvoGiantRageTrailEffect>(0.5f, 2.0f, 0.5f, 3.5f, 1.35f, 15)),
++            1, 1);
++
++        // Elite Barbarians ("Rage Spear"; wiki Elite Barbarians/Evolution, the
++        // official 26 Aug 2026 notes): each barbarian throws a spear at the
++        // nearest enemy ground troop 3-4.5 tiles away, 220 damage (284 -> 220
++        // on 26 Aug), recharging every 5 s, and enrages himself and allies
++        // within 1.5 tiles (assumed; the path toward the target is not
++        // modelled) for 2.5 s (3.5 -> 2.5 s on 26 Aug). 1 cycle (guides; the
++        // wiki gives none). The 6 Oct sight change (4.5 -> 6) is not separate
++        // here: he walks to his targets and throws once one is in the band.
++        addEvolution(178,
++            troop(17, "Elite Barbarians", 6.0f, Archetype::MeleeSquad, 1341, SPEED_FAST, 1.2f, 384, 14, 'e')
++                .withOffsets({ {-0.5f, 0.0f}, {0.5f, 0.0f} }),
++            troop(17, "Elite Barbarians", 6.0f, Archetype::MeleeSquad, 1341, SPEED_FAST, 1.2f, 384, 14, 'e')
++                .withOffsets({ {-0.5f, 0.0f}, {0.5f, 0.0f} })
++                .withSelfPeriodicEffect(1, 50, std::make_shared<EvoEliteBarbarianSpearEffect>(3.0f, 4.5f, 220, 1.35f, 25, 1.5f)),
++            1, 1);
++
++        // Electro Giant ("Level Damper", released 5 Oct 2026; wiki Electro
++        // Giant/Evolution, RoyaleAPI): 1 cycle. Keeps the base shock; every
++        // 6 s (first 2.5 s after the deploy) each enemy troop and building
++        // within 6 tiles loses one level, permanently and cumulatively, down
++        // to level 1. Crown Towers are exempt; no damage.
++        addEvolution(179,
++            troop(84, "Electro Giant", 7.0f, Archetype::MeleeBuildingTargeter, 3952, SPEED_SLOW, 1.2f, 184, 18, '|')
++                .withSplash(1.5f)
++                .withPeriodicEffect(50, std::make_shared<AreaStunEffect>(2.5f, 5)),
++            troop(84, "Electro Giant", 7.0f, Archetype::MeleeBuildingTargeter, 3952, SPEED_SLOW, 1.2f, 184, 18, '|')
++                .withSplash(1.5f)
++                .withPeriodicEffect(50, std::make_shared<AreaStunEffect>(2.5f, 5))
++                .withSelfPeriodicEffect(25, 60, std::make_shared<LevelDamperEffect>(6.0f)),
++            1, 1);
++
+         // === Mirror ===
+         // Registered so it can occupy a deck slot. GameManager::playCard
+         // substitutes the last card played (cost + 1), so this entry's own
+diff --git a/include/core/CardStats.h b/include/core/CardStats.h
+index 4a1fde9..83cfc38 100644
+--- a/include/core/CardStats.h
++++ b/include/core/CardStats.h
+@@ -5,6 +5,7 @@
+ #include "DeathEffect.h"
+ #include "PeriodicEffect.h"
+ #include "AbilityEffect.h"
++#include "SelfPeriodicEffect.h"
+ #include <memory>
+ #include <string>
+ #include <vector>
+@@ -232,6 +233,10 @@ struct CardStats {
+     // interval.
+     std::shared_ptr<IPeriodicEffect> periodicEffect;
+     int periodicIntervalTicks = 0;
++    // The self-periodic hook (SelfPeriodicEffect.h, patch 0015).
++    std::shared_ptr<ISelfPeriodicEffect> selfPeriodicEffect;
++    int selfPeriodicIntervalTicks = 0;
++    int selfPeriodicFirstTicks = 0;
+     // A faster interval used only while attacking (Evolved Furnace's "Hot
+     // Spawning"). 0 disables it.
+     int periodicHotIntervalTicks = 0;
+@@ -494,6 +499,14 @@ struct CardStats {
+         periodicEffect = std::move(effect);
+         return *this;
+     }
++    // First check `firstTicks` after the deploy ends, then every
++    // `intervalTicks` after each fire (a declined check retries next tick).
++    CardStats& withSelfPeriodicEffect(int firstTicks, int intervalTicks, std::shared_ptr<ISelfPeriodicEffect> effect) {
++        selfPeriodicFirstTicks = firstTicks;
++        selfPeriodicIntervalTicks = intervalTicks;
++        selfPeriodicEffect = std::move(effect);
++        return *this;
++    }
+     CardStats& withAllyBuffAura(float radius, int everyNAttacks, float multiplier, int durationTicks, int maxTargets) {
+         auraRadius = radius;
+         auraEveryNAttacks = everyNAttacks;
+diff --git a/include/core/EvolutionSelfEffects.h b/include/core/EvolutionSelfEffects.h
+new file mode 100644
+index 0000000..5263f20
+--- /dev/null
++++ b/include/core/EvolutionSelfEffects.h
+@@ -0,0 +1,93 @@
++#pragma once
++#include "../entities/SelfPeriodicEffect.h"
++#include "../entities/CombatEntity.h"
++#include <algorithm>
++#include <limits>
++
++// Self-periodic Evolution abilities (patch 0015). Each runs through
++// CombatEntity's self-periodic hook (CardStats::withSelfPeriodicEffect).
++
++// Evolved Giant ("Rage Trail"): from 50% health on, a rage zone every interval
++// around the Giant (allies and himself), +35% speed for the buff duration. The
++// radius starts at 2 tiles and grows 0.5 per attack started after the trigger,
++// up to 3.5 (three attacks). The trail is a path behind him in the game; here
++// it is a disc on him each interval. Rage is the engine's damage-and-attack
++// buff (applyBuff), as for the Rage spell; movement speed is not modelled.
++class EvoGiantRageTrailEffect : public ISelfPeriodicEffect {
++    float triggerHpFraction, baseRadius, radiusPerAttack, maxRadius, multiplier;
++    int durationTicks;
++
++public:
++    EvoGiantRageTrailEffect(float triggerHpFraction, float baseRadius, float radiusPerAttack,
++            float maxRadius, float multiplier, int durationTicks)
++        : triggerHpFraction(triggerHpFraction), baseRadius(baseRadius), radiusPerAttack(radiusPerAttack),
++          maxRadius(maxRadius), multiplier(multiplier), durationTicks(durationTicks) {}
++
++    bool apply(Board& board, CombatEntity& self) const override {
++        if (self.selfPeriodicState < 0) {
++            if (self.hp > self.fullHp * triggerHpFraction) return false;
++            self.selfPeriodicState = self.attacksStarted;   // attacks at the trigger
++        }
++        const float r = std::min(maxRadius,
++            baseRadius + radiusPerAttack * static_cast<float>(self.attacksStarted - self.selfPeriodicState));
++        applyAreaBuff(board, self.position, r, -1, self.team, multiplier, durationTicks, 1000000);
++        return true;
++    }
++};
++
++// Evolved Elite Barbarians ("Rage Spear"), per barbarian: the nearest enemy
++// ground troop between minRange and maxRange tiles takes `damage`, and the
++// thrower plus allies within trailRadius of him are enraged for
++// durationTicks. Recharges every interval; with no target in the band it
++// retries next tick. The spear's rage path toward the target is modelled as
++// the disc on the thrower.
++class EvoEliteBarbarianSpearEffect : public ISelfPeriodicEffect {
++    float minRange, maxRange;
++    int damage;
++    float multiplier;
++    int durationTicks;
++    float trailRadius;
++
++public:
++    EvoEliteBarbarianSpearEffect(float minRange, float maxRange, int damage, float multiplier,
++            int durationTicks, float trailRadius)
++        : minRange(minRange), maxRange(maxRange), damage(damage), multiplier(multiplier),
++          durationTicks(durationTicks), trailRadius(trailRadius) {}
++
++    bool apply(Board& board, CombatEntity& self) const override {
++        std::shared_ptr<Entity> best;
++        float bestDist = std::numeric_limits<float>::max();
++        for (const auto& e : board.getEntities()) {
++            if (e->team == self.team || !e->isAlive() || !e->isTargetable()) continue;
++            if (e->isBuilding() || e->isTower() || e->isFlying) continue;
++            const float d = self.position.distanceTo(e->position);
++            if (d < minRange || d > maxRange || d >= bestDist) continue;
++            best = e;
++            bestDist = d;
++        }
++        if (!best) return false;
++        best->takeDamage(damage);
++        applyAreaBuff(board, self.position, trailRadius, -1, self.team, multiplier, durationTicks, 1000000);
++        return true;
++    }
++};
++
++// Evolved Electro Giant ("Level Damper"): every interval, each enemy troop and
++// non-tower building within radius loses one level (CombatEntity::loseLevel:
++// about -9% hp and damage per step, never below level 1). No damage; the loss
++// is permanent and stacks. Crown Towers are exempt.
++class LevelDamperEffect : public ISelfPeriodicEffect {
++    float radius;
++
++public:
++    explicit LevelDamperEffect(float radius) : radius(radius) {}
++
++    bool apply(Board& board, CombatEntity& self) const override {
++        for (const auto& e : board.getEntities()) {
++            if (e->team == self.team || !e->isAlive() || e->isTower()) continue;
++            if (self.position.distanceTo(e->position) > radius) continue;
++            if (auto c = std::dynamic_pointer_cast<CombatEntity>(e)) c->loseLevel();
++        }
++        return true;
++    }
++};
+diff --git a/include/entities/Building.h b/include/entities/Building.h
+index 81fe7d3..807644d 100644
+--- a/include/entities/Building.h
++++ b/include/entities/Building.h
+@@ -27,6 +27,14 @@ public:
+         maxHp = CardLevels::scale(maxHp, level);
+     }
+ 
++    bool loseLevel() override {
++        const int from = currentLevel;
++        if (!CombatEntity::loseLevel()) return false;
++        maxHp = std::max(1, static_cast<int>(std::lround(static_cast<double>(maxHp)
++            * CardLevels::MULTIPLIER_PERCENT[from - 2] / CardLevels::MULTIPLIER_PERCENT[from - 1])));
++        return true;
++    }
++
+     float getCollisionRadius() const override { return COLLISION_RADIUS; }
+ 
+     bool isBuilding() const override { return true; }
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index 8f928ba..e6221b6 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -8,6 +8,7 @@
+ #include "DeathEffect.h"
+ #include "PeriodicEffect.h"
+ #include "AbilityEffect.h"
++#include "SelfPeriodicEffect.h"
+ #include <memory>
+ #include <limits>
+ #include <vector>
+@@ -222,6 +223,23 @@ public:
+     std::shared_ptr<IPeriodicEffect> periodicEffect;
+     int periodicIntervalTicks = 0;
+     int periodicTicksUntilNext = 0;
++    // The self-periodic hook (SelfPeriodicEffect.h, patch 0015): runs after
++    // the deploy, first after selfPeriodicTicksUntilNext, then every
++    // selfPeriodicIntervalTicks once it fires. selfPeriodicState is the
++    // effect's per-body memory (-1 = unset).
++    std::shared_ptr<ISelfPeriodicEffect> selfPeriodicEffect;
++    int selfPeriodicIntervalTicks = 0;
++    int selfPeriodicTicksUntilNext = 0;
++    int selfPeriodicState = -1;
++    // Attacks started, for effects that grow with them (Evolved Giant's rage
++    // radius).
++    int attacksStarted = 0;
++    // hp when it first acted, after level scaling: the ceiling for "at 50%
++    // health" checks. 0 until the first update.
++    int fullHp = 0;
++    // The level this body is at (CardLevels.h). scaleToLevel sets it;
++    // loseLevel (Evolved Electro Giant's Level Damper) steps it down.
++    int currentLevel = CardLevels::TOURNAMENT_LEVEL;
+     // Evolved Furnace: the faster interval used only while attacking (0 = none),
+     // and the alternating sideways spawn offset (0 = on the entity).
+     int periodicHotIntervalTicks = 0;
+@@ -681,6 +699,16 @@ public:
+         // deploying unit takes none of.
+         if (deploying) return;
+ 
++        if (fullHp <= 0) fullHp = hp;
++        if (selfPeriodicEffect && selfPeriodicIntervalTicks > 0) {
++            if (selfPeriodicTicksUntilNext > 0) selfPeriodicTicksUntilNext--;
++            if (selfPeriodicTicksUntilNext <= 0) {
++                selfPeriodicTicksUntilNext = selfPeriodicEffect->apply(board, *this)
++                    ? selfPeriodicIntervalTicks : 1;
++                if (hp <= 0) return;
++            }
++        }
++
+         if (periodicIntervalTicks > 0) {
+             // Evolved Furnace's Hot Spawning: the fast interval runs only while
+             // attacking (an attack started within one attack cycle), and going
+@@ -767,6 +795,7 @@ public:
+                     // direct hit, on arrival for a projectile).
+                     lastAttackDistance = dist;
+                     ticksSinceAttack = 0;
++                    attacksStarted++;
+                     // Reset here, not on projectile arrival: the only
+                     // grace-period card (Inferno Dragon Evolution) attacks
+                     // instantly.
+@@ -1048,6 +1077,7 @@ public:
+     // the flat secondary hits scale; multipliers and timings do not. Effect
+     // objects (on-hit, death, ability) keep their level-11 damage.
+     void scaleToLevel(int level) override {
++        if (CardLevels::isValid(level)) currentLevel = level;
+         hp = CardLevels::scale(hp, level);
+         damage = CardLevels::scale(damage, level);
+         shieldHp = CardLevels::scale(shieldHp, level);
+@@ -1057,6 +1087,22 @@ public:
+         transformCheckMaxHp = CardLevels::scale(transformCheckMaxHp, level);
+     }
+ 
++    // One level down (Evolved Electro Giant's Level Damper, patch 0015): hp,
++    // damage and shield shrink by one step of CardLevels::MULTIPLIER_PERCENT
++    // (about 9%), never below level 1 or 1 hp. Returns false at level 1.
++    virtual bool loseLevel() {
++        if (currentLevel <= CardLevels::MIN_LEVEL) return false;
++        const double f = static_cast<double>(CardLevels::MULTIPLIER_PERCENT[currentLevel - 2])
++                       / CardLevels::MULTIPLIER_PERCENT[currentLevel - 1];
++        auto down = [f](int v) { return v > 0 ? std::max(1, static_cast<int>(std::lround(v * f))) : v; };
++        currentLevel--;
++        hp = down(hp);
++        fullHp = down(fullHp);
++        damage = down(damage);
++        shieldHp = shieldHp > 0 ? static_cast<int>(std::lround(shieldHp * f)) : shieldHp;
++        return true;
++    }
++
+ protected:
+ 
+     int getCurrentDamage() const {
+diff --git a/include/entities/SelfPeriodicEffect.h b/include/entities/SelfPeriodicEffect.h
+new file mode 100644
+index 0000000..9d52658
+--- /dev/null
++++ b/include/entities/SelfPeriodicEffect.h
+@@ -0,0 +1,18 @@
++#pragma once
++#include "Entity.h"
++
++class CombatEntity;
++
++// A periodic hook that sees the entity it runs on (patch 0015): Evolved
++// Giant's rage trail, Evolved Elite Barbarians' spear, Evolved Electro Giant's
++// Level Damper. IPeriodicEffect only gets a position and a team.
++//
++// apply returns whether it fired. A fire restarts the full interval; a
++// decline (no target yet, hp still above a threshold) retries next tick.
++// Effect objects are shared by every body of a card, so per-body state lives
++// on the entity (CombatEntity::selfPeriodicState), never in the effect.
++class ISelfPeriodicEffect {
++public:
++    virtual ~ISelfPeriodicEffect() = default;
++    virtual bool apply(Board& board, CombatEntity& self) const = 0;
++};
+diff --git a/perception/mapping/card_map.json b/perception/mapping/card_map.json
+index 00966f1..7839127 100644
+--- a/perception/mapping/card_map.json
++++ b/perception/mapping/card_map.json
+@@ -373,7 +373,7 @@
+     "electrogiant": {
+       "real_name": "Electro Giant",
+       "sim_id": 84,
+-      "sim_evo_id": null,
++      "sim_evo_id": 179,
+       "cost": 7.0,
+       "is_spell": false,
+       "is_building": false,
+@@ -418,7 +418,7 @@
+     "elitebarbarians": {
+       "real_name": "Elite Barbarians",
+       "sim_id": 17,
+-      "sim_evo_id": null,
++      "sim_evo_id": 178,
+       "cost": 6.0,
+       "is_spell": false,
+       "is_building": false,
+@@ -583,7 +583,7 @@
+     "giant": {
+       "real_name": "Giant",
+       "sim_id": 2,
+-      "sim_evo_id": null,
++      "sim_evo_id": 177,
+       "cost": 5.0,
+       "is_spell": false,
+       "is_building": false,
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index 62d0151..a2939af 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -127,6 +127,9 @@ TEST_CASE("Every currently-defined card resolves with id/name/cost/isSpell", "[c
+         {153, "Goblin Drill", 4.0f, false}, // Evolution of id 98
+         {154, "Tesla", 4.0f, false}, // Evolution of id 26
+         {155, "Barbarians", 5.0f, false}, // Evolution of id 8
++        {177, "Giant", 5.0f, false}, // Evolution of id 2 (patch 0015)
++        {178, "Elite Barbarians", 6.0f, false}, // Evolution of id 17 (patch 0015)
++        {179, "Electro Giant", 7.0f, false}, // Evolution of id 84 (patch 0015)
+         {156, "Lumberjack", 4.0f, false}, // Evolution of id 21
+         {157, "Executioner", 5.0f, false}, // Evolution of id 36
+         {158, "Giant Snowball", 2.0f, true}, // Evolution of id 100
+diff --git a/tests/core/test_cards_0015.cpp b/tests/core/test_cards_0015.cpp
+new file mode 100644
+index 0000000..f27b823
+--- /dev/null
++++ b/tests/core/test_cards_0015.cpp
+@@ -0,0 +1,265 @@
++#include <catch_amalgamated.hpp>
++#include "test_helpers.h"
++#include "Board.h"
++#include "GameManager.h"
++#include "CardRegistry.h"
++#include "CardLevels.h"
++#include "CombatEntity.h"
++#include "Tower.h"
++#include "EvolutionSelfEffects.h"
++#include <cmath>
++#include <memory>
++#include <set>
++#include <vector>
++
++// Patch 0015: Evolved Giant (177), Evolved Elite Barbarians (178), Evolved
++// Electro Giant (179), on CombatEntity's self-periodic hook; Electro Giant's
++// damage (26 Aug 2026 notes) and Evolved Barbarians' rage length (4 Aug).
++
++namespace {
++
++constexpr int GIANT = 2, EVO_GIANT = 177;
++constexpr int ELITE_BARBARIANS = 17, EVO_ELITE_BARBARIANS = 178;
++constexpr int ELECTRO_GIANT = 84, EVO_ELECTRO_GIANT = 179;
++
++struct Match {
++    GameManager game;
++    Match() : game(std::vector<int>{ 0, 1, 2, 3, 4, 5, 6, 7 }, std::vector<int>{ 0, 1, 2, 3, 4, 5, 6, 7 }) {
++        game.seed(1);
++        game.reset();
++        for (const auto& e : game.getBoard().getEntities())
++            if (auto t = std::dynamic_pointer_cast<Tower>(e)) t->sleep();
++    }
++    Board& board() { return game.getBoard(); }
++    void step(int n = 1) { for (int i = 0; i < n; ++i) game.step(); }
++
++    std::vector<std::shared_ptr<CombatEntity>> spawnCard(int cardId, float x, float y, int team, bool evolved) {
++        std::set<int> before;
++        for (const auto& e : board().getEntities()) before.insert(e->id);
++        const CardDefinition* def = CardRegistry::getInstance().getCard(cardId);
++        if (evolved) def->spawnEvolvedEntity(x, y, team, board());
++        else def->spawnEntity(x, y, team, board());
++        board().commitPendingEntities();
++        std::vector<std::shared_ptr<CombatEntity>> out;
++        for (const auto& e : board().getEntities())
++            if (!before.count(e->id))
++                if (auto c = std::dynamic_pointer_cast<CombatEntity>(e)) out.push_back(c);
++        return out;
++    }
++    std::shared_ptr<StationaryCombatant> dummy(float x, float y, int team, int hp, bool flying = false) {
++        auto d = std::make_shared<StationaryCombatant>(board().allocateId(), x, y, hp, team, 0.5f, 0, 1000);
++        d->isFlying = flying;
++        spawn(board(), d);
++        return d;
++    }
++};
++
++// Exposes the current damage, which CombatEntity keeps protected.
++struct DamageProbe : StationaryCombatant {
++    using StationaryCombatant::StationaryCombatant;
++    int currentDamage() const { return getCurrentDamage(); }
++};
++
++}  // namespace
++
++TEST_CASE("Evolutions 177-179 are registered against their base cards", "[evolution][patch0015]") {
++    auto& reg = CardRegistry::getInstance();
++    const std::vector<std::pair<int, int>> pairs = {
++        { EVO_GIANT, GIANT }, { EVO_ELITE_BARBARIANS, ELITE_BARBARIANS }, { EVO_ELECTRO_GIANT, ELECTRO_GIANT } };
++    for (const auto& [evo, base] : pairs) {
++        const CardDefinition* e = reg.getCard(evo);
++        const CardDefinition* b = reg.getCard(base);
++        REQUIRE(e != nullptr);
++        REQUIRE(b != nullptr);
++        REQUIRE(e->isEvolution);
++        REQUIRE(e->name == b->name);
++        REQUIRE(e->cost == Catch::Approx(b->cost));
++        REQUIRE(e->hp == b->hp);
++        REQUIRE(e->evolutionCycleThreshold == 1);
++        REQUIRE(e->evolvedUsesGranted == 1);
++        REQUIRE(faceCardIdOf(evo) == base);
++    }
++}
++
++TEST_CASE("Electro Giant deals 184 (26 Aug 2026 notes), base and Evolution", "[evolution][patch0015]") {
++    REQUIRE(CardRegistry::getInstance().getCard(ELECTRO_GIANT)->stats->damage == 184);
++    REQUIRE(CardRegistry::getInstance().getCard(EVO_ELECTRO_GIANT)->stats->damage == 184);
++}
++
++TEST_CASE("Evolved Barbarians' Blade Rage lasts 5 s (4 Aug 2026 notes)", "[evolution][patch0015]") {
++    const CardDefinition* def = CardRegistry::getInstance().getCard(155);
++    REQUIRE(def->evolvedStats != nullptr);
++    REQUIRE(def->evolvedStats->selfHasteDurationTicks == 50);
++}
++
++TEST_CASE("only the evolved forms carry the self-periodic ability", "[evolution][patch0015]") {
++    for (int base : { GIANT, ELITE_BARBARIANS, ELECTRO_GIANT }) {
++        Match m;
++        for (const auto& c : m.spawnCard(base, 9.0f, 8.0f, 0, false)) REQUIRE(c->selfPeriodicEffect == nullptr);
++    }
++    for (int evo : { EVO_GIANT, EVO_ELITE_BARBARIANS, EVO_ELECTRO_GIANT }) {
++        Match m;
++        const auto plain = m.spawnCard(evo, 9.0f, 8.0f, 0, false);
++        for (const auto& c : plain) REQUIRE(c->selfPeriodicEffect == nullptr);
++        const auto evolved = m.spawnCard(evo, 9.0f, 8.0f, 0, true);
++        REQUIRE_FALSE(evolved.empty());
++        for (const auto& c : evolved) REQUIRE(c->selfPeriodicEffect != nullptr);
++    }
++}
++
++// ---------------- Evolved Giant ----------------
++
++TEST_CASE("Evolved Giant's rage trail starts at half health and widens with his attacks",
++        "[evolution][evo_giant][patch0015]") {
++    Board board;
++    auto giant = std::make_shared<StationaryCombatant>(board.allocateId(), 9.0f, 10.0f, 4000, 0, 1.2f, 0, 12);
++    giant->fullHp = 4000;
++    spawn(board, giant);
++    auto near = std::make_shared<StationaryCombatant>(board.allocateId(), 10.9f, 10.0f, 500, 0, 0.5f, 0, 1000);
++    auto mid = std::make_shared<StationaryCombatant>(board.allocateId(), 11.9f, 10.0f, 500, 0, 0.5f, 0, 1000);
++    auto far = std::make_shared<StationaryCombatant>(board.allocateId(), 12.6f, 10.0f, 500, 0, 0.5f, 0, 1000);
++    auto foe = std::make_shared<StationaryCombatant>(board.allocateId(), 10.0f, 10.0f, 500, 1, 0.5f, 0, 1000);
++    for (auto& e : { near, mid, far, foe }) spawn(board, e);
++
++    const EvoGiantRageTrailEffect trail(0.5f, 2.0f, 0.5f, 3.5f, 1.35f, 15);
++    giant->hp = 2001;
++    REQUIRE_FALSE(trail.apply(board, *giant));     // above half: nothing yet
++    REQUIRE(near->buffTicksRemaining == 0);
++
++    giant->hp = 2000;
++    giant->attacksStarted = 7;
++    REQUIRE(trail.apply(board, *giant));
++    REQUIRE(giant->selfPeriodicState == 7);
++    REQUIRE(giant->buffDamageMultiplier == Catch::Approx(1.35f));  // he is in his own trail
++    REQUIRE(near->buffTicksRemaining == 15);
++    REQUIRE(near->buffDamageMultiplier == Catch::Approx(1.35f));
++    REQUIRE(mid->buffTicksRemaining == 0);          // 2.9 tiles > 2.0
++    REQUIRE(foe->buffTicksRemaining == 0);          // enemies are never enraged
++
++    giant->attacksStarted = 9;                      // two attacks since: radius 3.0
++    REQUIRE(trail.apply(board, *giant));
++    REQUIRE(mid->buffTicksRemaining == 15);
++    REQUIRE(far->buffTicksRemaining == 0);          // 3.6 tiles
++
++    giant->attacksStarted = 30;                     // capped at 3.5
++    giant->hp = 4000;                               // once triggered, it stays on
++    REQUIRE(trail.apply(board, *giant));
++    REQUIRE(far->buffTicksRemaining == 0);
++}
++
++TEST_CASE("an evolved Giant in a match enrages after dropping to half health",
++        "[evolution][evo_giant][patch0015]") {
++    Match m;
++    auto giant = m.spawnCard(EVO_GIANT, 9.0f, 8.0f, 0, true).at(0);
++    m.step(15);                                     // deployed, acting
++    REQUIRE(giant->fullHp > 0);
++    REQUIRE(giant->buffTicksRemaining == 0);
++    giant->hp = giant->fullHp / 2;
++    m.step(2);
++    REQUIRE(giant->buffTicksRemaining > 0);
++    REQUIRE(giant->buffDamageMultiplier == Catch::Approx(1.35f));
++}
++
++// ---------------- Evolved Elite Barbarians ----------------
++
++TEST_CASE("Evolved Elite Barbarians throw a 220 spear at a ground troop 3-4.5 tiles away and enrage",
++        "[evolution][evo_elite_barbarians][patch0015]") {
++    Board board;
++    auto barb = std::make_shared<StationaryCombatant>(board.allocateId(), 9.0f, 10.0f, 1341, 0, 1.2f, 0, 12);
++    spawn(board, barb);
++    auto ally = std::make_shared<StationaryCombatant>(board.allocateId(), 9.0f, 9.0f, 500, 0, 0.5f, 0, 1000);
++    auto close = std::make_shared<StationaryCombatant>(board.allocateId(), 9.0f, 12.5f, 1000, 1, 0.5f, 0, 1000);
++    auto air = std::make_shared<StationaryCombatant>(board.allocateId(), 9.0f, 13.5f, 1000, 1, 0.5f, 0, 1000);
++    air->isFlying = true;
++    for (auto& e : { ally, close, air }) spawn(board, e);
++
++    const EvoEliteBarbarianSpearEffect spear(3.0f, 4.5f, 220, 1.35f, 25, 1.5f);
++    REQUIRE_FALSE(spear.apply(board, *barb));       // 2.5 tiles is too close; air is never a target
++    REQUIRE(close->hp == 1000);
++    REQUIRE(air->hp == 1000);
++
++    auto inBand = std::make_shared<StationaryCombatant>(board.allocateId(), 9.0f, 14.0f, 1000, 1, 0.5f, 0, 1000);
++    auto nearer = std::make_shared<StationaryCombatant>(board.allocateId(), 12.5f, 10.0f, 1000, 1, 0.5f, 0, 1000);
++    spawn(board, inBand);
++    spawn(board, nearer);
++    REQUIRE(spear.apply(board, *barb));
++    REQUIRE(nearer->hp == 1000 - 220);              // the nearest one in the band (3.5 < 4.0)
++    REQUIRE(inBand->hp == 1000);
++    REQUIRE(barb->buffTicksRemaining == 25);
++    REQUIRE(ally->buffTicksRemaining == 25);
++    REQUIRE(close->buffTicksRemaining == 0);
++}
++
++TEST_CASE("an evolved Elite Barbarian recharges the spear every 5 s", "[evolution][evo_elite_barbarians][patch0015]") {
++    Match m;
++    auto barbs = m.spawnCard(EVO_ELITE_BARBARIANS, 9.0f, 8.0f, 0, true);
++    REQUIRE(barbs.size() == 2);
++    for (auto& b : barbs) {
++        REQUIRE(b->selfPeriodicIntervalTicks == 50);
++        REQUIRE(b->selfPeriodicTicksUntilNext == 1);
++    }
++}
++
++// ---------------- Evolved Electro Giant ----------------
++
++TEST_CASE("Level Damper takes one level off nearby enemies, not Crown Towers, not below level 1",
++        "[evolution][evo_electro_giant][patch0015]") {
++    Board board;
++    auto eg = std::make_shared<StationaryCombatant>(board.allocateId(), 9.0f, 10.0f, 3952, 0, 1.2f, 0, 12);
++    spawn(board, eg);
++    auto foe = std::make_shared<DamageProbe>(board.allocateId(), 9.0f, 15.5f, 2560, 1, 0.5f, 256, 1000);
++    auto out = std::make_shared<StationaryCombatant>(board.allocateId(), 9.0f, 16.5f, 2560, 1, 0.5f, 256, 1000);
++    auto friendly = std::make_shared<StationaryCombatant>(board.allocateId(), 9.0f, 11.0f, 2560, 0, 0.5f, 256, 1000);
++    spawn(board, foe);
++    for (auto& e : { out, friendly }) spawn(board, e);
++
++    const LevelDamperEffect damper(6.0f);
++    REQUIRE(damper.apply(board, *eg));
++    REQUIRE(foe->currentLevel == CardLevels::TOURNAMENT_LEVEL - 1);
++    // One step of CardLevels::MULTIPLIER_PERCENT: 256 -> 233 (level 11 -> 10).
++    REQUIRE(foe->hp == 2330);
++    REQUIRE(foe->currentDamage() == 233);
++    REQUIRE(out->hp == 2560);                       // 6.5 tiles
++    REQUIRE(friendly->hp == 2560);
++
++    REQUIRE(damper.apply(board, *eg));              // cumulative
++    REQUIRE(foe->currentLevel == CardLevels::TOURNAMENT_LEVEL - 2);
++    REQUIRE(foe->hp == 2120);                       // 2330 * 212 / 233
++
++    foe->currentLevel = CardLevels::MIN_LEVEL;
++    const int hp = foe->hp;
++    REQUIRE(damper.apply(board, *eg));
++    REQUIRE(foe->hp == hp);
++}
++
++TEST_CASE("an evolved Electro Giant's first Level Damper pulse lands 2.5 s after the deploy, then every 6 s",
++        "[evolution][evo_electro_giant][patch0015]") {
++    Match m;
++    auto eg = m.spawnCard(EVO_ELECTRO_GIANT, 9.0f, 8.0f, 0, true).at(0);
++    auto foe = m.dummy(9.0f, 12.0f, 1, 10000);
++    auto tower = [&]() -> std::shared_ptr<Entity> {
++        for (const auto& e : m.board().getEntities()) if (e->isTower() && e->team == 1) return e;
++        return nullptr;
++    }();
++    REQUIRE(tower != nullptr);
++    const int towerHp = tower->hp;
++
++    int firstLoss = -1;
++    for (int t = 1; t <= 120 && firstLoss < 0; ++t) {
++        m.step();
++        if (foe->currentLevel < CardLevels::TOURNAMENT_LEVEL) firstLoss = t;
++    }
++    // Deploy (DEPLOY_TIME_TICKS) then 25 ticks, +-1 for the hook's ordering.
++    REQUIRE(firstLoss >= DEPLOY_TIME_TICKS + 24);
++    REQUIRE(firstLoss <= DEPLOY_TIME_TICKS + 27);
++    m.step(59);
++    REQUIRE(foe->currentLevel == CardLevels::TOURNAMENT_LEVEL - 1);
++    m.step(2);
++    REQUIRE(foe->currentLevel == CardLevels::TOURNAMENT_LEVEL - 2);
++    REQUIRE(foe->hp < 10000);
++
++    // Crown Towers are exempt: a pulse centred on one leaves it whole.
++    eg->position = tower->position;
++    REQUIRE(LevelDamperEffect(6.0f).apply(m.board(), *eg));
++    REQUIRE(tower->hp == towerHp);
++}
+diff --git a/tests/core/test_sight_range.cpp b/tests/core/test_sight_range.cpp
+index 0a3b2b1..913bb52 100644
+--- a/tests/core/test_sight_range.cpp
++++ b/tests/core/test_sight_range.cpp
+@@ -334,6 +334,9 @@ const SightRow SIGHT_CATALOG[] = {
+         { 173, "Hero Mega Minion", 5.5f },
+         { 175, "Hero Ice Golem", 7.0f },
+         { 176, "Minion Giant", 7.5f },
++        { 177, "Giant", 7.5f },
++        { 178, "Elite Barbarians", 5.5f },
++        { 179, "Electro Giant", 5.5f },
+ };
+ } // namespace
+ 

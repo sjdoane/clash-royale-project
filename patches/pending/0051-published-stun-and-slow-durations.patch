@@ -1,0 +1,236 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 07ae6bf..2c0c753 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1121,6 +1121,36 @@ lists as an Inferno reset.
+   `tests/entities/test_combat_entity.cpp` (lock, ramp and Sparky reset on a
+   stun but not on a slow).
+ 
++## 2026-11-22: stun and slow durations from the published buff times (patch 0051)
++
++**GAMEPLAY-AFFECTING.** The game data (FirstLight-Zero card_specs.json /
++projectiles.json, release 15.535.13) names the buff each card applies and its
++time. Compared with every `FreezeOnHit` in the registry:
++
++| card | published | engine before | now |
++|---|---|---|---|
++| Zap (and its Evolution) | ZapFreeze 500 ms | **no stun** | 5 ticks, full stop |
++| Lightning | ZapFreeze 500 ms on the bolt | **no stun** | 5 ticks, full stop |
++| Electro Spirit | ZapFreeze 500 ms | 8 ticks | 5 |
++| Zappies | ZapFreeze 500 ms | 3 ticks | 5 |
++| Ice Wizard, Hero Ice Wizard | IceWizardSlowDown 2500 ms | 30 ticks at 0.65 | 25 at 0.65 |
++| Giant Snowball (and its Evolution's base form) | IceWizardSlowDown 3000 ms | 15 ticks at 0.5 | 30 at 0.65 |
++| Electro Wizard, Electro Dragon, Ice Spirit, Freeze (3.5 s, note of 8 Sep), Ice Golem (2.5 s, note of 8 Sep) | | already right | |
++
++- The table gives buff names and times, not strengths. The Snowball's 0.65 is
++  the Ice Wizard's, because the table gives both the same buff
++  (`IceWizardSlowDown`); the Ice Wizard's own 35 % is the wiki value the
++  registry already had.
++- Not changed, not published in the extract: the Ice Golem's slow strength
++  (0.70 here; its buff `FreezeIceGolemite` has no record), Earthquake's
++  (`Earthquake` buff, 1000 ms refreshed every 0.1 s for 3 s; here a 3 s slow
++  of attack and movement per wave), the evolved Snowball's 4 s at 0.7, the
++  Electro Giant's reflected ZapFreeze (a periodic area stun stands in).
++- With patch 0050 a Zap on a Princess Tower costs it 0.5 s of arrows and a
++  retarget, nothing more.
++- Tests: `python_ai/tests/test_published_stun_and_slow_durations.py`,
++  `tests/core/test_card_registry.cpp` (`[patch0051]`).
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index fd29876..ef6ff22 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -634,7 +634,7 @@ private:
+         // Ice Wizard fires a projectile; the slow lands on arrival.
+         add(troop(34, "Ice Wizard", 3.0f, Archetype::RangedSquad, 689, SPEED_MEDIUM, 5.5f, 90, 17, 'i')
+             .withTargetsAir()
+-            .withOnHit(std::make_shared<FreezeOnHit>(30, 0.65f))
++            .withOnHit(std::make_shared<FreezeOnHit>(25, 0.65f) /* published: IceWizardSlowDown 2500 ms (was 30 ticks) */)
+             .withSplash(1.5f) /* audit 0003: wiki Ice Wizard, level 11 */);
+ 
+         // Executioner's axe hits on arrival and again 1.5 s later on the
+@@ -732,11 +732,15 @@ private:
+             .withKnockback(1.0f)
+             // audit 0003: wiki Fireball, level 11; Crown Tower damage: CrownTowerDamage.h
+             .withThrownFromKingTower(600));
+-        add(spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z') /* audit 0003: wiki Zap, level 11; Crown Tower damage: CrownTowerDamage.h */);
++        add(spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z')
++            .withSpellOnHit(std::make_shared<FreezeOnHit>(5, 0.0f)) /* published: ZapFreeze 500 ms */
++            /* audit 0003: wiki Zap, level 11; Crown Tower damage: CrownTowerDamage.h */);
+         add(spell(30, "Rocket", 6.0f, 2.0f, 1485, 15, 'r')
+             .withKnockback(1.0f) /* audit 0003: wiki Rocket, level 11; Crown Tower damage: CrownTowerDamage.h */
+             .withThrownFromKingTower(350));
+-        add(spell(31, "Lightning", 6.0f, 3.5f, 1057, 5, 'j') /* audit 0003: wiki Lightning, level 11; Crown Tower damage: CrownTowerDamage.h */);
++        add(spell(31, "Lightning", 6.0f, 3.5f, 1057, 5, 'j')
++            .withSpellOnHit(std::make_shared<FreezeOnHit>(5, 0.0f)) /* published: ZapFreeze 500 ms */
++            /* audit 0003: wiki Lightning, level 11; Crown Tower damage: CrownTowerDamage.h */);
+         // Poison: 92 damage every second for 8 s; whoever stands in it takes
+         // each pulse. A Crown Tower takes 21 per pulse (168 in all: official
+         // June 2026 notes, fixed in game on 26 Aug), and enemy troops inside
+@@ -940,7 +944,7 @@ private:
+         add(troop(75, "Electro Spirit", 1.0f, Archetype::RangedSquad, 215, SPEED_VERY_FAST, 2.5f, 99, 10, '>')
+             .withTargetsAir()
+             .withSplitTargets(2)
+-            .withOnHit(std::make_shared<FreezeOnHit>(8, 0.0f))
++            .withOnHit(std::make_shared<FreezeOnHit>(5, 0.0f)) /* published: ZapFreeze 500 ms (was 8 ticks) */
+             .withDieAfterFirstHit());
+ 
+         // === Swarms (expansion) ===
+@@ -958,7 +962,7 @@ private:
+         add(troop(79, "Zappies", 4.0f, Archetype::RangedSquad, 529, SPEED_MEDIUM, 4.5f, 117, 23, '[')
+             .withOffsets({ {0.0f, 0.0f}, {0.6f, 0.0f}, {-0.6f, 0.0f} })
+             .withTargetsAir()
+-            .withOnHit(std::make_shared<FreezeOnHit>(3, 0.0f)).withSightRange(5.0f) /* audit 0003: wiki Zappies, level 11 */);
++            .withOnHit(std::make_shared<FreezeOnHit>(5, 0.0f) /* published: ZapFreeze 500 ms (was 3 ticks) */).withSightRange(5.0f) /* audit 0003: wiki Zappies, level 11 */);
+         // withSightRange(6.0f), like the single Musketeer (id 6): three of her,
+         // with attackRange 6.0.
+         add(troop(80, "Three Musketeers", 9.0f, Archetype::RangedSquad, 906, SPEED_MEDIUM, 6.0f, 204, 13, ']')
+@@ -1080,7 +1084,7 @@ private:
+ 
+         // === Spells (expansion) ===
+         add(spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+-            .withSpellOnHit(std::make_shared<FreezeOnHit>(15, 0.5f))
++            .withSpellOnHit(std::make_shared<FreezeOnHit>(30, 0.65f) /* published: IceWizardSlowDown 3000 ms, the Ice Wizard's own slow (was 15 ticks at 0.5) */)
+             .withKnockback(1.0f) /* audit 0003: wiki Giant Snowball, level 11; Crown Tower damage: CrownTowerDamage.h */
+             .withThrownFromKingTower(800));
+         // Barbarian Barrel: rolls 4.5 tiles at width 2.6 (published), and its
+@@ -1265,8 +1269,12 @@ private:
+         // Zap ("Triple Shock"): three zaps instead of one. The growing radius
+         // between zaps is not modelled; the 3-tick gap is not sourced.
+         addEvolution(124,
+-            spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z') /* audit 0003: wiki Zap, level 11; Crown Tower damage: CrownTowerDamage.h */,
+-            spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z').withRepeats(3, 3) /* audit 0003: wiki Zap/Evolution, level 11; Crown Tower damage: CrownTowerDamage.h */,
++            spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z')
++                .withSpellOnHit(std::make_shared<FreezeOnHit>(5, 0.0f)) /* published: ZapFreeze 500 ms */
++                /* audit 0003: wiki Zap, level 11; Crown Tower damage: CrownTowerDamage.h */,
++            spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z').withRepeats(3, 3)
++                .withSpellOnHit(std::make_shared<FreezeOnHit>(5, 0.0f)) /* published: ZapFreeze 500 ms */
++                /* audit 0003: wiki Zap/Evolution, level 11; Crown Tower damage: CrownTowerDamage.h */,
+             2, 1);
+ 
+         // Skeletons ("Never-ending Horde"): see evolvedSkeletonChildStats.
+@@ -1665,7 +1673,7 @@ private:
+         // not modelled.
+         addEvolution(158,
+             spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+-                .withSpellOnHit(std::make_shared<FreezeOnHit>(15, 0.5f))
++                .withSpellOnHit(std::make_shared<FreezeOnHit>(30, 0.65f) /* published: IceWizardSlowDown 3000 ms, the Ice Wizard's own slow (was 15 ticks at 0.5) */)
+                 .withKnockback(1.0f) /* audit 0003: wiki Giant Snowball, level 11; Crown Tower damage: CrownTowerDamage.h */
+                 .withThrownFromKingTower(800),
+             spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+@@ -1952,7 +1960,7 @@ private:
+         // end early when the Snowman dies.
+         add(troop(183, "Hero Ice Wizard", 3.0f, Archetype::RangedSquad, 689, SPEED_MEDIUM, 5.5f, 90, 17, 'i')
+             .withTargetsAir()
+-            .withOnHit(std::make_shared<FreezeOnHit>(30, 0.65f))
++            .withOnHit(std::make_shared<FreezeOnHit>(25, 0.65f) /* published: IceWizardSlowDown 2500 ms (was 30 ticks) */)
+             .withSplash(1.5f)
+             .withHeroAbility(2.0f, 0, std::make_shared<HeroIceWizardSnowmanEffect>(heroIceWizardSnowmanStats(),
+                 5.5f, 2.5f, 46, 50), 1));
+diff --git a/python_ai/tests/test_published_stun_and_slow_durations.py b/python_ai/tests/test_published_stun_and_slow_durations.py
+new file mode 100644
+index 0000000..05716f7
+--- /dev/null
++++ b/python_ai/tests/test_published_stun_and_slow_durations.py
+@@ -0,0 +1,50 @@
++"""Stun and slow durations follow the published buff times (patch 0051).
++
++The game data (FirstLight-Zero card_specs.json / projectiles.json, release
++15.535.13) names the buff a card applies and for how long. `ZapFreeze` and
++`Freeze` are full stops (factor 0), `IceWizardSlowDown` is the Ice Wizard's
++35 % slow (factor 0.65), whoever applies it. The official notes after the
++release changed two of the times (Freeze 4 -> 3.5 s, Ice Golem 2 -> 2.5 s, both
++8 Sep 2026).
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++
++# card id, form, path to the effect, published buff, ticks, factor
++PUBLISHED = [
++    (29, "base", ("spell_on_hit",), "Zap: ZapFreeze 500 ms", 5, 0.0),
++    (124, "base", ("spell_on_hit",), "Zap (Evolution's base form): ZapFreeze 500 ms", 5, 0.0),
++    (124, "evolved", ("spell_on_hit",), "Zap Evolution: ZapFreeze 500 ms", 5, 0.0),
++    (31, "base", ("spell_on_hit",), "Lightning: LighningSpell ZapFreeze 500 ms", 5, 0.0),
++    (75, "base", ("on_hit",), "Electro Spirit: ZapFreeze 500 ms", 5, 0.0),
++    (79, "base", ("on_hit",), "Zappies: BuffOnDamage ZapFreeze 500 ms", 5, 0.0),
++    (57, "base", ("on_hit",), "Electro Dragon: ZapFreeze 500 ms", 5, 0.0),
++    (72, "base", ("on_hit",), "Ice Spirit: Freeze 1100 ms", 11, 0.0),
++    (34, "base", ("on_hit",), "Ice Wizard: IceWizardSlowDown 2500 ms", 25, 0.65),
++    (183, "base", ("on_hit",), "Hero Ice Wizard: as the Ice Wizard", 25, 0.65),
++    (100, "base", ("spell_on_hit",), "Giant Snowball: IceWizardSlowDown 3000 ms", 30, 0.65),
++    (158, "base", ("spell_on_hit",), "Giant Snowball (Evolution's base form)", 30, 0.65),
++    (107, "base", ("spell_on_hit",), "Freeze: 3.5 s since 8 Sep 2026 (release 4000 ms)", 35, 0.0),
++    (40, "base", ("death_effect", "on_hit"), "Ice Golem: slow 2.5 s since 8 Sep 2026", 25, None),
++]
++
++
++def test_stun_and_slow_durations_are_the_published_buff_times():
++    wrong = []
++    for cid, form, path, source, ticks, factor in PUBLISHED:
++        node = E.get_card_stats(cid)[form]
++        for key in path:
++            node = node.get(key) if isinstance(node, dict) else None
++        if not isinstance(node, dict) or node.get("type") != "freeze":
++            wrong.append((cid, source, "no stun or slow at all", node))
++            continue
++        if node["ticks"] != ticks or (factor is not None and abs(node["slow_factor"] - factor) > 1e-6):
++            wrong.append((cid, source, node))
++    assert not wrong, "\n".join(map(str, wrong))
++
++
++def test_a_stun_is_a_full_stop_and_the_ice_wizards_slow_is_one_strength():
++    assert E.get_card_stats(29)["base"]["spell_on_hit"]["slow_factor"] == 0.0
++    ice_wizard = E.get_card_stats(34)["base"]["on_hit"]["slow_factor"]
++    snowball = E.get_card_stats(100)["base"]["spell_on_hit"]["slow_factor"]
++    assert ice_wizard == snowball
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index 40f176e..d4ebfd8 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -720,8 +720,8 @@ TEST_CASE("Ice Wizard is genuinely ranged: freeze lands with the arrow, not when
+     auto projectile = std::dynamic_pointer_cast<Projectile>(board.getEntities().back());
+     REQUIRE(projectile != nullptr);
+ 
+-    projectile->update(board); // projectile speed 1.5 >= distance 1.0: lands this tick
+-    REQUIRE(enemy->freezeTicks == 30);
++    projectile->update(board); // projectile speed 1.46 >= distance 1.0: lands this tick
++    REQUIRE(enemy->freezeTicks == 25); // published IceWizardSlowDown 2500 ms (patch 0051)
+     REQUIRE(enemy->freezeSlow == Catch::Approx(0.65f));
+ }
+ 
+@@ -884,8 +884,30 @@ TEST_CASE("Giant Snowball deals damage and applies a partial slow via spellOnHit
+     while (spell->isAlive()) spell->update(board);
+ 
+     REQUIRE(enemy->hp == 821); // 1000 - 179
+-    REQUIRE(enemy->freezeTicks == 15);
+-    REQUIRE(enemy->freezeSlow == Catch::Approx(0.5f));
++    // Published: TargetBuff IceWizardSlowDown for 3000 ms, the Ice Wizard's own
++    // slow (35 %). It was 1.5 s at 50 % (patch 0051).
++    REQUIRE(enemy->freezeTicks == 30);
++    REQUIRE(enemy->freezeSlow == Catch::Approx(0.65f));
++}
++
++TEST_CASE("Zap and Lightning stun for 0.5 s", "[card_registry][spell_on_hit][patch0051]") {
++    // Published: Zap's area effect and Lightning's bolt carry ZapFreeze for
++    // 500 ms. Neither stunned at all before patch 0051.
++    for (int cardId : { 29, 31, 124 }) {
++        INFO(cardId);
++        Board board;
++        auto enemy = std::make_shared<StationaryCombatant>(1, 5.0f, 6.0f, 100000, 1, 5.0f, 10, 10);
++        spawn(board, enemy);
++        CardRegistry::getInstance().getCard(cardId)->spawnEntity(5.0f, 5.0f, 0, board);
++        board.commitPendingEntities();
++        auto spell = std::dynamic_pointer_cast<AreaSpell>(board.getEntities().back());
++        REQUIRE(spell != nullptr);
++        int updates = 0;
++        while (spell->isAlive() && enemy->hp == 100000 && updates++ < 100) spell->update(board);
++        REQUIRE(enemy->hp < 100000);
++        REQUIRE(enemy->freezeTicks == 5);
++        REQUIRE(enemy->freezeSlow == Catch::Approx(0.0f));
++    }
+ }
+ 
+ TEST_CASE("Battle Ram releases 2 Barbarians on death, reusing the Barbarians card's own sourced stats", "[card_registry][death]") {

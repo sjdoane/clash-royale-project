@@ -1,0 +1,193 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 2de346e..aef871e 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -785,6 +785,28 @@ RoyaleAPI cards_stats.json, which agree. New table `include/core/SightClips.h`
+   `tests/core/test_sight_range.cpp` ("a published sight clip cuts the sideways
+   reach"; the raw-range case now uses the unclipped Battle Ram).
+ 
++## 2026-11-22: Crown Towers compete for targets by their body (patch 0043)
++
++**GAMEPLAY-AFFECTING.** `Tower::getTargetingRadius` (3.3 Princess / 4.4 King)
++is gone; a tower is ranked in `findTarget` by its collision radius (1.5 / 2.0)
++like every other building.
++
++- Why it existed: fitted upstream to one observation, "a Cannon 7-8 tiles
++  off-lane does not pull a Hog, one at 6 does". That is the published sight
++  clip (patch 0042, `SightClips.h`), which now carries it.
++- What it broke: every troop, not only building-targeters, saw a tower as 1.8
++  tiles nearer than it is. Skeletons, an Ice Golem or a Cannon played in front
++  of the tower once the attacker was within about 5 tiles did not distract it:
++  a Knight walked past an Ice Golem two tiles in front of the tower (750 tower
++  damage, now 0); a Hog ignored a Cannon played 1.5 s late beside the tower
++  (634, now 0). In replays "the attacker walks past a defender unit that is
++  nearer than the tower" was flagged in 19% of first-excess-damage events.
++- Published tower collision radii are 1.0 / 1.4; the engine's 1.5 / 2.0 bodies
++  are unchanged here (they also set tower reach and where units stop).
++- Tests: `python_ai/tests/test_towers_compete_for_targets_by_their_body.py`,
++  `tests/core/test_sight_range.cpp` ("a Crown Tower competes for targets by its
++  body").
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/SightClips.h b/include/core/SightClips.h
+index 5fe45cd..5b4e92e 100644
+--- a/include/core/SightClips.h
++++ b/include/core/SightClips.h
+@@ -42,7 +42,7 @@
+ // Before this table the engine had the disc only, and got the "a Cannon 7-8
+ // tiles off-lane does not pull a Hog" observation by inflating the Crown
+ // Towers' targeting footprint instead (Tower::getTargetingRadius, removed in
+-// the next patch).
++// patch 0043).
+ //
+ // Sources: FLZ = FirstLight-Zero card_specs.json (release 15.535.13), CRAPI =
+ // RoyaleAPI cr-api-data cards_stats.json (older files; the two agree wherever
+diff --git a/include/entities/Entity.h b/include/entities/Entity.h
+index a6a8bd3..cf3f21b 100644
+--- a/include/entities/Entity.h
++++ b/include/entities/Entity.h
+@@ -83,8 +83,8 @@ public:
+     virtual float getCollisionRadius() const { return 0.0f; }
+ 
+     // Footprint for target-selection distance only, never collision or attack
+-    // range. A Crown Tower's is larger than its body, since units close on its
+-    // edge (see Tower::getTargetingRadius).
++    // range. Nothing overrides it since patch 0043: every building, Crown
++    // Towers included, competes by its body.
+     virtual float getTargetingRadius() const { return getCollisionRadius(); }
+ 
+     // Re-applies board bounds and river constraints. Only Troop overrides it;
+diff --git a/include/entities/Tower.h b/include/entities/Tower.h
+index 628aff3..d3ea3f3 100644
+--- a/include/entities/Tower.h
++++ b/include/entities/Tower.h
+@@ -25,14 +25,14 @@ public:
+     static constexpr float DEFAULT_PROJECTILE_TILES_PER_TICK = 2.0f;
+     float projectileTilesPerTick = DEFAULT_PROJECTILE_TILES_PER_TICK;
+ 
+-    // Target-selection footprint, larger than the collision radius and fitted
+-    // to real play: a Hog with a Cannon 7-8 tiles off-lane keeps walking at the
+-    // Princess Tower and diverts only at 6. Against a Cannon's 1.0 that needs
+-    // 2.92 < r < 3.65; 3.3 is mid-band. The King's is scaled by the same 2.0 /
+-    // 1.5 ratio as its collision radius.
+-    float getTargetingRadius() const override {
+-        return (symbol == 'R') ? 4.4f : 3.3f;
+-    }
++    // Target selection uses the collision radius above, like every other
++    // building (Entity::getTargetingRadius): the nearest footprint wins. Until
++    // patch 0043 a Crown Tower competed with an inflated footprint (3.3 / 4.4),
++    // fitted so that a Cannon 7-8 tiles off-lane would not pull a Hog Rider.
++    // That fact is the published sight clip (SightClips.h, patch 0042); the
++    // inflated footprint also made every troop prefer a tower over a unit up
++    // to 1.8 tiles nearer, so Skeletons, an Ice Golem or a Cannon played in
++    // front of the tower did not distract.
+ 
+     bool isTower() const override { return true; }
+ 
+diff --git a/python_ai/tests/test_towers_compete_for_targets_by_their_body.py b/python_ai/tests/test_towers_compete_for_targets_by_their_body.py
+new file mode 100644
+index 0000000..d72eda9
+--- /dev/null
++++ b/python_ai/tests/test_towers_compete_for_targets_by_their_body.py
+@@ -0,0 +1,72 @@
++"""A Crown Tower is chosen as a target by its body, like any building (patch 0043).
++
++Target selection is "nearest footprint in sight". Until this patch a Princess
++Tower's footprint for that comparison was 3.3 tiles (King 4.4) against a body
++of 1.5 (published collision radius 1.0), so a troop preferred the tower over a
++defender up to 1.8 tiles nearer. The number had been fitted to one observation
++(a Cannon 7-8 tiles off-lane does not pull a Hog Rider), which is the published
++sight clip (patch 0042). What it broke is ordinary defence: an Ice Golem,
++Skeletons or a Cannon played in front of the tower when the attacker is already
++close did not distract it.
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++
++NOOP = 4
++KNIGHT, HOG, CANNON, ICE_GOLEM, SKELETONS = 0, 15, 129, 40, 125
++OURS = [129, 168, 125, 15, 40, 72, 33, 7]
++
++
++def _defend(attacker, card, x, y, delay, ticks=400):
++    """Team 1 drops `attacker` at its left bridge; `delay` ticks later team 0
++    answers with `card` at (x, y). -> (Princess Tower HP lost, whether the
++    attacker ever targeted a team-0 unit that is not a Crown Tower)."""
++    deck = [attacker] + [c for c in (4, 12, 112, 61, 20, 14, 26, 24) if c != attacker][:7]
++    env = E.ClashRoyaleEnv(list(OURS), deck, 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    env.set_elixir_for_team(0, 10.0)
++    env.set_elixir_for_team(1, 10.0)
++    assert env.set_hand_for_team(0, [card] + [c for c in OURS if c != card][:3])
++    assert env.set_hand_for_team(1, deck[:4])
++    before = env.get_tower_hp(0, 1)
++    env.step_self_play(NOOP, 0.0, 0.0, 0, 3.0, 15.0, delay)
++    env.step_self_play(0, float(x), float(y), NOOP, 0.0, 0.0, 1)
++    distracted = False
++    for _ in range(ticks):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        units = env.get_units()
++        towers = {u["id"] for u in units if u["tower"]}
++        ours = {u["id"] for u in units if u["team"] == 0}
++        for u in units:
++            if u["team"] == 1 and u["card_id"] == attacker and u["target_id"] in ours - towers:
++                distracted = True
++    return before - env.get_tower_hp(0, 1), distracted
++
++
++def test_an_ice_golem_played_beside_the_tower_takes_a_knight_off_it():
++    # The Knight is 3 s past the bridge, about 7 tiles from the tower; the Ice
++    # Golem lands two tiles in front of the tower. The Knight reaches the Golem
++    # first, and under the tower's fire never gets to the tower. (Before: it
++    # walked past the Golem and did a lone Knight's full 750.)
++    alone, _ = _defend(KNIGHT, ICE_GOLEM, 16, 2, 30)      # Golem far away: no help
++    lost, distracted = _defend(KNIGHT, ICE_GOLEM, 3, 8, 30)
++    assert alone >= 600
++    assert distracted
++    assert lost == 0
++
++
++def test_a_late_cannon_in_front_of_the_tower_still_pulls_a_hog():
++    # Cannon 1.5 s after the Hog, two tiles in front of the tower and two to
++    # the side. Its body is nearer than the tower's the whole way down the
++    # lane. (Before: the Hog ignored it and hit the tower twice.)
++    lost, distracted = _defend(HOG, CANNON, 5, 8, 15)
++    assert distracted
++    assert lost == 0
++
++
++def test_a_tower_still_wins_when_it_is_the_nearer_one():
++    # A Cannon behind the Princess Tower does not pull a Hog off it.
++    lost, distracted = _defend(HOG, CANNON, 7, 3, 15)
++    assert not distracted
++    assert lost >= 317
+diff --git a/tests/core/test_sight_range.cpp b/tests/core/test_sight_range.cpp
+index 70dddd4..d0c0b94 100644
+--- a/tests/core/test_sight_range.cpp
++++ b/tests/core/test_sight_range.cpp
+@@ -495,10 +495,21 @@ TEST_CASE("the nearest-building rule holds for every catalogued sight range",
+     INFO("card id " << card << ", catalogued sight " << sight);
+ 
+     REQUIRE(driftAt(card, LANE_Y, 7.0f) == Catch::Approx(0.0f).margin(0.05f));
+-    // 3.0 centre => rank 2.0 against the tower's 6.0 - 3.3 = 2.7.
++    // 3.0 centre => rank 2.0 against the tower's 6.0 - 1.5 = 4.5.
+     REQUIRE(driftAt(card, LANE_Y, 3.0f) < -0.3f);
+ }
+ 
++TEST_CASE("a Crown Tower competes for targets by its body, like any building",
++          "[targeting][nearest_building][tower_footprint]") {
++    // Patch 0043. At y = 11 the Princess Tower at (14, 6) is 5.0 away: 3.5 to
++    // its 1.5 body. A Cannon 4.0 to the side is 3.0 to its body, so it is the
++    // nearer building and pulls; at 5.0 (4.0 to its body) the tower is nearer.
++    // With the old 3.3 tower footprint the tower "was" 1.7 away and a Hog
++    // walked past a Cannon standing right beside its path.
++    REQUIRE(driftAt(15, 11.0f, 4.0f) < -0.3f);
++    REQUIRE(driftAt(15, 11.0f, 5.0f) > -0.05f);
++}
++
+ TEST_CASE("sight still bounds acquisition at the raw catalogued range",
+           "[targeting][sight][centre_to_centre]") {
+     // Rule 1 alone. At y = 20 the tower is 14.0 away, so the Cannon is always

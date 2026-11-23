@@ -1,0 +1,87 @@
+{
+ "protocol": "Opponent spell casts on YouTube 2.6 matches (runs/live/vid_<vid>.yolo.jsonl, 4 Hz, made by live_ppo/eval/video_frames.py). Each cast is labelled by viewing frames: (1) a blind 2 fps contact-sheet pass over the match and (2) a full-resolution check of EVERY spell track the detector built in the match, whether it emitted, merged or dropped it. t is the video second of the first 4 Hz frame in which the spell is visible. For every labelled cast this was also YOLO's first sighting, so 'first sighting - label' is 0 by construction; the latency that counts is emission - label. Bias: step (2) only shows casts YOLO saw at least once, and step (1) at sheet scale missed a real Barbarian Barrel, so a cast YOLO never fires on may be missing from these labels. Recall here is therefore an upper bound. 'ambiguous' casts are not scored either way. Classes are YOLO class names; they map to engine cards through opp_plays.card_for_class.",
+ "videos": {
+  "QD_1suWFNKo": {
+   "matches": [
+    [4, 150],
+    [154, 446]
+   ],
+   "casts": [
+    [82.5, "barbarian-barrel"],
+    [176.0, "barbarian-barrel"],
+    [181.25, "poison"],
+    [228.5, "barbarian-barrel"],
+    [270.75, "graveyard"],
+    [275.25, "poison"],
+    [305.0, "graveyard"],
+    [311.0, "poison"],
+    [331.5, "graveyard"],
+    [336.25, "poison"],
+    [370.25, "poison"],
+    [378.0, "graveyard"],
+    [379.0, "barbarian-barrel"],
+    [390.75, "poison"],
+    [408.5, "graveyard"],
+    [416.0, "poison"],
+    [419.5, "graveyard"],
+    [421.5, "barbarian-barrel"],
+    [428.5, "poison"]
+   ],
+   "ambiguous": [
+    [410.5, "barbarian-barrel"]
+   ],
+   "notes": "Opponent deck: Graveyard / Poison / Barbarian Barrel. Every Rage track in these matches is a false sprite (our placement circle, our 'Boule de feu' label, pink beams)."
+  },
+  "uVf1EUszTIM": {
+   "matches": [
+    [466, 638]
+   ],
+   "casts": [
+    [467.75, "goblin-barrel"],
+    [514.75, "goblin-barrel"],
+    [562.5, "goblin-barrel"],
+    [578.75, "goblin-barrel"],
+    [598.25, "goblin-barrel"],
+    [624.75, "goblin-barrel"]
+   ],
+   "ambiguous": [],
+   "notes": "Opponent Goblin Barrel deck. Every barrel is seen flying from the opponent's king toward our towers. Single-hit Fireball explosions at 563.5 and 613.75 are fire-spirit / unit hits, not casts."
+  },
+  "iVgmnDX-GPY": {
+   "matches": [
+    [4, 256],
+    [584, 876]
+   ],
+   "casts": [
+    [39.25, "giant-snowball"],
+    [108.25, "giant-snowball"],
+    [143.75, "giant-snowball"],
+    [170.75, "graveyard"],
+    [178.0, "giant-snowball"],
+    [204.75, "graveyard"],
+    [207.25, "giant-snowball"],
+    [237.0, "graveyard"],
+    [238.75, "giant-snowball"],
+    [248.25, "poison"],
+    [585.0, "fireball"],
+    [622.5, "fireball"],
+    [675.0, "barbarian-barrel"],
+    [708.25, "fireball"],
+    [740.0, "fireball"],
+    [754.25, "fireball"],
+    [782.25, "fireball"],
+    [793.75, "barbarian-barrel"],
+    [804.5, "fireball"],
+    [814.0, "barbarian-barrel"],
+    [821.75, "fireball"],
+    [837.5, "barbarian-barrel"],
+    [843.25, "fireball"],
+    [850.25, "barbarian-barrel"],
+    [854.5, "fireball"],
+    [861.5, "barbarian-barrel"]
+   ],
+   "ambiguous": [],
+   "notes": "Match 1: the static 'Giant Snowball' at 4.5 s is the video's Subscribe overlay. Match 2 (window opens at 584 so it includes the first Fireball at 585.0): the opponent Fireballs our right princess tower again and again; each one is confirmed by its HP falling 253 (4352 -> 4099 -> ... -> 2328). Zap at 839.25 = placement circles. Our own Fireballs fly from our king toward theirs, and our Logs roll away from us."
+  }
+ }
+}

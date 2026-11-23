@@ -1,0 +1,304 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 98b24a1..c40ecd4 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -463,6 +463,33 @@ Princess Tower), one across the board later. Every win rate earned before this
+ date describes different spell timing. Checkpoints still load — the
+ observation and the action space did not move.
+ 
++## 2026-11-21: a knockback stops a charge (patch 0031)
++
++A Prince hit by The Log kept his charge: `chargeProgress` was only ever
++cleared by landing a hit, so his first swing on the tower was the doubled one
++(782) whether or not he had been knocked back. The real Log resets the charge
++of Prince and Dark Prince (published). Now `pushAway` and `pushAlong` call
++`Entity::onKnockedBack()`, and `CombatEntity` drops a charge that was building
++or held. Two existing rules are kept: a charge that has stuck (Evolved Battle
++Ram) stays, and a dash past its point of immunity (Bandit) is not stopped.
++
++- It applies to EVERY knockback (The Log, Fireball, Giant Snowball, Rocket)
++  and EVERY charging card (Prince, Dark Prince, Battle Ram, Ram Rider, ...).
++  Only The Log on Prince / Dark Prince is published; the rest is the same rule
++  applied uniformly, not separately sourced.
++- A pull (`pullToward`: Tornado, hooks) does NOT reset. Stuns and freezes do
++  not reset either; in the real game they do. Not changed here.
++- Measured through the bindings: Prince injected at (3, 16) against our left
++  Princess Tower, Log at (3, 8) cast 15-25 ticks later: first hit 391 instead
++  of 782. A Log cast at tick 10 knocks him back far enough to run three tiles
++  again and he still lands 782, as he should.
++- Tests: `tests/entities/test_combat_entity.cpp` (`[charge][knockback]`),
++  `python_ai/tests/test_knockback_resets_charge.py`.
++
++**GAMEPLAY-AFFECTING** for any deck with a charging card on either side;
++none is in `DEFAULT_DECK`, but The Log and Fireball are, and they are now
++worth more against those cards. Checkpoints still load.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index 06db671..bbffa30 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -193,6 +193,20 @@ public:
+ 
+     bool isCharging() const { return chargeThreshold > 0.0f && chargeProgress >= chargeThreshold; }
+ 
++    // A knockback (The Log, Fireball, Giant Snowball, Rocket) stops a charge:
++    // the distance run so far is lost and the troop must run chargeThreshold
++    // tiles again before its next hit is a charged one. Published for The Log
++    // against Prince and Dark Prince; the same rule is applied to every
++    // knockback and every charging card. Two exceptions already in the
++    // engine are kept: a charge that has stuck (Evolved Battle Ram) stays,
++    // and a dash that is past the point of immunity (Bandit) is not stopped
++    // by a spell that could not hurt it.
++    void onKnockedBack() override {
++        if (chargeThreshold <= 0.0f || chargeHasStuck) return;
++        if (chargeGrantsInvulnerability && chargeProgress >= chargeThreshold * 0.5f) return;
++        chargeProgress = 0.0f;
++    }
++
+     // Sticky charge (Evolved Battle Ram): once reached, the charge bonus
+     // applies to every hit for the rest of its life. chargeHasStuck is
+     // internal.
+diff --git a/include/entities/Entity.h b/include/entities/Entity.h
+index 836442a..f438973 100644
+--- a/include/entities/Entity.h
++++ b/include/entities/Entity.h
+@@ -128,6 +128,11 @@ public:
+         const std::unordered_map<int, std::shared_ptr<Entity>>& byOldId) {
+         (void)byOldId;
+     }
++
++    // Called by pushAway / pushAlong after they have moved this entity: a
++    // knockback is an interruption, not just a displacement (CombatEntity
++    // drops a charge that was building).
++    virtual void onKnockedBack() {}
+ };
+ 
+ // Repositioning helpers shared by every pull and push (hooks, Tornado,
+@@ -136,6 +141,8 @@ public:
+ //
+ // All of them are no-ops on a building, enforced here once rather than at each
+ // call site. Nothing may move an entity by writing `position` directly.
++// The two pushes (pushAway, pushAlong) also tell the entity it was knocked back
++// (Entity::onKnockedBack); the pulls and the lane mirror do not.
+ inline bool exemptFromForcedMovement(const Entity& entity) {
+     return entity.isBuilding();
+ }
+@@ -171,6 +178,7 @@ inline void pushAway(Entity& entity, const Vector2D& point, float distance) {
+     if (dist <= 0.01f) return; // coincident: no direction
+     entity.position.x += (entity.position.x - point.x) / dist * distance;
+     entity.position.y += (entity.position.y - point.y) / dist * distance;
++    entity.onKnockedBack();
+ }
+ 
+ // Moves `entity` `distance` tiles along an explicit direction, with the same
+@@ -184,4 +192,5 @@ inline void pushAlong(Entity& entity, float dirX, float dirY, float distance) {
+     if (len <= 0.0001f) return; // no direction
+     entity.position.x += dirX / len * distance;
+     entity.position.y += dirY / len * distance;
++    entity.onKnockedBack();
+ }
+\ No newline at end of file
+diff --git a/python_ai/tests/test_knockback_resets_charge.py b/python_ai/tests/test_knockback_resets_charge.py
+new file mode 100644
+index 0000000..438ec7a
+--- /dev/null
++++ b/python_ai/tests/test_knockback_resets_charge.py
+@@ -0,0 +1,65 @@
++"""A knockback stops a charge: The Log on a Prince running at a tower.
++
++Published for The Log against Prince and Dark Prince. The Prince's first hit
++on the Princess Tower is the doubled one only if nothing knocked him back on
++the way (or he had the room to run his three tiles again afterwards).
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++
++ID = {E.get_card_info(c)["name"]: c for c in E.get_all_card_ids()}
++NOOP = 4
++OURS = [15, 6, 25, 40, 24, 72, 33, 7]                  # holds The Log and Fireball
++THEIRS = [ID["Goblin Barrel"], 4, 12, 112, 61, 20, ID["Prince"], 2]
++LEFT_X = 3.0
++
++
++def _first_tower_hit(start_y, card=None, at=None, cast_tick=None, charger="Prince"):
++    """Damage and tick of the charger's first hit on our left Princess Tower."""
++    env = E.ClashRoyaleEnv(list(OURS), list(THEIRS), 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    env.inject(ID[charger], LEFT_X, start_y, 1, -1.0, 0)
++    hp = env.get_tower_hp(0, 1)
++    for tick in range(1, 140):
++        if card is not None and tick == cast_tick + 1:
++            env.set_elixir_for_team(0, 10.0)
++            assert env.set_hand_for_team(0, [card] + [c for c in OURS if c != card][:3])
++            spent = env.get_elixir_spent(0)
++            env.step_self_play(0, at[0], at[1], NOOP, 0.0, 0.0, 1)
++            assert env.get_elixir_spent(0) > spent, "the play was refused"
++        else:
++            env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        now = env.get_tower_hp(0, 1)
++        if now < hp:
++            return hp - now, tick
++    raise AssertionError("the tower was never hit")
++
++
++def test_an_unanswered_prince_lands_the_doubled_hit():
++    plain, _ = _first_tower_hit(start_y=10.5)          # too short a run to charge
++    charged, _ = _first_tower_hit(start_y=16.0)
++    assert charged == 2 * plain
++
++
++def test_a_log_that_catches_him_near_the_tower_costs_him_the_charge():
++    plain, _ = _first_tower_hit(start_y=10.5)
++    _, unanswered_tick = _first_tower_hit(start_y=16.0)
++    for cast_tick in (15, 20, 25):
++        dealt, tick = _first_tower_hit(16.0, ID["The Log"], (LEFT_X, 8.0), cast_tick)
++        assert dealt == plain, cast_tick
++        assert tick > unanswered_tick, cast_tick       # and he arrives later
++
++
++def test_a_log_far_from_the_tower_leaves_him_room_to_charge_again():
++    plain, _ = _first_tower_hit(start_y=10.5)
++    _, unanswered_tick = _first_tower_hit(start_y=16.0)
++    dealt, tick = _first_tower_hit(16.0, ID["The Log"], (LEFT_X, 11.0), 3)
++    assert tick > unanswered_tick                      # the Log did catch him
++    assert dealt == 2 * plain
++
++
++def test_a_fireball_knockback_costs_him_the_charge_too():
++    plain, _ = _first_tower_hit(start_y=10.5)
++    dealt, _ = _first_tower_hit(16.0, ID["Fireball"], (LEFT_X, 10.0), 25)
++    assert dealt == plain
+diff --git a/tests/entities/test_combat_entity.cpp b/tests/entities/test_combat_entity.cpp
+index a213c68..6b2fe0b 100644
+--- a/tests/entities/test_combat_entity.cpp
++++ b/tests/entities/test_combat_entity.cpp
+@@ -1,6 +1,7 @@
+ #include <catch_amalgamated.hpp>
+ #include "test_helpers.h"
+ #include "MeleeTroop.h"
++#include "AreaSpell.h"
+ #include "CappedSpawnOnHitEffect.h"
+ #include "PoisonOnHit.h"
+ #include "Building.h"
+@@ -885,6 +886,117 @@ TEST_CASE("chargeIsSticky keeps every subsequent hit charged instead of resettin
+     REQUIRE(target->hp == 10000 - 200 - 200 - 200);
+ }
+ 
++// --- a knockback stops a charge (The Log on a Prince) ---
++
++namespace {
++// A charger one tick's run (4.0 tiles, past the 3.0 threshold) from being in
++// reach of a 10000-hp target at (0, 5): after one update it stands at (0, 4),
++// charged, with the hit still to come.
++std::shared_ptr<MeleeTroop> chargedAttacker(Board& board, std::shared_ptr<DummyEntity>& target) {
++    target = std::make_shared<DummyEntity>(1, 0.0f, 5.0f, 10000, 1);
++    spawn(board, target);
++    auto attacker = std::make_shared<MeleeTroop>(2, 0.0f, 0.0f, 100, 0, 4.0f, 1.0f, 100, 10, 'p');
++    attacker->setIgnoresRiver(true);
++    attacker->chargeThreshold = 3.0f;
++    attacker->chargeMultiplier = 2.0f;
++    spawn(board, attacker);                  // on the board, so a spell finds it
++    attacker->update(board);
++    REQUIRE(attacker->isCharging());
++    REQUIRE(target->hp == 10000);
++    return attacker;
++}
++}
++
++TEST_CASE("A knockback throws away the charge a troop had built", "[combat_entity][charge][knockback]") {
++    SECTION("a push along a direction, as from a rolling Log") {
++        Board board;
++        std::shared_ptr<DummyEntity> target;
++        auto attacker = chargedAttacker(board, target);
++        pushAlong(*attacker, 0.0f, -1.0f, 0.5f); // back to (0, 3.5), still in reach
++        REQUIRE(attacker->chargeProgress == 0.0f);
++        REQUIRE_FALSE(attacker->isCharging());
++        attacker->update(board);
++        REQUIRE(target->hp == 10000 - 100); // a plain hit, not the doubled one
++    }
++    SECTION("a push away from a point, as from a Fireball") {
++        Board board;
++        std::shared_ptr<DummyEntity> target;
++        auto attacker = chargedAttacker(board, target);
++        // An enemy spell just behind the target's side of the attacker: 10
++        // damage and 0.5 tiles of knockback, thrown straight back.
++        AreaSpell spell(3, 0.0f, 4.3f, 1, 2.5f, 10, 0, '*', nullptr, false, 1, 0, false, 1.0f, 0, 0.5f);
++        spell.update(board);
++        REQUIRE(attacker->hp == 90);
++        REQUIRE(attacker->position.y == Catch::Approx(3.5f));
++        REQUIRE(attacker->chargeProgress == 0.0f);
++        attacker->update(board);
++        REQUIRE(target->hp == 10000 - 100);
++    }
++    SECTION("without the knockback the same hit is the charged one") {
++        Board board;
++        std::shared_ptr<DummyEntity> target;
++        auto attacker = chargedAttacker(board, target);
++        attacker->update(board);
++        REQUIRE(target->hp == 10000 - 200);
++    }
++}
++
++TEST_CASE("A knocked-back charger has to run the whole distance again", "[combat_entity][charge][knockback]") {
++    Board board;
++    auto target = std::make_shared<DummyEntity>(1, 0.0f, 12.0f, 10000, 1);
++    spawn(board, target);
++    auto attacker = std::make_shared<MeleeTroop>(2, 0.0f, 0.0f, 100, 0, 1.0f, 1.0f, 100, 10, 'p');
++    attacker->setIgnoresRiver(true);
++    attacker->chargeThreshold = 3.0f;
++    attacker->chargeMultiplier = 2.0f;
++    attacker->sightRange = 20.0f;                          // sees the target from the start
++
++    for (int i = 0; i < 2; ++i) attacker->update(board);   // 2.0 of the 3.0 run
++    REQUIRE(attacker->chargeProgress == Catch::Approx(2.0f));
++    pushAlong(*attacker, 0.0f, -1.0f, 0.8f);
++    REQUIRE(attacker->chargeProgress == 0.0f);
++    for (int i = 0; i < 2; ++i) attacker->update(board);
++    REQUIRE_FALSE(attacker->isCharging());                 // 2.0 again, not 4.0
++    for (int i = 0; i < 2; ++i) attacker->update(board);
++    REQUIRE(attacker->isCharging());                       // 4.0 since the knock
++}
++
++TEST_CASE("A pull does not stop a charge, and a knockback leaves a stuck charge and an immune dash alone",
++          "[combat_entity][charge][knockback]") {
++    SECTION("a pull toward a point (Tornado, a hook) is not a knockback") {
++        Board board;
++        std::shared_ptr<DummyEntity> target;
++        auto attacker = chargedAttacker(board, target);
++        pullToward(*attacker, Vector2D{ 0.0f, 0.0f }, 0.5f);
++        REQUIRE(attacker->isCharging());
++    }
++    SECTION("a charge that has stuck (Evolved Battle Ram) stays") {
++        Board board;
++        std::shared_ptr<DummyEntity> target;
++        auto attacker = chargedAttacker(board, target);
++        attacker->chargeIsSticky = true;
++        attacker->update(board);                 // charged hit: the charge sticks
++        REQUIRE(target->hp == 10000 - 200);
++        REQUIRE(attacker->chargeHasStuck);
++        pushAlong(*attacker, 0.0f, -1.0f, 0.5f);
++        REQUIRE(attacker->isCharging());
++    }
++    SECTION("a dash past the point of immunity (Bandit) is not stopped") {
++        Board board;
++        std::shared_ptr<DummyEntity> target;
++        auto attacker = chargedAttacker(board, target);
++        attacker->chargeGrantsInvulnerability = true;
++        pushAlong(*attacker, 0.0f, -1.0f, 0.5f);
++        REQUIRE(attacker->isCharging());
++    }
++    SECTION("a troop with no charge is only moved") {
++        MeleeTroop plain(2, 0.0f, 0.0f, 100, 0, 1.0f, 1.0f, 100, 10, 'p');
++        pushAway(plain, Vector2D{ 0.0f, 1.0f }, 0.5f);
++        REQUIRE(plain.position.y == Catch::Approx(-0.5f));
++        REQUIRE(plain.chargeProgress == 0.0f);
++    }
++}
++
+ TEST_CASE("A card without charge configured (chargeThreshold 0, the default) never deals bonus damage", "[combat_entity][charge]") {
+     Board board;
+     auto target = std::make_shared<DummyEntity>(1, 0.0f, 5.0f, 10000, 1);

@@ -1,0 +1,110 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 92bf85c..541245b 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1311,6 +1311,105 @@ Test: `tests/core/test_cards_0015.cpp` `[patch0055]` (the registered evolved
+ pair throws one spear each at a troop in the band and is enraged for exactly
+ 20 updates).
+ 
++## 2026-11-22: one ability charge per deployment, none while deploying (patch 0080)
++
++**GAMEPLAY-AFFECTING.** Every Champion and Hero ability changes when it can be
++pressed. Datasets and checkpoints built on an earlier engine saw other
++readiness bits and other cooldown fractions.
++
++Three rules, each from two independent sources: the published table of release
++15.535.13 (`card_specs.json`, game of 4 Aug 2026; the later official notes of
++26 Aug, 8 Sep, 16 Sep, 6 Oct and 19 Oct 2026 change no ability charge, cooldown
++or cost), and the human replay set (60,000 sides holding exactly one Champion
++or Hero for the per-deployment counts, 20,000 sides for the delays).
++
++| rule | published | recorded | engine before |
++|---|---|---|---|
++| one charge per deployment, no cooldown | every ability `MaxCharges: 1` and no `Cooldown` | 0 repeated presses on one deployment for every card but Boss Bandit (Golden Knight 0 with 7,247 press / redeploy / press sequences, Mighty Miner 0 / 3,778, Hero Berserker 0 / 11,299) | the seven older Champions had a 12-30 s cooldown and unlimited uses (Mighty Miner 130 ticks, Golden Knight 120, Skeleton King 200, Archer Queen 170, Monk 170, Little Prince 300, Goblinstein 170) |
++| Boss Bandit: two charges, 3 s apart | `MaxCharges: 2, Cooldown: 3000` | 599 repeats, never closer than 3.9 s | already so |
++| a new body has a fresh charge | a charge belongs to the character | 251 Golden Knight presses come under 12 s after the previous one, each on a new body (Mighty Miner 221 under 13 s, Archer Queen 229 under 17 s) | the slot's cooldown was carried to the next body and FROZEN while no body was alive |
++| nothing while the body deploys | every carrier `DeployTime: 1000` | 1st percentile of the delay from card to press is 1.2 s or more for every card (33,848 presses) | ready one tick after the play |
++
++What changed:
++
++- `CardRegistry.h`: the seven Champions are `withChampionAbility(cost, 0,
++  effect, 1)`. Costs were already the published ones (all 23 published
++  abilities checked, test below).
++- `GameManager::isChampionAbilityReady` and `activateChampionAbility` refuse
++  while `deployTicksRemaining > 0`. First ready tick is 10 after the play
++  for every card, 25 for Hero Mega Minion (its 1.5 s lockout), 27 for Hero
++  Barbarian Barrel (its Barbarian lands 17 ticks after the card).
++- `CombatEntity`: the ability cooldown does not run while deploying, so Hero
++  Mega Minion's lockout counts from landing.
++- `GameManager::trackSlotEntities`: a new body keeps its own cooldown and
++  inherits nothing. It used to overwrite the body's cooldown with the slot's,
++  which also wiped Hero Mega Minion's lockout (ready on tick 1).
++  `championCooldownRemaining` is 0 with no live body.
++
++What this did to replayed human presses (4,000 validation matches, both
++sides, `training/ghost.py` unchanged): dropped presses 18.5% -> 15.1%; the
++cause "Champion cooldown carried over" went from 319 drops to 4. Of what
++remains, nine in ten are a body that is already dead in the simulation when
++the human pressed (the replay diverged; the body had been dead for a median
++of 4.8 s), and a wrong slot on sides holding two such cards (the recorded
++press lists both cards; `ghost.py` takes the first). Trying the other slot
++when the first is not ready brings the share to 8.9% (measured with a
++prototype; `training/ghost.py` itself is not changed by this patch).
++
++Observation side effect: "cooldown left / max" of the own ability block and
++the opponent's estimated cooldown fraction are 0 for every card but Boss
++Bandit now, since there is no cooldown. Nothing in the observation says "the
++charge on the current body is spent" for the OPPONENT; for the own side the
++ready bit says it.
++
++NOT changed, because nothing published in that release decides it or it is a
++larger piece of work:
++
++- **Cast time and trigger delay.** Published per ability (`CastTime` 0 to
++  2500 ms, `TriggerDelay` 0 to 933 ms; Hero Bowler 2500 / 200, Hero Dark
++  Prince 2000 / 50, Hero Knight 1200 / 150, the older Champions 933). Every
++  ability here takes effect on the tick it is pressed.
++- **Hero Mega Minion's lockout.** 15 ticks here, from the official note that
++  introduced it; the release table has `Cooldown: 1000` on the ability. With
++  15 the first ready tick is 25; the recorded 1st and 5th percentile of the
++  delay are 27 and 30 ticks, which either value satisfies.
++- **Hero Barbarian Barrel** is published `CanBePreCasted: true` (pressable
++  before the Barbarian is out); here it waits for the Barbarian. Recorded 1st
++  percentile 26 ticks.
++- **Hero Goblins.** The Banner is pressable only after the squad is wiped,
++  for 70 ticks. The release publishes the ability on a flag building (cost 1,
++  cast 500 ms) but not the window.
++- **Goblinstein.** The release puts the ability on the Doctor; here it is on
++  the Monster.
++- **Hero Ice Wizard, Hero Electro Wizard** have no ability record in that
++  release and appear in no recorded deck; they follow the same rules here.
++- **Boss Bandit on a redeploy.** The new body starts with two charges and no
++  cooldown. Nothing published says whether the 3 s carries over.
++- Effect parameters of the Hero abilities (damage, radius, duration) were not
++  re-checked: the action groups they point at are not in the published file.
++
++Tests: `python_ai/tests/test_ability_charges_and_deploy.py` (99: no press
++before the body has deployed and nothing charged for trying, published cost,
++one charge over 40 s, Boss Bandit's two, fresh charge on a redeploy, the
++newest body owns the button, the Mega Minion lockout); C++
++`tests/core/test_game_manager.cpp`, `test_champion_abilities.cpp`,
++`test_snapshot_champion_state.cpp`, `test_deck_audit_item32.cpp` and four
++others updated to the new rules. Suites: 1196 passed, 3 skipped (Python);
++828 cases, 827 passed, 1 failed as expected (C++).
++
++## 2026-11-22: the engine's count of ability activations is readable (patch 0081)
++
++No behaviour change. `ClashEnv::getAbilityActivations(team)` and
++`getAbilityElixirSpent(team)`, bound as `get_ability_activations` and
++`get_ability_elixir_spent`, read the per-team counters `MatchStatistics`
++already kept. `get_elixir_spent` counts cards only, and a raised ability flag
++is not an activation (not ready, still deploying, too little elixir left
++after the same tick's card), so counting flags over-counts: over 190
++measured matches the scripted teacher raised 2.91 flags a match on a slot the
++engine reported ready, and the engine activated 2.47 times.
++
++Test: `python_ai/tests/test_ability_activation_counts.py`.
++
+ ## 2026-11-22: the Hog 2.6 offence checked end to end, tests only (patch 0056)
+ 
+ No behaviour change. The simulated Hog 2.6 side scores 0.51 crowns a match

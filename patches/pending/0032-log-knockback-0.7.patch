@@ -1,0 +1,44 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index c40ecd4..f5ae916 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1460,7 +1460,7 @@ advancing every tick and damaging each target **at most once**.
+ 
+ | | width | range | speed | knockback |
+ |---|---|---|---|---|
+-| The Log (33) | 3.9 | 10.1 | 0.34 tiles/tick (measured) | 0.8 |
++| The Log (33) | 3.9 | 10.1 | 0.34 tiles/tick (measured) | 0.7 (published; 0.8 until patch 0032, 2026-11-21) |
+ | Barbarian Barrel (101, 174) | 2.6 | 4.5 | 0.5 tiles/tick | none |
+ 
+ **The Log's speed is measured, not guessed** (UPSTREAM_REQUESTS.md item 43). It
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index 34fe98d..8651b15 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -732,10 +732,12 @@ private:
+         // rolls in 3 videos took 2.96 s median motion start to stop, and the
+         // moving-phase slope was 3.47 screen tiles/s (UPSTREAM_REQUESTS.md
+         // item 43). It agrees with the published speed 200 read as 60 = 1
+-        // tile/s (3.33). Knockback (0.8) is not sourced.
++        // tile/s (3.33). Knockback 0.7 tiles is the published pushback (700; 0.7
++        // tiles since the 7/2/2023 balance update), on the scale that gives
++        // Fireball its 1.0. It was an unsourced 0.8.
+         add(spell(33, "The Log", 2.0f, 3.9f, 269, 8, 'o')
+             .withGroundOnly()
+-            .withRollingSweep(10.1f, 3.9f, 0.34f, 0.8f)
++            .withRollingSweep(10.1f, 3.9f, 0.34f, 0.7f)
+             .withCrownTowerDamage(35)); // audit 0003: wiki The Log, level 11 (13% since 1/6/2026)
+ 
+         // --- the 2026 roster expansion (ids 46+) ---
+diff --git a/tests/entities/test_area_spell.cpp b/tests/entities/test_area_spell.cpp
+index 4c15436..ab71fb7 100644
+--- a/tests/entities/test_area_spell.cpp
++++ b/tests/entities/test_area_spell.cpp
+@@ -467,6 +467,7 @@ TEST_CASE("The Log rolls at the measured 0.34 tiles/tick and still reaches the t
+     const auto& stats = *CardRegistry::getInstance().getCard(33)->stats;
+     REQUIRE(stats.spellRollSpeed == Catch::Approx(0.34f));
+     REQUIRE(stats.spellRollRange == Catch::Approx(10.1f));
++    REQUIRE(stats.spellRollKnockback == Catch::Approx(0.7f)); // published pushback, 700
+ 
+     const float towerY = ArenaLayout::princessY(1);
+     Board board;

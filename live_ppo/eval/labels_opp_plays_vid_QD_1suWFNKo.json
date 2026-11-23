@@ -1,0 +1,10720 @@
+{
+ "src": "vid_QD_1suWFNKo",
+ "protocol": "Opponent-play labels. Events come from the deploy stopwatch, not from YOLO: every\ntroop/building play shows a gold-rimmed stopwatch at the deploy point whose face\nfills RED for the opponent (BLUE for us) over the deploy time. /tmp/opp/watch.py\n(Hough circle + ring/face colour test, 4 Hz frames) finds them; consecutive\ndetections are merged into one event (same place, gaps <= 0.75 s). frame = first\nframe the watch is seen (+-0.25 s at 4 Hz), ref = watch centre (549x976 ref px),\ntile_yolo = video_dataset/detector/common.ref_to_tile(ref), tile_engine = (x, live_ppo/tile_map.det_to_engine_y(y, \"tower\")) -- the project's tower-anchored row map (identity to det row 13, +1 on 14-17, +2 from 18).\ntier \"gold\": every event in the match was checked by eye on zoomed filmstrips\n(-> side, false watch hits removed, card named only when readable by eye, else \"?\").\ntier \"silver\": unverified events with >= 2 red detections (label precision measured\non the gold matches). Spells have no stopwatch: on gold matches with\nspells_labelled, spell plays were added by eye from YOLO spell-track candidates\nand blind sheet review (id_source / src_event say which); spell recall is\ntherefore relative to what either source surfaced.\n\n\nRound 3 (2026-11-18): gold troop cards named on dev for identity tuning. Sheets of 220 px crops at +0/+0.5/+1/+2/+3 s around each watch, viewed blind first (id_source 'eye'); for plays not readable blind, the YOLO classes born within 4 tiles / 4 s were then shown and kept only when the crop agreed (id_source 'yolo+eye', biased toward plays YOLO sees). id_conf high/moderate. 10 of 34 stay '?'.",
+ "windows": [
+  {
+   "match": 0,
+   "a": 225,
+   "b": 9120,
+   "complete": false,
+   "tier": "gold",
+   "spells_labelled": false
+  },
+  {
+   "match": 1,
+   "a": 9135,
+   "b": 26880,
+   "complete": false,
+   "tier": "silver",
+   "spells_labelled": false
+  },
+  {
+   "match": 2,
+   "a": 26895,
+   "b": 33165,
+   "complete": false,
+   "tier": "silver",
+   "spells_labelled": false
+  },
+  {
+   "match": 3,
+   "a": 33180,
+   "b": 43380,
+   "complete": false,
+   "tier": "gold",
+   "spells_labelled": false
+  },
+  {
+   "match": 4,
+   "a": 43395,
+   "b": 54675,
+   "complete": false,
+   "tier": "silver",
+   "spells_labelled": false
+  },
+  {
+   "match": 5,
+   "a": 54840,
+   "b": 65610,
+   "complete": false,
+   "tier": "silver",
+   "spells_labelled": false
+  },
+  {
+   "match": 6,
+   "a": 65625,
+   "b": 83520,
+   "complete": false,
+   "tier": "silver",
+   "spells_labelled": false
+  },
+  {
+   "match": 7,
+   "a": 83730,
+   "b": 95220,
+   "complete": false,
+   "tier": "silver",
+   "spells_labelled": false
+  },
+  {
+   "match": 8,
+   "a": 95235,
+   "b": 112500,
+   "complete": false,
+   "tier": "silver",
+   "spells_labelled": false
+  },
+  {
+   "match": 9,
+   "a": 112515,
+   "b": 122895,
+   "complete": false,
+   "tier": "silver",
+   "spells_labelled": false
+  },
+  {
+   "match": 10,
+   "a": 123135,
+   "b": 139080,
+   "complete": false,
+   "tier": "silver",
+   "spells_labelled": false
+  },
+  {
+   "match": 11,
+   "a": 139275,
+   "b": 157005,
+   "complete": false,
+   "tier": "silver",
+   "spells_labelled": false
+  },
+  {
+   "match": 12,
+   "a": 157305,
+   "b": 166620,
+   "complete": false,
+   "tier": "silver",
+   "spells_labelled": false
+  }
+ ],
+ "plays": [
+  {
+   "id": "0.0",
+   "match": 0,
+   "frame": 480,
+   "t": 10.75,
+   "card": "Royal Hogs",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    385
+   ],
+   "tile_yolo": [
+    2.0,
+    16.85
+   ],
+   "tile_engine": [
+    2.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "4 pig riders",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch",
+   "id_conf": "high"
+  },
+  {
+   "id": "0.1",
+   "match": 0,
+   "frame": 705,
+   "t": 14.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    131,
+    384
+   ],
+   "tile_yolo": [
+    3.03,
+    16.9
+   ],
+   "tile_engine": [
+    3.03,
+    17.9
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "single small unit, unreadable",
+   "tier": "gold",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "0.2",
+   "match": 0,
+   "frame": 990,
+   "t": 19.25,
+   "card": "Royal Ghost",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    303
+   ],
+   "tile_yolo": [
+    2.99,
+    20.77
+   ],
+   "tile_engine": [
+    2.99,
+    22.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "translucent sword ghost; YOLO agrees",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch",
+   "id_conf": "moderate"
+  },
+  {
+   "id": "0.3",
+   "match": 0,
+   "frame": 1920,
+   "t": 34.75,
+   "card": "Goblin Hut",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    282
+   ],
+   "tile_yolo": [
+    8.0,
+    21.78
+   ],
+   "tile_engine": [
+    8.0,
+    23.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "horned hut spawning spear goblins",
+   "tier": "gold",
+   "id_source": "yolo+eye",
+   "src_event": "stopwatch",
+   "id_conf": "high"
+  },
+  {
+   "id": "0.4",
+   "match": 0,
+   "frame": 2085,
+   "t": 37.5,
+   "card": "Skeletons",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    366,
+    385
+   ],
+   "tile_yolo": [
+    12.01,
+    16.85
+   ],
+   "tile_engine": [
+    12.01,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "3 small bodies",
+   "tier": "gold",
+   "id_source": "yolo+eye",
+   "src_event": "stopwatch",
+   "id_conf": "moderate"
+  },
+  {
+   "id": "0.5",
+   "match": 0,
+   "frame": 2355,
+   "t": 42.0,
+   "card": "Royal Hogs",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    209,
+    386
+   ],
+   "tile_yolo": [
+    6.01,
+    16.81
+   ],
+   "tile_engine": [
+    6.01,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "4 pig riders",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch",
+   "id_conf": "high"
+  },
+  {
+   "id": "0.6",
+   "match": 0,
+   "frame": 3435,
+   "t": 60.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    419,
+    261
+   ],
+   "tile_yolo": [
+    14.03,
+    22.78
+   ],
+   "tile_engine": [
+    14.03,
+    24.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "purple swarm at our tower, unreadable",
+   "tier": "gold",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "0.7",
+   "match": 0,
+   "frame": 3585,
+   "t": 62.5,
+   "card": "Royal Ghost",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    392,
+    178
+   ],
+   "tile_yolo": [
+    13.0,
+    26.75
+   ],
+   "tile_engine": [
+    13.0,
+    28.75
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "translucent figure at the deploy",
+   "tier": "gold",
+   "id_source": "yolo+eye",
+   "src_event": "stopwatch",
+   "id_conf": "moderate"
+  },
+  {
+   "id": "0.8",
+   "match": 0,
+   "frame": 4215,
+   "t": 73.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    384
+   ],
+   "tile_yolo": [
+    14.0,
+    16.9
+   ],
+   "tile_engine": [
+    14.0,
+    17.9
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "several small bodies next to an earlier wizard, ambiguous",
+   "tier": "gold",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "0.9",
+   "match": 0,
+   "frame": 4605,
+   "t": 79.5,
+   "card": "Royal Hogs",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    385
+   ],
+   "tile_yolo": [
+    2.0,
+    16.85
+   ],
+   "tile_engine": [
+    2.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "4 pig riders; YOLO barely sees them",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch",
+   "id_conf": "high"
+  },
+  {
+   "id": "0.10",
+   "match": 0,
+   "frame": 6420,
+   "t": 109.75,
+   "card": "Royal Ghost",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    94
+   ],
+   "tile_yolo": [
+    8.99,
+    30.77
+   ],
+   "tile_engine": [
+    8.99,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "behind King Tower; translucent sword figure walks out",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch",
+   "id_conf": "moderate"
+  },
+  {
+   "id": "0.11",
+   "match": 0,
+   "frame": 6870,
+   "t": 117.25,
+   "card": "Skeletons",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    282
+   ],
+   "tile_yolo": [
+    8.99,
+    21.78
+   ],
+   "tile_engine": [
+    8.99,
+    23.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "3 small bodies",
+   "tier": "gold",
+   "id_source": "yolo+eye",
+   "src_event": "stopwatch",
+   "id_conf": "moderate"
+  },
+  {
+   "id": "0.12",
+   "match": 0,
+   "frame": 7035,
+   "t": 120.0,
+   "card": "Royal Hogs",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    385
+   ],
+   "tile_yolo": [
+    2.0,
+    16.85
+   ],
+   "tile_engine": [
+    2.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "4 pig riders",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch",
+   "id_conf": "high"
+  },
+  {
+   "id": "0.13",
+   "match": 0,
+   "frame": 7290,
+   "t": 124.25,
+   "card": "Goblin Hut",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    281
+   ],
+   "tile_yolo": [
+    8.99,
+    21.83
+   ],
+   "tile_engine": [
+    8.99,
+    23.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "horned hut spawning spear goblins",
+   "tier": "gold",
+   "id_source": "yolo+eye",
+   "src_event": "stopwatch",
+   "id_conf": "high"
+  },
+  {
+   "id": "0.14",
+   "match": 0,
+   "frame": 7455,
+   "t": 127.0,
+   "card": "Royal Ghost",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    261
+   ],
+   "tile_yolo": [
+    14.99,
+    22.78
+   ],
+   "tile_engine": [
+    14.99,
+    24.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "translucent figure",
+   "tier": "gold",
+   "id_source": "yolo+eye",
+   "src_event": "stopwatch",
+   "id_conf": "moderate"
+  },
+  {
+   "id": "0.15",
+   "match": 0,
+   "frame": 7590,
+   "t": 129.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    385
+   ],
+   "tile_yolo": [
+    14.0,
+    16.85
+   ],
+   "tile_engine": [
+    14.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "unreadable under our Log",
+   "tier": "gold",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "0.x3045",
+   "match": 0,
+   "frame": 3045,
+   "t": 53.5,
+   "card": "Electro Wizard",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    490,
+    212
+   ],
+   "tile_yolo": [
+    16.75,
+    25.12
+   ],
+   "tile_engine": [
+    16.75,
+    27.12
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "watch hidden by the spawn splash (Ice Wizard-like); found from a YOLO birth with no watch; cyan spiky hair; deploy splash hid the watch",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "yolo+eye",
+   "id_conf": "moderate"
+  },
+  {
+   "id": "1.0",
+   "match": 1,
+   "frame": 9720,
+   "t": 26.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    282
+   ],
+   "tile_yolo": [
+    8.99,
+    21.78
+   ],
+   "tile_engine": [
+    8.99,
+    23.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.1",
+   "match": 1,
+   "frame": 10035,
+   "t": 31.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    105,
+    385
+   ],
+   "tile_yolo": [
+    2.04,
+    16.85
+   ],
+   "tile_engine": [
+    2.04,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.2",
+   "match": 1,
+   "frame": 11580,
+   "t": 57.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    94
+   ],
+   "tile_yolo": [
+    8.99,
+    30.77
+   ],
+   "tile_engine": [
+    8.99,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.3",
+   "match": 1,
+   "frame": 12090,
+   "t": 65.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    95
+   ],
+   "tile_yolo": [
+    8.99,
+    30.72
+   ],
+   "tile_engine": [
+    8.99,
+    32.72
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.4",
+   "match": 1,
+   "frame": 12660,
+   "t": 75.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    281
+   ],
+   "tile_yolo": [
+    8.99,
+    21.83
+   ],
+   "tile_engine": [
+    8.99,
+    23.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.6",
+   "match": 1,
+   "frame": 13455,
+   "t": 88.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    94
+   ],
+   "tile_yolo": [
+    8.99,
+    30.77
+   ],
+   "tile_engine": [
+    8.99,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.7",
+   "match": 1,
+   "frame": 13875,
+   "t": 95.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    323
+   ],
+   "tile_yolo": [
+    2.99,
+    19.82
+   ],
+   "tile_engine": [
+    2.99,
+    21.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.8",
+   "match": 1,
+   "frame": 14055,
+   "t": 98.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    78,
+    281
+   ],
+   "tile_yolo": [
+    1.01,
+    21.83
+   ],
+   "tile_engine": [
+    1.01,
+    23.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.9",
+   "match": 1,
+   "frame": 15180,
+   "t": 117.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    385
+   ],
+   "tile_yolo": [
+    14.0,
+    16.85
+   ],
+   "tile_engine": [
+    14.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.10",
+   "match": 1,
+   "frame": 15555,
+   "t": 123.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    52,
+    115
+   ],
+   "tile_yolo": [
+    0.02,
+    29.76
+   ],
+   "tile_engine": [
+    0.02,
+    31.76
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.11",
+   "match": 1,
+   "frame": 16140,
+   "t": 133.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    384
+   ],
+   "tile_yolo": [
+    14.99,
+    16.9
+   ],
+   "tile_engine": [
+    14.99,
+    17.9
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.12",
+   "match": 1,
+   "frame": 16365,
+   "t": 137.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    392,
+    323
+   ],
+   "tile_yolo": [
+    13.0,
+    19.82
+   ],
+   "tile_engine": [
+    13.0,
+    21.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.13",
+   "match": 1,
+   "frame": 17265,
+   "t": 152.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    321
+   ],
+   "tile_yolo": [
+    8.99,
+    19.91
+   ],
+   "tile_engine": [
+    8.99,
+    21.91
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.14",
+   "match": 1,
+   "frame": 17550,
+   "t": 156.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    115
+   ],
+   "tile_yolo": [
+    17.01,
+    29.76
+   ],
+   "tile_engine": [
+    17.01,
+    31.76
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.15",
+   "match": 1,
+   "frame": 17850,
+   "t": 161.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    280
+   ],
+   "tile_yolo": [
+    8.0,
+    21.87
+   ],
+   "tile_engine": [
+    8.0,
+    23.87
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.16",
+   "match": 1,
+   "frame": 18150,
+   "t": 166.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    183,
+    342
+   ],
+   "tile_yolo": [
+    5.02,
+    18.91
+   ],
+   "tile_engine": [
+    5.02,
+    20.91
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.18",
+   "match": 1,
+   "frame": 19080,
+   "t": 182.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    499,
+    118
+   ],
+   "tile_yolo": [
+    17.09,
+    29.62
+   ],
+   "tile_engine": [
+    17.09,
+    31.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.19",
+   "match": 1,
+   "frame": 19350,
+   "t": 186.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    365
+   ],
+   "tile_yolo": [
+    8.04,
+    17.81
+   ],
+   "tile_engine": [
+    8.04,
+    19.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.21",
+   "match": 1,
+   "frame": 20670,
+   "t": 208.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    115
+   ],
+   "tile_yolo": [
+    17.01,
+    29.76
+   ],
+   "tile_engine": [
+    17.01,
+    31.76
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.22",
+   "match": 1,
+   "frame": 21000,
+   "t": 214.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    281
+   ],
+   "tile_yolo": [
+    8.99,
+    21.83
+   ],
+   "tile_engine": [
+    8.99,
+    23.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.23",
+   "match": 1,
+   "frame": 21345,
+   "t": 220.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    286,
+    240
+   ],
+   "tile_yolo": [
+    8.95,
+    23.79
+   ],
+   "tile_engine": [
+    8.95,
+    25.79
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.25",
+   "match": 1,
+   "frame": 21495,
+   "t": 222.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    182,
+    282
+   ],
+   "tile_yolo": [
+    4.98,
+    21.78
+   ],
+   "tile_engine": [
+    4.98,
+    23.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.26",
+   "match": 1,
+   "frame": 21975,
+   "t": 230.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    393,
+    385
+   ],
+   "tile_yolo": [
+    13.04,
+    16.85
+   ],
+   "tile_engine": [
+    13.04,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.27",
+   "match": 1,
+   "frame": 22365,
+   "t": 237.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    302
+   ],
+   "tile_yolo": [
+    8.99,
+    20.82
+   ],
+   "tile_engine": [
+    8.99,
+    22.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.29",
+   "match": 1,
+   "frame": 23130,
+   "t": 249.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    323
+   ],
+   "tile_yolo": [
+    2.0,
+    19.82
+   ],
+   "tile_engine": [
+    2.0,
+    21.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.30",
+   "match": 1,
+   "frame": 23265,
+   "t": 252.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    52,
+    323
+   ],
+   "tile_yolo": [
+    0.02,
+    19.82
+   ],
+   "tile_engine": [
+    0.02,
+    21.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.31",
+   "match": 1,
+   "frame": 23715,
+   "t": 259.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    281
+   ],
+   "tile_yolo": [
+    8.0,
+    21.83
+   ],
+   "tile_engine": [
+    8.0,
+    23.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.32",
+   "match": 1,
+   "frame": 23910,
+   "t": 262.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    52,
+    323
+   ],
+   "tile_yolo": [
+    0.02,
+    19.82
+   ],
+   "tile_engine": [
+    0.02,
+    21.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.33",
+   "match": 1,
+   "frame": 24045,
+   "t": 265.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    386
+   ],
+   "tile_yolo": [
+    2.0,
+    16.81
+   ],
+   "tile_engine": [
+    2.0,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.34",
+   "match": 1,
+   "frame": 24165,
+   "t": 267.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    51,
+    323
+   ],
+   "tile_yolo": [
+    -0.02,
+    19.82
+   ],
+   "tile_engine": [
+    -0.02,
+    21.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.35",
+   "match": 1,
+   "frame": 24915,
+   "t": 279.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    384
+   ],
+   "tile_yolo": [
+    2.0,
+    16.9
+   ],
+   "tile_engine": [
+    2.0,
+    17.9
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.36",
+   "match": 1,
+   "frame": 25065,
+   "t": 282.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    235,
+    384
+   ],
+   "tile_yolo": [
+    7.01,
+    16.9
+   ],
+   "tile_engine": [
+    7.01,
+    17.9
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.37",
+   "match": 1,
+   "frame": 25500,
+   "t": 289.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    235,
+    365
+   ],
+   "tile_yolo": [
+    7.01,
+    17.81
+   ],
+   "tile_engine": [
+    7.01,
+    19.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "1.38",
+   "match": 1,
+   "frame": 25905,
+   "t": 296.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    321
+   ],
+   "tile_yolo": [
+    2.0,
+    19.91
+   ],
+   "tile_engine": [
+    2.0,
+    21.91
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "2.0",
+   "match": 2,
+   "frame": 27930,
+   "t": 27.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    94
+   ],
+   "tile_yolo": [
+    8.99,
+    30.77
+   ],
+   "tile_engine": [
+    8.99,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "2.1",
+   "match": 2,
+   "frame": 28830,
+   "t": 42.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    401,
+    361
+   ],
+   "tile_yolo": [
+    13.35,
+    18.0
+   ],
+   "tile_engine": [
+    13.35,
+    20.0
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "2.2",
+   "match": 2,
+   "frame": 29010,
+   "t": 45.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    93
+   ],
+   "tile_yolo": [
+    8.99,
+    30.81
+   ],
+   "tile_engine": [
+    8.99,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "2.3",
+   "match": 2,
+   "frame": 29415,
+   "t": 52.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    410,
+    451
+   ],
+   "tile_yolo": [
+    13.69,
+    13.7
+   ],
+   "tile_engine": [
+    13.69,
+    14.4
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "2.4",
+   "match": 2,
+   "frame": 29970,
+   "t": 61.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    385
+   ],
+   "tile_yolo": [
+    14.99,
+    16.85
+   ],
+   "tile_engine": [
+    14.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "2.5",
+   "match": 2,
+   "frame": 30390,
+   "t": 68.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    386
+   ],
+   "tile_yolo": [
+    14.0,
+    16.81
+   ],
+   "tile_engine": [
+    14.0,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "2.6",
+   "match": 2,
+   "frame": 30555,
+   "t": 71.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    195,
+    574
+   ],
+   "tile_yolo": [
+    5.48,
+    7.82
+   ],
+   "tile_engine": [
+    5.48,
+    7.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "3.0",
+   "match": 3,
+   "frame": 33180,
+   "t": 15.5,
+   "card": "Sparky",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    240
+   ],
+   "tile_yolo": [
+    8.99,
+    23.79
+   ],
+   "tile_engine": [
+    8.99,
+    25.79
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "wheeled cannon, red coil",
+   "tier": "gold",
+   "id_source": "yolo+eye",
+   "src_event": "stopwatch",
+   "id_conf": "high"
+  },
+  {
+   "id": "3.1",
+   "match": 3,
+   "frame": 34020,
+   "t": 29.5,
+   "card": "Giant",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    156,
+    385
+   ],
+   "tile_yolo": [
+    3.99,
+    16.85
+   ],
+   "tile_engine": [
+    3.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "gold",
+   "id_source": "yolo+eye",
+   "src_event": "stopwatch",
+   "id_conf": "high"
+  },
+  {
+   "id": "3.2",
+   "match": 3,
+   "frame": 34185,
+   "t": 32.25,
+   "card": "Bats",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    385
+   ],
+   "tile_yolo": [
+    8.0,
+    16.85
+   ],
+   "tile_engine": [
+    8.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "5 small flyers",
+   "tier": "gold",
+   "id_source": "yolo+eye",
+   "src_event": "stopwatch",
+   "id_conf": "moderate"
+  },
+  {
+   "id": "3.3",
+   "match": 3,
+   "frame": 34620,
+   "t": 39.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    445,
+    383
+   ],
+   "tile_yolo": [
+    15.03,
+    16.95
+   ],
+   "tile_engine": [
+    15.03,
+    17.95
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "golden horned unit with sword and a black bar (Hero/champion?), not identified",
+   "tier": "gold",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "3.4",
+   "match": 3,
+   "frame": 35490,
+   "t": 54.0,
+   "card": "Minion Horde",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    386
+   ],
+   "tile_yolo": [
+    2.0,
+    16.81
+   ],
+   "tile_engine": [
+    2.0,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "6 minions (6 level badges); YOLO class is minion",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch",
+   "id_conf": "high"
+  },
+  {
+   "id": "3.5",
+   "match": 3,
+   "frame": 35850,
+   "t": 60.0,
+   "card": "Skeleton Army",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    471,
+    219
+   ],
+   "tile_yolo": [
+    16.02,
+    24.79
+   ],
+   "tile_engine": [
+    16.02,
+    26.79
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "~15 small bodies",
+   "tier": "gold",
+   "id_source": "yolo+eye",
+   "src_event": "stopwatch",
+   "id_conf": "high"
+  },
+  {
+   "id": "3.6",
+   "match": 3,
+   "frame": 37425,
+   "t": 86.25,
+   "card": "Sparky",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    260,
+    94
+   ],
+   "tile_yolo": [
+    7.96,
+    30.77
+   ],
+   "tile_engine": [
+    7.96,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "behind King Tower; spiked wheel walks out",
+   "tier": "gold",
+   "id_source": "yolo+eye",
+   "src_event": "stopwatch",
+   "id_conf": "moderate"
+  },
+  {
+   "id": "3.7",
+   "match": 3,
+   "frame": 38370,
+   "t": 102.0,
+   "card": "Giant",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    79,
+    385
+   ],
+   "tile_yolo": [
+    1.05,
+    16.85
+   ],
+   "tile_engine": [
+    1.05,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "giant-shaped spawn at the watch; Sparky already beside it",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch",
+   "id_conf": "high"
+  },
+  {
+   "id": "3.8",
+   "match": 3,
+   "frame": 38505,
+   "t": 104.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    364
+   ],
+   "tile_yolo": [
+    2.99,
+    17.86
+   ],
+   "tile_engine": [
+    2.99,
+    19.72
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "same golden horned unit",
+   "tier": "gold",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "3.9",
+   "match": 3,
+   "frame": 39120,
+   "t": 114.5,
+   "card": "Bats",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    386
+   ],
+   "tile_yolo": [
+    2.0,
+    16.81
+   ],
+   "tile_engine": [
+    2.0,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "5 small spawns",
+   "tier": "gold",
+   "id_source": "yolo+eye",
+   "src_event": "stopwatch",
+   "id_conf": "moderate"
+  },
+  {
+   "id": "3.10",
+   "match": 3,
+   "frame": 40050,
+   "t": 130.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    93
+   ],
+   "tile_yolo": [
+    8.99,
+    30.81
+   ],
+   "tile_engine": [
+    8.99,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "behind King Tower, unreadable",
+   "tier": "gold",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "3.11",
+   "match": 3,
+   "frame": 40515,
+   "t": 137.75,
+   "card": "Giant",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    392,
+    219
+   ],
+   "tile_yolo": [
+    13.0,
+    24.79
+   ],
+   "tile_engine": [
+    13.0,
+    26.79
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "gold",
+   "id_source": "yolo+eye",
+   "src_event": "stopwatch",
+   "id_conf": "high"
+  },
+  {
+   "id": "3.12",
+   "match": 3,
+   "frame": 40725,
+   "t": 141.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    92
+   ],
+   "tile_yolo": [
+    8.0,
+    30.86
+   ],
+   "tile_engine": [
+    8.0,
+    32.86
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "same golden horned unit",
+   "tier": "gold",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "3.13",
+   "match": 3,
+   "frame": 41040,
+   "t": 146.5,
+   "card": "Minion Horde",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    156,
+    386
+   ],
+   "tile_yolo": [
+    3.99,
+    16.81
+   ],
+   "tile_engine": [
+    3.99,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "6 minions (6 level badges)",
+   "tier": "gold",
+   "id_source": "eye",
+   "src_event": "stopwatch",
+   "id_conf": "high"
+  },
+  {
+   "id": "3.15",
+   "match": 3,
+   "frame": 41685,
+   "t": 157.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    385
+   ],
+   "tile_yolo": [
+    14.99,
+    16.85
+   ],
+   "tile_engine": [
+    14.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "Bats-like spawns and a Sparky-like body, ambiguous",
+   "tier": "gold",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "3.16",
+   "match": 3,
+   "frame": 42270,
+   "t": 167.0,
+   "card": "Giant",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    156,
+    386
+   ],
+   "tile_yolo": [
+    3.99,
+    16.81
+   ],
+   "tile_engine": [
+    3.99,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "gold",
+   "id_source": "yolo+eye",
+   "src_event": "stopwatch",
+   "id_conf": "high"
+  },
+  {
+   "id": "3.17",
+   "match": 3,
+   "frame": 42330,
+   "t": 168.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    386
+   ],
+   "tile_yolo": [
+    2.0,
+    16.81
+   ],
+   "tile_engine": [
+    2.0,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "same golden horned unit",
+   "tier": "gold",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.0",
+   "match": 4,
+   "frame": 43395,
+   "t": 28.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    115
+   ],
+   "tile_yolo": [
+    17.01,
+    29.76
+   ],
+   "tile_engine": [
+    17.01,
+    31.76
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.2",
+   "match": 4,
+   "frame": 45090,
+   "t": 57.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    94
+   ],
+   "tile_yolo": [
+    8.04,
+    30.77
+   ],
+   "tile_engine": [
+    8.04,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.3",
+   "match": 4,
+   "frame": 45570,
+   "t": 65.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    260
+   ],
+   "tile_yolo": [
+    8.04,
+    22.83
+   ],
+   "tile_engine": [
+    8.04,
+    24.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.4",
+   "match": 4,
+   "frame": 46125,
+   "t": 74.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    470,
+    385
+   ],
+   "tile_yolo": [
+    15.98,
+    16.85
+   ],
+   "tile_engine": [
+    15.98,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.5",
+   "match": 4,
+   "frame": 47970,
+   "t": 105.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    365
+   ],
+   "tile_yolo": [
+    8.0,
+    17.81
+   ],
+   "tile_engine": [
+    8.0,
+    19.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.6",
+   "match": 4,
+   "frame": 48225,
+   "t": 109.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    137,
+    369
+   ],
+   "tile_yolo": [
+    3.26,
+    17.62
+   ],
+   "tile_engine": [
+    3.26,
+    19.24
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.7",
+   "match": 4,
+   "frame": 48360,
+   "t": 111.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    471,
+    241
+   ],
+   "tile_yolo": [
+    16.02,
+    23.74
+   ],
+   "tile_engine": [
+    16.02,
+    25.74
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.9",
+   "match": 4,
+   "frame": 49245,
+   "t": 126.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    385
+   ],
+   "tile_yolo": [
+    14.0,
+    16.85
+   ],
+   "tile_engine": [
+    14.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.10",
+   "match": 4,
+   "frame": 49515,
+   "t": 130.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    365
+   ],
+   "tile_yolo": [
+    17.01,
+    17.81
+   ],
+   "tile_engine": [
+    17.01,
+    19.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.11",
+   "match": 4,
+   "frame": 50520,
+   "t": 147.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    386
+   ],
+   "tile_yolo": [
+    14.99,
+    16.81
+   ],
+   "tile_engine": [
+    14.99,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.12",
+   "match": 4,
+   "frame": 51105,
+   "t": 157.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    385
+   ],
+   "tile_yolo": [
+    2.99,
+    16.85
+   ],
+   "tile_engine": [
+    2.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.13",
+   "match": 4,
+   "frame": 51315,
+   "t": 160.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    281
+   ],
+   "tile_yolo": [
+    14.0,
+    21.83
+   ],
+   "tile_engine": [
+    14.0,
+    23.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.14",
+   "match": 4,
+   "frame": 52155,
+   "t": 174.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    471,
+    242
+   ],
+   "tile_yolo": [
+    16.02,
+    23.69
+   ],
+   "tile_engine": [
+    16.02,
+    25.69
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.15",
+   "match": 4,
+   "frame": 52425,
+   "t": 179.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    366,
+    261
+   ],
+   "tile_yolo": [
+    12.01,
+    22.78
+   ],
+   "tile_engine": [
+    12.01,
+    24.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.16",
+   "match": 4,
+   "frame": 52860,
+   "t": 186.38,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    303
+   ],
+   "tile_yolo": [
+    17.01,
+    20.77
+   ],
+   "tile_engine": [
+    17.01,
+    22.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.17",
+   "match": 4,
+   "frame": 53445,
+   "t": 196.12,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    281
+   ],
+   "tile_yolo": [
+    8.99,
+    21.83
+   ],
+   "tile_engine": [
+    8.99,
+    23.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.19",
+   "match": 4,
+   "frame": 54180,
+   "t": 208.38,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    94
+   ],
+   "tile_yolo": [
+    8.0,
+    30.77
+   ],
+   "tile_engine": [
+    8.0,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "4.20",
+   "match": 4,
+   "frame": 54300,
+   "t": 210.38,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    471,
+    240
+   ],
+   "tile_yolo": [
+    16.02,
+    23.79
+   ],
+   "tile_engine": [
+    16.02,
+    25.79
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "5.0",
+   "match": 5,
+   "frame": 55185,
+   "t": 12.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    303
+   ],
+   "tile_yolo": [
+    14.99,
+    20.77
+   ],
+   "tile_engine": [
+    14.99,
+    22.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "5.1",
+   "match": 5,
+   "frame": 56400,
+   "t": 32.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    392,
+    385
+   ],
+   "tile_yolo": [
+    13.0,
+    16.85
+   ],
+   "tile_engine": [
+    13.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "5.3",
+   "match": 5,
+   "frame": 57015,
+   "t": 42.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    178
+   ],
+   "tile_yolo": [
+    14.0,
+    26.75
+   ],
+   "tile_engine": [
+    14.0,
+    28.75
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "5.6",
+   "match": 5,
+   "frame": 57840,
+   "t": 56.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    94
+   ],
+   "tile_yolo": [
+    8.04,
+    30.77
+   ],
+   "tile_engine": [
+    8.04,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "5.7",
+   "match": 5,
+   "frame": 59025,
+   "t": 76.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    385
+   ],
+   "tile_yolo": [
+    14.99,
+    16.85
+   ],
+   "tile_engine": [
+    14.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "5.8",
+   "match": 5,
+   "frame": 59910,
+   "t": 90.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    385
+   ],
+   "tile_yolo": [
+    2.0,
+    16.85
+   ],
+   "tile_engine": [
+    2.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "5.9",
+   "match": 5,
+   "frame": 61725,
+   "t": 121.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    94
+   ],
+   "tile_yolo": [
+    8.99,
+    30.77
+   ],
+   "tile_engine": [
+    8.99,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "5.10",
+   "match": 5,
+   "frame": 62385,
+   "t": 132.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    338,
+    93
+   ],
+   "tile_yolo": [
+    10.94,
+    30.81
+   ],
+   "tile_engine": [
+    10.94,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "5.11",
+   "match": 5,
+   "frame": 62715,
+   "t": 137.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    323
+   ],
+   "tile_yolo": [
+    17.01,
+    19.82
+   ],
+   "tile_engine": [
+    17.01,
+    21.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "5.12",
+   "match": 5,
+   "frame": 63090,
+   "t": 143.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    386
+   ],
+   "tile_yolo": [
+    14.99,
+    16.81
+   ],
+   "tile_engine": [
+    14.99,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "5.14",
+   "match": 5,
+   "frame": 63885,
+   "t": 157.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    386
+   ],
+   "tile_yolo": [
+    14.0,
+    16.81
+   ],
+   "tile_engine": [
+    14.0,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "5.15",
+   "match": 5,
+   "frame": 64200,
+   "t": 162.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    470,
+    386
+   ],
+   "tile_yolo": [
+    15.98,
+    16.81
+   ],
+   "tile_engine": [
+    15.98,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "5.16",
+   "match": 5,
+   "frame": 64860,
+   "t": 173.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    417,
+    386
+   ],
+   "tile_yolo": [
+    13.96,
+    16.81
+   ],
+   "tile_engine": [
+    13.96,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.0",
+   "match": 6,
+   "frame": 65715,
+   "t": 10.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    93
+   ],
+   "tile_yolo": [
+    8.99,
+    30.81
+   ],
+   "tile_engine": [
+    8.99,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.2",
+   "match": 6,
+   "frame": 65940,
+   "t": 14.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    316,
+    62
+   ],
+   "tile_yolo": [
+    10.1,
+    32.3
+   ],
+   "tile_engine": [
+    10.1,
+    34.3
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.3",
+   "match": 6,
+   "frame": 66060,
+   "t": 16.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    78,
+    385
+   ],
+   "tile_yolo": [
+    1.01,
+    16.85
+   ],
+   "tile_engine": [
+    1.01,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.5",
+   "match": 6,
+   "frame": 66945,
+   "t": 30.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    366,
+    241
+   ],
+   "tile_yolo": [
+    12.01,
+    23.74
+   ],
+   "tile_engine": [
+    12.01,
+    25.74
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.6",
+   "match": 6,
+   "frame": 66990,
+   "t": 31.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.8",
+   "match": 6,
+   "frame": 67305,
+   "t": 36.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    316,
+    62
+   ],
+   "tile_yolo": [
+    10.1,
+    32.3
+   ],
+   "tile_engine": [
+    10.1,
+    34.3
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.10",
+   "match": 6,
+   "frame": 68445,
+   "t": 55.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    52,
+    115
+   ],
+   "tile_yolo": [
+    0.02,
+    29.76
+   ],
+   "tile_engine": [
+    0.02,
+    31.76
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.11",
+   "match": 6,
+   "frame": 68880,
+   "t": 63.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    209,
+    385
+   ],
+   "tile_yolo": [
+    6.01,
+    16.85
+   ],
+   "tile_engine": [
+    6.01,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.12",
+   "match": 6,
+   "frame": 68955,
+   "t": 64.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    274,
+    313
+   ],
+   "tile_yolo": [
+    8.5,
+    20.3
+   ],
+   "tile_engine": [
+    8.5,
+    22.3
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.13",
+   "match": 6,
+   "frame": 69015,
+   "t": 65.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    316,
+    62
+   ],
+   "tile_yolo": [
+    10.1,
+    32.3
+   ],
+   "tile_engine": [
+    10.1,
+    34.3
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.15",
+   "match": 6,
+   "frame": 69765,
+   "t": 77.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.17",
+   "match": 6,
+   "frame": 70380,
+   "t": 88.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.18",
+   "match": 6,
+   "frame": 70770,
+   "t": 94.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    94
+   ],
+   "tile_yolo": [
+    8.0,
+    30.77
+   ],
+   "tile_engine": [
+    8.0,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.20",
+   "match": 6,
+   "frame": 71175,
+   "t": 101.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.21",
+   "match": 6,
+   "frame": 71640,
+   "t": 109.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    385
+   ],
+   "tile_yolo": [
+    8.99,
+    16.85
+   ],
+   "tile_engine": [
+    8.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.27",
+   "match": 6,
+   "frame": 72345,
+   "t": 120.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    471,
+    385
+   ],
+   "tile_yolo": [
+    16.02,
+    16.85
+   ],
+   "tile_engine": [
+    16.02,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.29",
+   "match": 6,
+   "frame": 72615,
+   "t": 125.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.30",
+   "match": 6,
+   "frame": 72915,
+   "t": 130.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    274,
+    292
+   ],
+   "tile_yolo": [
+    8.5,
+    21.3
+   ],
+   "tile_engine": [
+    8.5,
+    23.3
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.31",
+   "match": 6,
+   "frame": 73185,
+   "t": 134.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.32",
+   "match": 6,
+   "frame": 73215,
+   "t": 135.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    94
+   ],
+   "tile_yolo": [
+    8.0,
+    30.77
+   ],
+   "tile_engine": [
+    8.0,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.33",
+   "match": 6,
+   "frame": 73440,
+   "t": 139.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.34",
+   "match": 6,
+   "frame": 73710,
+   "t": 143.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    316,
+    61
+   ],
+   "tile_yolo": [
+    10.1,
+    32.34
+   ],
+   "tile_engine": [
+    10.1,
+    34.34
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.35",
+   "match": 6,
+   "frame": 73875,
+   "t": 146.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    235,
+    386
+   ],
+   "tile_yolo": [
+    7.01,
+    16.81
+   ],
+   "tile_engine": [
+    7.01,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.36",
+   "match": 6,
+   "frame": 73995,
+   "t": 148.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    470,
+    386
+   ],
+   "tile_yolo": [
+    15.98,
+    16.81
+   ],
+   "tile_engine": [
+    15.98,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.38",
+   "match": 6,
+   "frame": 74625,
+   "t": 158.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    316,
+    62
+   ],
+   "tile_yolo": [
+    10.1,
+    32.3
+   ],
+   "tile_engine": [
+    10.1,
+    34.3
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.39",
+   "match": 6,
+   "frame": 74805,
+   "t": 161.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    316,
+    62
+   ],
+   "tile_yolo": [
+    10.1,
+    32.3
+   ],
+   "tile_engine": [
+    10.1,
+    34.3
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.40",
+   "match": 6,
+   "frame": 74925,
+   "t": 163.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    274,
+    292
+   ],
+   "tile_yolo": [
+    8.5,
+    21.3
+   ],
+   "tile_engine": [
+    8.5,
+    23.3
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.41",
+   "match": 6,
+   "frame": 74985,
+   "t": 164.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    316,
+    63
+   ],
+   "tile_yolo": [
+    10.1,
+    32.25
+   ],
+   "tile_engine": [
+    10.1,
+    34.25
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.42",
+   "match": 6,
+   "frame": 75090,
+   "t": 166.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    340,
+    345
+   ],
+   "tile_yolo": [
+    11.02,
+    18.77
+   ],
+   "tile_engine": [
+    11.02,
+    20.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.44",
+   "match": 6,
+   "frame": 75825,
+   "t": 178.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    386
+   ],
+   "tile_yolo": [
+    8.0,
+    16.81
+   ],
+   "tile_engine": [
+    8.0,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.45",
+   "match": 6,
+   "frame": 76080,
+   "t": 182.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    78,
+    386
+   ],
+   "tile_yolo": [
+    1.01,
+    16.81
+   ],
+   "tile_engine": [
+    1.01,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.46",
+   "match": 6,
+   "frame": 76110,
+   "t": 183.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.47",
+   "match": 6,
+   "frame": 76440,
+   "t": 188.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    405,
+    271
+   ],
+   "tile_yolo": [
+    13.5,
+    22.3
+   ],
+   "tile_engine": [
+    13.5,
+    24.3
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.49",
+   "match": 6,
+   "frame": 76740,
+   "t": 193.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.50",
+   "match": 6,
+   "frame": 76785,
+   "t": 194.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    313,
+    281
+   ],
+   "tile_yolo": [
+    9.99,
+    21.83
+   ],
+   "tile_engine": [
+    9.99,
+    23.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.51",
+   "match": 6,
+   "frame": 76965,
+   "t": 197.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.52",
+   "match": 6,
+   "frame": 77235,
+   "t": 202.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    93
+   ],
+   "tile_yolo": [
+    8.99,
+    30.81
+   ],
+   "tile_engine": [
+    8.99,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.53",
+   "match": 6,
+   "frame": 77835,
+   "t": 212.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    471,
+    385
+   ],
+   "tile_yolo": [
+    16.02,
+    16.85
+   ],
+   "tile_engine": [
+    16.02,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.54",
+   "match": 6,
+   "frame": 78030,
+   "t": 215.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.56",
+   "match": 6,
+   "frame": 78345,
+   "t": 220.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    316,
+    61
+   ],
+   "tile_yolo": [
+    10.1,
+    32.34
+   ],
+   "tile_engine": [
+    10.1,
+    34.34
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.57",
+   "match": 6,
+   "frame": 78585,
+   "t": 224.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    274,
+    313
+   ],
+   "tile_yolo": [
+    8.5,
+    20.3
+   ],
+   "tile_engine": [
+    8.5,
+    22.3
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.58",
+   "match": 6,
+   "frame": 78855,
+   "t": 229.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    385
+   ],
+   "tile_yolo": [
+    14.0,
+    16.85
+   ],
+   "tile_engine": [
+    14.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.59",
+   "match": 6,
+   "frame": 78945,
+   "t": 230.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.61",
+   "match": 6,
+   "frame": 79950,
+   "t": 247.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    385
+   ],
+   "tile_yolo": [
+    8.0,
+    16.85
+   ],
+   "tile_engine": [
+    8.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.62",
+   "match": 6,
+   "frame": 79980,
+   "t": 247.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    77,
+    385
+   ],
+   "tile_yolo": [
+    0.97,
+    16.85
+   ],
+   "tile_engine": [
+    0.97,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.63",
+   "match": 6,
+   "frame": 80385,
+   "t": 254.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    300,
+    375
+   ],
+   "tile_yolo": [
+    9.49,
+    17.33
+   ],
+   "tile_engine": [
+    9.49,
+    18.66
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.64",
+   "match": 6,
+   "frame": 80700,
+   "t": 259.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    241
+   ],
+   "tile_yolo": [
+    8.99,
+    23.74
+   ],
+   "tile_engine": [
+    8.99,
+    25.74
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.65",
+   "match": 6,
+   "frame": 80865,
+   "t": 262.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.66",
+   "match": 6,
+   "frame": 80925,
+   "t": 263.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    384
+   ],
+   "tile_yolo": [
+    14.0,
+    16.9
+   ],
+   "tile_engine": [
+    14.0,
+    17.9
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.67",
+   "match": 6,
+   "frame": 81030,
+   "t": 265.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.68",
+   "match": 6,
+   "frame": 81285,
+   "t": 269.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    385
+   ],
+   "tile_yolo": [
+    14.0,
+    16.85
+   ],
+   "tile_engine": [
+    14.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.69",
+   "match": 6,
+   "frame": 81690,
+   "t": 276.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    282
+   ],
+   "tile_yolo": [
+    17.01,
+    21.78
+   ],
+   "tile_engine": [
+    17.01,
+    23.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.70",
+   "match": 6,
+   "frame": 81870,
+   "t": 279.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.71",
+   "match": 6,
+   "frame": 82005,
+   "t": 281.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    385
+   ],
+   "tile_yolo": [
+    8.04,
+    16.85
+   ],
+   "tile_engine": [
+    8.04,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.72",
+   "match": 6,
+   "frame": 82170,
+   "t": 284.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    80,
+    386
+   ],
+   "tile_yolo": [
+    1.09,
+    16.81
+   ],
+   "tile_engine": [
+    1.09,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.74",
+   "match": 6,
+   "frame": 82515,
+   "t": 290.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    314,
+    60
+   ],
+   "tile_yolo": [
+    10.02,
+    32.39
+   ],
+   "tile_engine": [
+    10.02,
+    34.39
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.75",
+   "match": 6,
+   "frame": 82725,
+   "t": 293.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    470,
+    386
+   ],
+   "tile_yolo": [
+    15.98,
+    16.81
+   ],
+   "tile_engine": [
+    15.98,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.76",
+   "match": 6,
+   "frame": 82755,
+   "t": 294.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    392,
+    365
+   ],
+   "tile_yolo": [
+    13.0,
+    17.81
+   ],
+   "tile_engine": [
+    13.0,
+    19.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.77",
+   "match": 6,
+   "frame": 82830,
+   "t": 295.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    286,
+    432
+   ],
+   "tile_yolo": [
+    8.95,
+    14.61
+   ],
+   "tile_engine": [
+    8.95,
+    15.61
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "6.78",
+   "match": 6,
+   "frame": 82860,
+   "t": 295.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    209,
+    385
+   ],
+   "tile_yolo": [
+    6.01,
+    16.85
+   ],
+   "tile_engine": [
+    6.01,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.0",
+   "match": 7,
+   "frame": 83880,
+   "t": 13.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    417,
+    281
+   ],
+   "tile_yolo": [
+    13.96,
+    21.83
+   ],
+   "tile_engine": [
+    13.96,
+    23.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.1",
+   "match": 7,
+   "frame": 84300,
+   "t": 20.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    52,
+    115
+   ],
+   "tile_yolo": [
+    0.02,
+    29.76
+   ],
+   "tile_engine": [
+    0.02,
+    31.76
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.2",
+   "match": 7,
+   "frame": 84570,
+   "t": 24.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    52,
+    157
+   ],
+   "tile_yolo": [
+    0.02,
+    27.75
+   ],
+   "tile_engine": [
+    0.02,
+    29.75
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.3",
+   "match": 7,
+   "frame": 86460,
+   "t": 56.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    282
+   ],
+   "tile_yolo": [
+    8.99,
+    21.78
+   ],
+   "tile_engine": [
+    8.99,
+    23.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.4",
+   "match": 7,
+   "frame": 86880,
+   "t": 63.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    366,
+    303
+   ],
+   "tile_yolo": [
+    12.01,
+    20.77
+   ],
+   "tile_engine": [
+    12.01,
+    22.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.6",
+   "match": 7,
+   "frame": 88890,
+   "t": 96.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    92
+   ],
+   "tile_yolo": [
+    8.99,
+    30.86
+   ],
+   "tile_engine": [
+    8.99,
+    32.86
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.7",
+   "match": 7,
+   "frame": 89100,
+   "t": 100.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    131,
+    303
+   ],
+   "tile_yolo": [
+    3.03,
+    20.77
+   ],
+   "tile_engine": [
+    3.03,
+    22.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.9",
+   "match": 7,
+   "frame": 89700,
+   "t": 110.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    53,
+    117
+   ],
+   "tile_yolo": [
+    0.05,
+    29.67
+   ],
+   "tile_engine": [
+    0.05,
+    31.67
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.10",
+   "match": 7,
+   "frame": 90480,
+   "t": 123.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    115
+   ],
+   "tile_yolo": [
+    17.01,
+    29.76
+   ],
+   "tile_engine": [
+    17.01,
+    31.76
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.11",
+   "match": 7,
+   "frame": 90765,
+   "t": 128.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    416,
+    280
+   ],
+   "tile_yolo": [
+    13.92,
+    21.87
+   ],
+   "tile_engine": [
+    13.92,
+    23.87
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.12",
+   "match": 7,
+   "frame": 91260,
+   "t": 136.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    437,
+    187
+   ],
+   "tile_yolo": [
+    14.72,
+    26.32
+   ],
+   "tile_engine": [
+    14.72,
+    28.32
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.14",
+   "match": 7,
+   "frame": 91560,
+   "t": 141.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    386
+   ],
+   "tile_yolo": [
+    8.0,
+    16.81
+   ],
+   "tile_engine": [
+    8.0,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.15",
+   "match": 7,
+   "frame": 91875,
+   "t": 146.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    365
+   ],
+   "tile_yolo": [
+    17.01,
+    17.81
+   ],
+   "tile_engine": [
+    17.01,
+    19.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.16",
+   "match": 7,
+   "frame": 92010,
+   "t": 148.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    385
+   ],
+   "tile_yolo": [
+    14.99,
+    16.85
+   ],
+   "tile_engine": [
+    14.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.17",
+   "match": 7,
+   "frame": 92400,
+   "t": 155.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    385
+   ],
+   "tile_yolo": [
+    14.0,
+    16.85
+   ],
+   "tile_engine": [
+    14.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.19",
+   "match": 7,
+   "frame": 93330,
+   "t": 170.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    282
+   ],
+   "tile_yolo": [
+    14.0,
+    21.78
+   ],
+   "tile_engine": [
+    14.0,
+    23.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.21",
+   "match": 7,
+   "frame": 94005,
+   "t": 182.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    115
+   ],
+   "tile_yolo": [
+    17.01,
+    29.76
+   ],
+   "tile_engine": [
+    17.01,
+    31.76
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.22",
+   "match": 7,
+   "frame": 94200,
+   "t": 185.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    343
+   ],
+   "tile_yolo": [
+    14.0,
+    18.86
+   ],
+   "tile_engine": [
+    14.0,
+    20.86
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.23",
+   "match": 7,
+   "frame": 94680,
+   "t": 193.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    261
+   ],
+   "tile_yolo": [
+    14.0,
+    22.78
+   ],
+   "tile_engine": [
+    14.0,
+    24.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "7.24",
+   "match": 7,
+   "frame": 95160,
+   "t": 201.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    323
+   ],
+   "tile_yolo": [
+    14.99,
+    19.82
+   ],
+   "tile_engine": [
+    14.99,
+    21.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.1",
+   "match": 8,
+   "frame": 95520,
+   "t": 17.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    385
+   ],
+   "tile_yolo": [
+    14.99,
+    16.85
+   ],
+   "tile_engine": [
+    14.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.2",
+   "match": 8,
+   "frame": 95745,
+   "t": 21.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    385
+   ],
+   "tile_yolo": [
+    14.0,
+    16.85
+   ],
+   "tile_engine": [
+    14.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.3",
+   "match": 8,
+   "frame": 95895,
+   "t": 23.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    328,
+    510
+   ],
+   "tile_yolo": [
+    10.56,
+    10.88
+   ],
+   "tile_engine": [
+    10.56,
+    10.88
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.4",
+   "match": 8,
+   "frame": 96615,
+   "t": 35.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    93
+   ],
+   "tile_yolo": [
+    8.99,
+    30.81
+   ],
+   "tile_engine": [
+    8.99,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.5",
+   "match": 8,
+   "frame": 97155,
+   "t": 44.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    94
+   ],
+   "tile_yolo": [
+    8.99,
+    30.77
+   ],
+   "tile_engine": [
+    8.99,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.6",
+   "match": 8,
+   "frame": 98055,
+   "t": 59.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    498,
+    303
+   ],
+   "tile_yolo": [
+    17.05,
+    20.77
+   ],
+   "tile_engine": [
+    17.05,
+    22.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.8",
+   "match": 8,
+   "frame": 98175,
+   "t": 61.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    445,
+    385
+   ],
+   "tile_yolo": [
+    15.03,
+    16.85
+   ],
+   "tile_engine": [
+    15.03,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.9",
+   "match": 8,
+   "frame": 98595,
+   "t": 68.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    401,
+    467
+   ],
+   "tile_yolo": [
+    13.35,
+    12.93
+   ],
+   "tile_engine": [
+    13.35,
+    12.93
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.10",
+   "match": 8,
+   "frame": 98610,
+   "t": 69.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    356,
+    499
+   ],
+   "tile_yolo": [
+    11.63,
+    11.4
+   ],
+   "tile_engine": [
+    11.63,
+    11.4
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.11",
+   "match": 8,
+   "frame": 100005,
+   "t": 92.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    94
+   ],
+   "tile_yolo": [
+    8.99,
+    30.77
+   ],
+   "tile_engine": [
+    8.99,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.12",
+   "match": 8,
+   "frame": 100545,
+   "t": 101.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    94
+   ],
+   "tile_yolo": [
+    8.99,
+    30.77
+   ],
+   "tile_engine": [
+    8.99,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.13",
+   "match": 8,
+   "frame": 100785,
+   "t": 105.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    131,
+    323
+   ],
+   "tile_yolo": [
+    3.03,
+    19.82
+   ],
+   "tile_engine": [
+    3.03,
+    21.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.14",
+   "match": 8,
+   "frame": 101355,
+   "t": 114.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    386
+   ],
+   "tile_yolo": [
+    2.0,
+    16.81
+   ],
+   "tile_engine": [
+    2.0,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.16",
+   "match": 8,
+   "frame": 101520,
+   "t": 117.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    166,
+    465
+   ],
+   "tile_yolo": [
+    4.37,
+    13.03
+   ],
+   "tile_engine": [
+    4.37,
+    13.06
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.17",
+   "match": 8,
+   "frame": 101550,
+   "t": 118.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    385
+   ],
+   "tile_yolo": [
+    8.99,
+    16.85
+   ],
+   "tile_engine": [
+    8.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.18",
+   "match": 8,
+   "frame": 102315,
+   "t": 130.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    78,
+    218
+   ],
+   "tile_yolo": [
+    1.01,
+    24.84
+   ],
+   "tile_engine": [
+    1.01,
+    26.84
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.19",
+   "match": 8,
+   "frame": 102450,
+   "t": 133.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    398,
+    421
+   ],
+   "tile_yolo": [
+    13.23,
+    15.13
+   ],
+   "tile_engine": [
+    13.23,
+    16.13
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.20",
+   "match": 8,
+   "frame": 102510,
+   "t": 134.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    262
+   ],
+   "tile_yolo": [
+    2.99,
+    22.73
+   ],
+   "tile_engine": [
+    2.99,
+    24.73
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.21",
+   "match": 8,
+   "frame": 103110,
+   "t": 144.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    216,
+    524
+   ],
+   "tile_yolo": [
+    6.28,
+    10.21
+   ],
+   "tile_engine": [
+    6.28,
+    10.21
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.22",
+   "match": 8,
+   "frame": 103230,
+   "t": 146.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    51,
+    116
+   ],
+   "tile_yolo": [
+    -0.02,
+    29.71
+   ],
+   "tile_engine": [
+    -0.02,
+    31.71
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.23",
+   "match": 8,
+   "frame": 103515,
+   "t": 150.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    200
+   ],
+   "tile_yolo": [
+    8.99,
+    25.7
+   ],
+   "tile_engine": [
+    8.99,
+    27.7
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.24",
+   "match": 8,
+   "frame": 103530,
+   "t": 151.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    258
+   ],
+   "tile_yolo": [
+    8.99,
+    22.93
+   ],
+   "tile_engine": [
+    8.99,
+    24.93
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.25",
+   "match": 8,
+   "frame": 103710,
+   "t": 154.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    385
+   ],
+   "tile_yolo": [
+    14.99,
+    16.85
+   ],
+   "tile_engine": [
+    14.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.27",
+   "match": 8,
+   "frame": 104340,
+   "t": 164.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    385
+   ],
+   "tile_yolo": [
+    2.0,
+    16.85
+   ],
+   "tile_engine": [
+    2.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.28",
+   "match": 8,
+   "frame": 104715,
+   "t": 170.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    209,
+    477
+   ],
+   "tile_yolo": [
+    6.01,
+    12.46
+   ],
+   "tile_engine": [
+    6.01,
+    12.46
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.29",
+   "match": 8,
+   "frame": 104820,
+   "t": 172.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    245,
+    456
+   ],
+   "tile_yolo": [
+    7.39,
+    13.46
+   ],
+   "tile_engine": [
+    7.39,
+    13.92
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.30",
+   "match": 8,
+   "frame": 105180,
+   "t": 178.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    115
+   ],
+   "tile_yolo": [
+    17.01,
+    29.76
+   ],
+   "tile_engine": [
+    17.01,
+    31.76
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.31",
+   "match": 8,
+   "frame": 105645,
+   "t": 186.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    94
+   ],
+   "tile_yolo": [
+    8.04,
+    30.77
+   ],
+   "tile_engine": [
+    8.04,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.32",
+   "match": 8,
+   "frame": 105825,
+   "t": 189.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    323
+   ],
+   "tile_yolo": [
+    8.99,
+    19.82
+   ],
+   "tile_engine": [
+    8.99,
+    21.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.34",
+   "match": 8,
+   "frame": 105975,
+   "t": 191.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    422,
+    335
+   ],
+   "tile_yolo": [
+    14.15,
+    19.24
+   ],
+   "tile_engine": [
+    14.15,
+    21.24
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.35",
+   "match": 8,
+   "frame": 106170,
+   "t": 195.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    50,
+    114
+   ],
+   "tile_yolo": [
+    -0.06,
+    29.81
+   ],
+   "tile_engine": [
+    -0.06,
+    31.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.36",
+   "match": 8,
+   "frame": 106485,
+   "t": 200.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    303
+   ],
+   "tile_yolo": [
+    14.99,
+    20.77
+   ],
+   "tile_engine": [
+    14.99,
+    22.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.37",
+   "match": 8,
+   "frame": 106800,
+   "t": 205.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    426,
+    526
+   ],
+   "tile_yolo": [
+    14.3,
+    10.11
+   ],
+   "tile_engine": [
+    14.3,
+    10.11
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.39",
+   "match": 8,
+   "frame": 107175,
+   "t": 211.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    424,
+    531
+   ],
+   "tile_yolo": [
+    14.23,
+    9.87
+   ],
+   "tile_engine": [
+    14.23,
+    9.87
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.40",
+   "match": 8,
+   "frame": 107220,
+   "t": 212.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    496,
+    114
+   ],
+   "tile_yolo": [
+    16.98,
+    29.81
+   ],
+   "tile_engine": [
+    16.98,
+    31.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.41",
+   "match": 8,
+   "frame": 108000,
+   "t": 225.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    94
+   ],
+   "tile_yolo": [
+    8.0,
+    30.77
+   ],
+   "tile_engine": [
+    8.0,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.42",
+   "match": 8,
+   "frame": 108150,
+   "t": 228.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    385
+   ],
+   "tile_yolo": [
+    8.99,
+    16.85
+   ],
+   "tile_engine": [
+    8.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.45",
+   "match": 8,
+   "frame": 108450,
+   "t": 233.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    156,
+    385
+   ],
+   "tile_yolo": [
+    3.99,
+    16.85
+   ],
+   "tile_engine": [
+    3.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.46",
+   "match": 8,
+   "frame": 108585,
+   "t": 235.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    385
+   ],
+   "tile_yolo": [
+    14.99,
+    16.85
+   ],
+   "tile_engine": [
+    14.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.47",
+   "match": 8,
+   "frame": 108600,
+   "t": 235.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    413,
+    513
+   ],
+   "tile_yolo": [
+    13.81,
+    10.74
+   ],
+   "tile_engine": [
+    13.81,
+    10.74
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.48",
+   "match": 8,
+   "frame": 108870,
+   "t": 240.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    291,
+    514
+   ],
+   "tile_yolo": [
+    9.14,
+    10.69
+   ],
+   "tile_engine": [
+    9.14,
+    10.69
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.50",
+   "match": 8,
+   "frame": 108960,
+   "t": 241.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    385
+   ],
+   "tile_yolo": [
+    2.0,
+    16.85
+   ],
+   "tile_engine": [
+    2.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.52",
+   "match": 8,
+   "frame": 109410,
+   "t": 249.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    471,
+    197
+   ],
+   "tile_yolo": [
+    16.02,
+    25.84
+   ],
+   "tile_engine": [
+    16.02,
+    27.84
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.53",
+   "match": 8,
+   "frame": 109770,
+   "t": 255.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    95
+   ],
+   "tile_yolo": [
+    8.04,
+    30.72
+   ],
+   "tile_engine": [
+    8.04,
+    32.72
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.54",
+   "match": 8,
+   "frame": 109920,
+   "t": 257.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    365
+   ],
+   "tile_yolo": [
+    8.99,
+    17.81
+   ],
+   "tile_engine": [
+    8.99,
+    19.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.56",
+   "match": 8,
+   "frame": 110220,
+   "t": 262.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    78,
+    385
+   ],
+   "tile_yolo": [
+    1.01,
+    16.85
+   ],
+   "tile_engine": [
+    1.01,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.57",
+   "match": 8,
+   "frame": 110385,
+   "t": 265.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    432,
+    401
+   ],
+   "tile_yolo": [
+    14.53,
+    16.09
+   ],
+   "tile_engine": [
+    14.53,
+    17.09
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.58",
+   "match": 8,
+   "frame": 110445,
+   "t": 266.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    164,
+    496
+   ],
+   "tile_yolo": [
+    4.29,
+    11.55
+   ],
+   "tile_engine": [
+    4.29,
+    11.55
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.59",
+   "match": 8,
+   "frame": 110535,
+   "t": 267.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    393,
+    386
+   ],
+   "tile_yolo": [
+    13.04,
+    16.81
+   ],
+   "tile_engine": [
+    13.04,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.60",
+   "match": 8,
+   "frame": 110715,
+   "t": 270.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    386
+   ],
+   "tile_yolo": [
+    14.99,
+    16.81
+   ],
+   "tile_engine": [
+    14.99,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.61",
+   "match": 8,
+   "frame": 111330,
+   "t": 281.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    324,
+    478
+   ],
+   "tile_yolo": [
+    10.41,
+    12.41
+   ],
+   "tile_engine": [
+    10.41,
+    12.41
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.62",
+   "match": 8,
+   "frame": 111405,
+   "t": 282.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    251,
+    496
+   ],
+   "tile_yolo": [
+    7.62,
+    11.55
+   ],
+   "tile_engine": [
+    7.62,
+    11.55
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.63",
+   "match": 8,
+   "frame": 111585,
+   "t": 285.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    385
+   ],
+   "tile_yolo": [
+    14.99,
+    16.85
+   ],
+   "tile_engine": [
+    14.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.64",
+   "match": 8,
+   "frame": 111990,
+   "t": 292.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    397,
+    459
+   ],
+   "tile_yolo": [
+    13.19,
+    13.32
+   ],
+   "tile_engine": [
+    13.19,
+    13.63
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "8.66",
+   "match": 8,
+   "frame": 112350,
+   "t": 298.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    93
+   ],
+   "tile_yolo": [
+    8.0,
+    30.81
+   ],
+   "tile_engine": [
+    8.0,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "9.0",
+   "match": 9,
+   "frame": 113685,
+   "t": 42.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    78,
+    219
+   ],
+   "tile_yolo": [
+    1.01,
+    24.79
+   ],
+   "tile_engine": [
+    1.01,
+    26.79
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "9.1",
+   "match": 9,
+   "frame": 114510,
+   "t": 56.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    471,
+    385
+   ],
+   "tile_yolo": [
+    16.02,
+    16.85
+   ],
+   "tile_engine": [
+    16.02,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "9.2",
+   "match": 9,
+   "frame": 114675,
+   "t": 59.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    78,
+    386
+   ],
+   "tile_yolo": [
+    1.01,
+    16.81
+   ],
+   "tile_engine": [
+    1.01,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "9.3",
+   "match": 9,
+   "frame": 116220,
+   "t": 84.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    51,
+    115
+   ],
+   "tile_yolo": [
+    -0.02,
+    29.76
+   ],
+   "tile_engine": [
+    -0.02,
+    31.76
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "9.4",
+   "match": 9,
+   "frame": 116310,
+   "t": 86.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    131,
+    303
+   ],
+   "tile_yolo": [
+    3.03,
+    20.77
+   ],
+   "tile_engine": [
+    3.03,
+    22.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "9.5",
+   "match": 9,
+   "frame": 117900,
+   "t": 112.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    182,
+    240
+   ],
+   "tile_yolo": [
+    4.98,
+    23.79
+   ],
+   "tile_engine": [
+    4.98,
+    25.79
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "9.6",
+   "match": 9,
+   "frame": 118260,
+   "t": 118.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    131,
+    365
+   ],
+   "tile_yolo": [
+    3.03,
+    17.81
+   ],
+   "tile_engine": [
+    3.03,
+    19.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "9.7",
+   "match": 9,
+   "frame": 119055,
+   "t": 132.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    260,
+    94
+   ],
+   "tile_yolo": [
+    7.96,
+    30.77
+   ],
+   "tile_engine": [
+    7.96,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "9.8",
+   "match": 9,
+   "frame": 119550,
+   "t": 140.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    498,
+    116
+   ],
+   "tile_yolo": [
+    17.05,
+    29.71
+   ],
+   "tile_engine": [
+    17.05,
+    31.71
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "9.9",
+   "match": 9,
+   "frame": 119895,
+   "t": 146.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    241
+   ],
+   "tile_yolo": [
+    8.99,
+    23.74
+   ],
+   "tile_engine": [
+    8.99,
+    25.74
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "9.10",
+   "match": 9,
+   "frame": 120150,
+   "t": 150.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    131,
+    323
+   ],
+   "tile_yolo": [
+    3.03,
+    19.82
+   ],
+   "tile_engine": [
+    3.03,
+    21.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "9.11",
+   "match": 9,
+   "frame": 120240,
+   "t": 151.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    313,
+    385
+   ],
+   "tile_yolo": [
+    9.99,
+    16.85
+   ],
+   "tile_engine": [
+    9.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "9.13",
+   "match": 9,
+   "frame": 120720,
+   "t": 159.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    79,
+    386
+   ],
+   "tile_yolo": [
+    1.05,
+    16.81
+   ],
+   "tile_engine": [
+    1.05,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.0",
+   "match": 10,
+   "frame": 123165,
+   "t": 30.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    594
+   ],
+   "tile_yolo": [
+    17.01,
+    6.86
+   ],
+   "tile_engine": [
+    17.01,
+    6.86
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.1",
+   "match": 10,
+   "frame": 123735,
+   "t": 40.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    94
+   ],
+   "tile_yolo": [
+    8.04,
+    30.77
+   ],
+   "tile_engine": [
+    8.04,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.2",
+   "match": 10,
+   "frame": 124215,
+   "t": 48.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    280
+   ],
+   "tile_yolo": [
+    8.99,
+    21.87
+   ],
+   "tile_engine": [
+    8.99,
+    23.87
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.3",
+   "match": 10,
+   "frame": 124440,
+   "t": 51.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    343
+   ],
+   "tile_yolo": [
+    14.99,
+    18.86
+   ],
+   "tile_engine": [
+    14.99,
+    20.86
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.5",
+   "match": 10,
+   "frame": 125880,
+   "t": 75.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    92
+   ],
+   "tile_yolo": [
+    8.99,
+    30.86
+   ],
+   "tile_engine": [
+    8.99,
+    32.86
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.6",
+   "match": 10,
+   "frame": 126870,
+   "t": 92.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    392,
+    573
+   ],
+   "tile_yolo": [
+    13.0,
+    7.87
+   ],
+   "tile_engine": [
+    13.0,
+    7.87
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.7",
+   "match": 10,
+   "frame": 127410,
+   "t": 101.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    131,
+    261
+   ],
+   "tile_yolo": [
+    3.03,
+    22.78
+   ],
+   "tile_engine": [
+    3.03,
+    24.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.8",
+   "match": 10,
+   "frame": 128610,
+   "t": 121.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    392,
+    343
+   ],
+   "tile_yolo": [
+    13.0,
+    18.86
+   ],
+   "tile_engine": [
+    13.0,
+    20.86
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.9",
+   "match": 10,
+   "frame": 128925,
+   "t": 126.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    323
+   ],
+   "tile_yolo": [
+    2.99,
+    19.82
+   ],
+   "tile_engine": [
+    2.99,
+    21.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.10",
+   "match": 10,
+   "frame": 128940,
+   "t": 126.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    235,
+    282
+   ],
+   "tile_yolo": [
+    7.01,
+    21.78
+   ],
+   "tile_engine": [
+    7.01,
+    23.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.12",
+   "match": 10,
+   "frame": 129810,
+   "t": 141.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    156,
+    656
+   ],
+   "tile_yolo": [
+    3.99,
+    3.9
+   ],
+   "tile_engine": [
+    3.99,
+    3.9
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.13",
+   "match": 10,
+   "frame": 130095,
+   "t": 146.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    52,
+    365
+   ],
+   "tile_yolo": [
+    0.02,
+    17.81
+   ],
+   "tile_engine": [
+    0.02,
+    19.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.14",
+   "match": 10,
+   "frame": 130335,
+   "t": 150.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    281
+   ],
+   "tile_yolo": [
+    8.04,
+    21.83
+   ],
+   "tile_engine": [
+    8.04,
+    23.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.15",
+   "match": 10,
+   "frame": 130860,
+   "t": 158.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    209,
+    238
+   ],
+   "tile_yolo": [
+    6.01,
+    23.88
+   ],
+   "tile_engine": [
+    6.01,
+    25.88
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.16",
+   "match": 10,
+   "frame": 130890,
+   "t": 159.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    156,
+    261
+   ],
+   "tile_yolo": [
+    3.99,
+    22.78
+   ],
+   "tile_engine": [
+    3.99,
+    24.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.18",
+   "match": 10,
+   "frame": 131595,
+   "t": 171.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    94
+   ],
+   "tile_yolo": [
+    8.0,
+    30.77
+   ],
+   "tile_engine": [
+    8.0,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.20",
+   "match": 10,
+   "frame": 132240,
+   "t": 181.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    385
+   ],
+   "tile_yolo": [
+    2.0,
+    16.85
+   ],
+   "tile_engine": [
+    2.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.21",
+   "match": 10,
+   "frame": 132780,
+   "t": 190.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    235,
+    95
+   ],
+   "tile_yolo": [
+    7.01,
+    30.72
+   ],
+   "tile_engine": [
+    7.01,
+    32.72
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.22",
+   "match": 10,
+   "frame": 133110,
+   "t": 196.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    392,
+    343
+   ],
+   "tile_yolo": [
+    13.0,
+    18.86
+   ],
+   "tile_engine": [
+    13.0,
+    20.86
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.23",
+   "match": 10,
+   "frame": 133245,
+   "t": 198.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    470,
+    365
+   ],
+   "tile_yolo": [
+    15.98,
+    17.81
+   ],
+   "tile_engine": [
+    15.98,
+    19.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.24",
+   "match": 10,
+   "frame": 133815,
+   "t": 207.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    471,
+    385
+   ],
+   "tile_yolo": [
+    16.02,
+    16.85
+   ],
+   "tile_engine": [
+    16.02,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.25",
+   "match": 10,
+   "frame": 134160,
+   "t": 213.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    366,
+    573
+   ],
+   "tile_yolo": [
+    12.01,
+    7.87
+   ],
+   "tile_engine": [
+    12.01,
+    7.87
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.27",
+   "match": 10,
+   "frame": 134415,
+   "t": 217.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    365
+   ],
+   "tile_yolo": [
+    2.0,
+    17.81
+   ],
+   "tile_engine": [
+    2.0,
+    19.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.29",
+   "match": 10,
+   "frame": 134895,
+   "t": 225.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    115
+   ],
+   "tile_yolo": [
+    17.01,
+    29.76
+   ],
+   "tile_engine": [
+    17.01,
+    31.76
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.30",
+   "match": 10,
+   "frame": 135420,
+   "t": 234.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    283
+   ],
+   "tile_yolo": [
+    8.04,
+    21.73
+   ],
+   "tile_engine": [
+    8.04,
+    23.73
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.31",
+   "match": 10,
+   "frame": 135660,
+   "t": 238.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    385
+   ],
+   "tile_yolo": [
+    8.99,
+    16.85
+   ],
+   "tile_engine": [
+    8.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.32",
+   "match": 10,
+   "frame": 135855,
+   "t": 241.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    470,
+    594
+   ],
+   "tile_yolo": [
+    15.98,
+    6.86
+   ],
+   "tile_engine": [
+    15.98,
+    6.86
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.33",
+   "match": 10,
+   "frame": 136050,
+   "t": 245.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    385
+   ],
+   "tile_yolo": [
+    8.99,
+    16.85
+   ],
+   "tile_engine": [
+    8.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.34",
+   "match": 10,
+   "frame": 136320,
+   "t": 249.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    386
+   ],
+   "tile_yolo": [
+    14.0,
+    16.81
+   ],
+   "tile_engine": [
+    14.0,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.35",
+   "match": 10,
+   "frame": 136545,
+   "t": 253.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    385
+   ],
+   "tile_yolo": [
+    8.04,
+    16.85
+   ],
+   "tile_engine": [
+    8.04,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.36",
+   "match": 10,
+   "frame": 137040,
+   "t": 261.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    92
+   ],
+   "tile_yolo": [
+    8.99,
+    30.86
+   ],
+   "tile_engine": [
+    8.99,
+    32.86
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.37",
+   "match": 10,
+   "frame": 137385,
+   "t": 267.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    281
+   ],
+   "tile_yolo": [
+    8.04,
+    21.83
+   ],
+   "tile_engine": [
+    8.04,
+    23.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.39",
+   "match": 10,
+   "frame": 137670,
+   "t": 272.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    235,
+    95
+   ],
+   "tile_yolo": [
+    7.01,
+    30.72
+   ],
+   "tile_engine": [
+    7.01,
+    32.72
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.40",
+   "match": 10,
+   "frame": 137955,
+   "t": 276.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    78,
+    260
+   ],
+   "tile_yolo": [
+    1.01,
+    22.83
+   ],
+   "tile_engine": [
+    1.01,
+    24.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.41",
+   "match": 10,
+   "frame": 138330,
+   "t": 283.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    344
+   ],
+   "tile_yolo": [
+    14.0,
+    18.81
+   ],
+   "tile_engine": [
+    14.0,
+    20.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.42",
+   "match": 10,
+   "frame": 138435,
+   "t": 284.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    101,
+    300
+   ],
+   "tile_yolo": [
+    1.89,
+    20.92
+   ],
+   "tile_engine": [
+    1.89,
+    22.92
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.43",
+   "match": 10,
+   "frame": 138555,
+   "t": 286.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    471,
+    386
+   ],
+   "tile_yolo": [
+    16.02,
+    16.81
+   ],
+   "tile_engine": [
+    16.02,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.44",
+   "match": 10,
+   "frame": 138765,
+   "t": 290.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    392,
+    572
+   ],
+   "tile_yolo": [
+    13.0,
+    7.91
+   ],
+   "tile_engine": [
+    13.0,
+    7.91
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "10.46",
+   "match": 10,
+   "frame": 138810,
+   "t": 291.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    131,
+    261
+   ],
+   "tile_yolo": [
+    3.03,
+    22.78
+   ],
+   "tile_engine": [
+    3.03,
+    24.78
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.0",
+   "match": 11,
+   "frame": 139410,
+   "t": 11.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    417,
+    195
+   ],
+   "tile_yolo": [
+    13.96,
+    25.94
+   ],
+   "tile_engine": [
+    13.96,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.2",
+   "match": 11,
+   "frame": 140085,
+   "t": 22.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    94
+   ],
+   "tile_yolo": [
+    8.04,
+    30.77
+   ],
+   "tile_engine": [
+    8.04,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.5",
+   "match": 11,
+   "frame": 140475,
+   "t": 29.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    417,
+    193
+   ],
+   "tile_yolo": [
+    13.96,
+    26.03
+   ],
+   "tile_engine": [
+    13.96,
+    28.03
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.7",
+   "match": 11,
+   "frame": 140775,
+   "t": 34.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    93
+   ],
+   "tile_yolo": [
+    8.99,
+    30.81
+   ],
+   "tile_engine": [
+    8.99,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.8",
+   "match": 11,
+   "frame": 140910,
+   "t": 36.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    195
+   ],
+   "tile_yolo": [
+    2.99,
+    25.94
+   ],
+   "tile_engine": [
+    2.99,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.9",
+   "match": 11,
+   "frame": 141165,
+   "t": 40.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    388,
+    170
+   ],
+   "tile_yolo": [
+    12.85,
+    27.13
+   ],
+   "tile_engine": [
+    12.85,
+    29.13
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.10",
+   "match": 11,
+   "frame": 141285,
+   "t": 42.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    52,
+    365
+   ],
+   "tile_yolo": [
+    0.02,
+    17.81
+   ],
+   "tile_engine": [
+    0.02,
+    19.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.11",
+   "match": 11,
+   "frame": 141525,
+   "t": 46.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    195
+   ],
+   "tile_yolo": [
+    14.0,
+    25.94
+   ],
+   "tile_engine": [
+    14.0,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.13",
+   "match": 11,
+   "frame": 141930,
+   "t": 53.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    131,
+    116
+   ],
+   "tile_yolo": [
+    3.03,
+    29.71
+   ],
+   "tile_engine": [
+    3.03,
+    31.71
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.14",
+   "match": 11,
+   "frame": 142065,
+   "t": 55.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    416,
+    195
+   ],
+   "tile_yolo": [
+    13.92,
+    25.94
+   ],
+   "tile_engine": [
+    13.92,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.17",
+   "match": 11,
+   "frame": 143010,
+   "t": 71.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    195
+   ],
+   "tile_yolo": [
+    2.99,
+    25.94
+   ],
+   "tile_engine": [
+    2.99,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.18",
+   "match": 11,
+   "frame": 143055,
+   "t": 72.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    417,
+    195
+   ],
+   "tile_yolo": [
+    13.96,
+    25.94
+   ],
+   "tile_engine": [
+    13.96,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.19",
+   "match": 11,
+   "frame": 143325,
+   "t": 76.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    242
+   ],
+   "tile_yolo": [
+    8.99,
+    23.69
+   ],
+   "tile_engine": [
+    8.99,
+    25.69
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.20",
+   "match": 11,
+   "frame": 143445,
+   "t": 78.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    399,
+    406
+   ],
+   "tile_yolo": [
+    13.27,
+    15.85
+   ],
+   "tile_engine": [
+    13.27,
+    16.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.21",
+   "match": 11,
+   "frame": 143580,
+   "t": 80.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    260
+   ],
+   "tile_yolo": [
+    14.99,
+    22.83
+   ],
+   "tile_engine": [
+    14.99,
+    24.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.22",
+   "match": 11,
+   "frame": 143610,
+   "t": 81.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    197
+   ],
+   "tile_yolo": [
+    2.99,
+    25.84
+   ],
+   "tile_engine": [
+    2.99,
+    27.84
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.23",
+   "match": 11,
+   "frame": 143655,
+   "t": 82.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    419,
+    195
+   ],
+   "tile_yolo": [
+    14.03,
+    25.94
+   ],
+   "tile_engine": [
+    14.03,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.24",
+   "match": 11,
+   "frame": 143790,
+   "t": 84.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    129,
+    195
+   ],
+   "tile_yolo": [
+    2.96,
+    25.94
+   ],
+   "tile_engine": [
+    2.96,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.26",
+   "match": 11,
+   "frame": 144315,
+   "t": 93.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    416,
+    195
+   ],
+   "tile_yolo": [
+    13.92,
+    25.94
+   ],
+   "tile_engine": [
+    13.92,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.28",
+   "match": 11,
+   "frame": 145140,
+   "t": 106.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    93
+   ],
+   "tile_yolo": [
+    8.99,
+    30.81
+   ],
+   "tile_engine": [
+    8.99,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.32",
+   "match": 11,
+   "frame": 145635,
+   "t": 115.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    416,
+    195
+   ],
+   "tile_yolo": [
+    13.92,
+    25.94
+   ],
+   "tile_engine": [
+    13.92,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.33",
+   "match": 11,
+   "frame": 145695,
+   "t": 116.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    195
+   ],
+   "tile_yolo": [
+    2.99,
+    25.94
+   ],
+   "tile_engine": [
+    2.99,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.34",
+   "match": 11,
+   "frame": 145845,
+   "t": 118.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    93
+   ],
+   "tile_yolo": [
+    8.99,
+    30.81
+   ],
+   "tile_engine": [
+    8.99,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.35",
+   "match": 11,
+   "frame": 146010,
+   "t": 121.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    195
+   ],
+   "tile_yolo": [
+    2.99,
+    25.94
+   ],
+   "tile_engine": [
+    2.99,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.38",
+   "match": 11,
+   "frame": 146385,
+   "t": 127.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    286,
+    323
+   ],
+   "tile_yolo": [
+    8.95,
+    19.82
+   ],
+   "tile_engine": [
+    8.95,
+    21.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.39",
+   "match": 11,
+   "frame": 146430,
+   "t": 128.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    129,
+    195
+   ],
+   "tile_yolo": [
+    2.96,
+    25.94
+   ],
+   "tile_engine": [
+    2.96,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.41",
+   "match": 11,
+   "frame": 146655,
+   "t": 132.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    365
+   ],
+   "tile_yolo": [
+    17.01,
+    17.81
+   ],
+   "tile_engine": [
+    17.01,
+    19.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.43",
+   "match": 11,
+   "frame": 146670,
+   "t": 132.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    131,
+    195
+   ],
+   "tile_yolo": [
+    3.03,
+    25.94
+   ],
+   "tile_engine": [
+    3.03,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.46",
+   "match": 11,
+   "frame": 147090,
+   "t": 139.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    94
+   ],
+   "tile_yolo": [
+    8.99,
+    30.77
+   ],
+   "tile_engine": [
+    8.99,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.47",
+   "match": 11,
+   "frame": 147225,
+   "t": 141.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    416,
+    195
+   ],
+   "tile_yolo": [
+    13.92,
+    25.94
+   ],
+   "tile_engine": [
+    13.92,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.48",
+   "match": 11,
+   "frame": 147315,
+   "t": 143.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    286,
+    93
+   ],
+   "tile_yolo": [
+    8.95,
+    30.81
+   ],
+   "tile_engine": [
+    8.95,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.49",
+   "match": 11,
+   "frame": 147405,
+   "t": 144.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    401,
+    449
+   ],
+   "tile_yolo": [
+    13.35,
+    13.79
+   ],
+   "tile_engine": [
+    13.35,
+    14.59
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.50",
+   "match": 11,
+   "frame": 147570,
+   "t": 147.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    425,
+    196
+   ],
+   "tile_yolo": [
+    14.26,
+    25.89
+   ],
+   "tile_engine": [
+    14.26,
+    27.89
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.51",
+   "match": 11,
+   "frame": 147600,
+   "t": 147.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    131,
+    178
+   ],
+   "tile_yolo": [
+    3.03,
+    26.75
+   ],
+   "tile_engine": [
+    3.03,
+    28.75
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.53",
+   "match": 11,
+   "frame": 147930,
+   "t": 153.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    195
+   ],
+   "tile_yolo": [
+    2.99,
+    25.94
+   ],
+   "tile_engine": [
+    2.99,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.54",
+   "match": 11,
+   "frame": 148020,
+   "t": 154.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    416,
+    195
+   ],
+   "tile_yolo": [
+    13.92,
+    25.94
+   ],
+   "tile_engine": [
+    13.92,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.55",
+   "match": 11,
+   "frame": 148035,
+   "t": 155.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    93
+   ],
+   "tile_yolo": [
+    8.99,
+    30.81
+   ],
+   "tile_engine": [
+    8.99,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.56",
+   "match": 11,
+   "frame": 148125,
+   "t": 156.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    131,
+    195
+   ],
+   "tile_yolo": [
+    3.03,
+    25.94
+   ],
+   "tile_engine": [
+    3.03,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.57",
+   "match": 11,
+   "frame": 148545,
+   "t": 163.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    303
+   ],
+   "tile_yolo": [
+    8.99,
+    20.77
+   ],
+   "tile_engine": [
+    8.99,
+    22.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.58",
+   "match": 11,
+   "frame": 148665,
+   "t": 165.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    471,
+    385
+   ],
+   "tile_yolo": [
+    16.02,
+    16.85
+   ],
+   "tile_engine": [
+    16.02,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.59",
+   "match": 11,
+   "frame": 148665,
+   "t": 165.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    417,
+    193
+   ],
+   "tile_yolo": [
+    13.96,
+    26.03
+   ],
+   "tile_engine": [
+    13.96,
+    28.03
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.60",
+   "match": 11,
+   "frame": 148830,
+   "t": 168.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    129,
+    195
+   ],
+   "tile_yolo": [
+    2.96,
+    25.94
+   ],
+   "tile_engine": [
+    2.96,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.61",
+   "match": 11,
+   "frame": 149025,
+   "t": 171.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    195
+   ],
+   "tile_yolo": [
+    14.0,
+    25.94
+   ],
+   "tile_engine": [
+    14.0,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.62",
+   "match": 11,
+   "frame": 149070,
+   "t": 172.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    195
+   ],
+   "tile_yolo": [
+    2.99,
+    25.94
+   ],
+   "tile_engine": [
+    2.99,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.63",
+   "match": 11,
+   "frame": 149145,
+   "t": 173.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    92
+   ],
+   "tile_yolo": [
+    8.99,
+    30.86
+   ],
+   "tile_engine": [
+    8.99,
+    32.86
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.64",
+   "match": 11,
+   "frame": 149310,
+   "t": 176.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    281,
+    410
+   ],
+   "tile_yolo": [
+    8.76,
+    15.66
+   ],
+   "tile_engine": [
+    8.76,
+    16.66
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.65",
+   "match": 11,
+   "frame": 149355,
+   "t": 177.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    395,
+    482
+   ],
+   "tile_yolo": [
+    13.12,
+    12.22
+   ],
+   "tile_engine": [
+    13.12,
+    12.22
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.67",
+   "match": 11,
+   "frame": 149475,
+   "t": 179.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    94
+   ],
+   "tile_yolo": [
+    8.0,
+    30.77
+   ],
+   "tile_engine": [
+    8.0,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.68",
+   "match": 11,
+   "frame": 149625,
+   "t": 181.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    131,
+    195
+   ],
+   "tile_yolo": [
+    3.03,
+    25.94
+   ],
+   "tile_engine": [
+    3.03,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.70",
+   "match": 11,
+   "frame": 149910,
+   "t": 186.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    217
+   ],
+   "tile_yolo": [
+    17.01,
+    24.89
+   ],
+   "tile_engine": [
+    17.01,
+    26.89
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.71",
+   "match": 11,
+   "frame": 150135,
+   "t": 190.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    304
+   ],
+   "tile_yolo": [
+    8.99,
+    20.73
+   ],
+   "tile_engine": [
+    8.99,
+    22.73
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.74",
+   "match": 11,
+   "frame": 150375,
+   "t": 194.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    262
+   ],
+   "tile_yolo": [
+    14.99,
+    22.73
+   ],
+   "tile_engine": [
+    14.99,
+    24.73
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.77",
+   "match": 11,
+   "frame": 150660,
+   "t": 198.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    417,
+    195
+   ],
+   "tile_yolo": [
+    13.96,
+    25.94
+   ],
+   "tile_engine": [
+    13.96,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.78",
+   "match": 11,
+   "frame": 150960,
+   "t": 203.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    92
+   ],
+   "tile_yolo": [
+    8.99,
+    30.86
+   ],
+   "tile_engine": [
+    8.99,
+    32.86
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.79",
+   "match": 11,
+   "frame": 151080,
+   "t": 205.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    129,
+    195
+   ],
+   "tile_yolo": [
+    2.96,
+    25.94
+   ],
+   "tile_engine": [
+    2.96,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.80",
+   "match": 11,
+   "frame": 151305,
+   "t": 209.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    94
+   ],
+   "tile_yolo": [
+    8.04,
+    30.77
+   ],
+   "tile_engine": [
+    8.04,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.81",
+   "match": 11,
+   "frame": 151305,
+   "t": 209.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    364,
+    458
+   ],
+   "tile_yolo": [
+    11.93,
+    13.36
+   ],
+   "tile_engine": [
+    11.93,
+    13.73
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.82",
+   "match": 11,
+   "frame": 151335,
+   "t": 210.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    195
+   ],
+   "tile_yolo": [
+    2.99,
+    25.94
+   ],
+   "tile_engine": [
+    2.99,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.83",
+   "match": 11,
+   "frame": 151410,
+   "t": 211.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    417,
+    195
+   ],
+   "tile_yolo": [
+    13.96,
+    25.94
+   ],
+   "tile_engine": [
+    13.96,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.85",
+   "match": 11,
+   "frame": 151815,
+   "t": 218.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    93
+   ],
+   "tile_yolo": [
+    8.99,
+    30.81
+   ],
+   "tile_engine": [
+    8.99,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.86",
+   "match": 11,
+   "frame": 151860,
+   "t": 218.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    149,
+    195
+   ],
+   "tile_yolo": [
+    3.72,
+    25.94
+   ],
+   "tile_engine": [
+    3.72,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.87",
+   "match": 11,
+   "frame": 151995,
+   "t": 221.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    416,
+    195
+   ],
+   "tile_yolo": [
+    13.92,
+    25.94
+   ],
+   "tile_engine": [
+    13.92,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.88",
+   "match": 11,
+   "frame": 152325,
+   "t": 226.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    129,
+    195
+   ],
+   "tile_yolo": [
+    2.96,
+    25.94
+   ],
+   "tile_engine": [
+    2.96,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.89",
+   "match": 11,
+   "frame": 152430,
+   "t": 228.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    302
+   ],
+   "tile_yolo": [
+    8.99,
+    20.82
+   ],
+   "tile_engine": [
+    8.99,
+    22.82
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.90",
+   "match": 11,
+   "frame": 152430,
+   "t": 228.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    195
+   ],
+   "tile_yolo": [
+    14.0,
+    25.94
+   ],
+   "tile_engine": [
+    14.0,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.91",
+   "match": 11,
+   "frame": 152520,
+   "t": 229.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    129,
+    195
+   ],
+   "tile_yolo": [
+    2.96,
+    25.94
+   ],
+   "tile_engine": [
+    2.96,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.92",
+   "match": 11,
+   "frame": 152790,
+   "t": 234.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    386
+   ],
+   "tile_yolo": [
+    8.04,
+    16.81
+   ],
+   "tile_engine": [
+    8.04,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.93",
+   "match": 11,
+   "frame": 152865,
+   "t": 235.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    364
+   ],
+   "tile_yolo": [
+    2.0,
+    17.86
+   ],
+   "tile_engine": [
+    2.0,
+    19.72
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.94",
+   "match": 11,
+   "frame": 152955,
+   "t": 237.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    417,
+    195
+   ],
+   "tile_yolo": [
+    13.96,
+    25.94
+   ],
+   "tile_engine": [
+    13.96,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.95",
+   "match": 11,
+   "frame": 153120,
+   "t": 239.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    129,
+    195
+   ],
+   "tile_yolo": [
+    2.96,
+    25.94
+   ],
+   "tile_engine": [
+    2.96,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.96",
+   "match": 11,
+   "frame": 153420,
+   "t": 244.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    404,
+    470
+   ],
+   "tile_yolo": [
+    13.46,
+    12.79
+   ],
+   "tile_engine": [
+    13.46,
+    12.79
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.98",
+   "match": 11,
+   "frame": 153420,
+   "t": 244.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    131,
+    195
+   ],
+   "tile_yolo": [
+    3.03,
+    25.94
+   ],
+   "tile_engine": [
+    3.03,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.99",
+   "match": 11,
+   "frame": 153495,
+   "t": 246.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    303
+   ],
+   "tile_yolo": [
+    14.99,
+    20.77
+   ],
+   "tile_engine": [
+    14.99,
+    22.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.100",
+   "match": 11,
+   "frame": 153525,
+   "t": 246.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    218
+   ],
+   "tile_yolo": [
+    8.99,
+    24.84
+   ],
+   "tile_engine": [
+    8.99,
+    26.84
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.102",
+   "match": 11,
+   "frame": 153735,
+   "t": 250.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    418,
+    260
+   ],
+   "tile_yolo": [
+    14.0,
+    22.83
+   ],
+   "tile_engine": [
+    14.0,
+    24.83
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.104",
+   "match": 11,
+   "frame": 154095,
+   "t": 256.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    365
+   ],
+   "tile_yolo": [
+    17.01,
+    17.81
+   ],
+   "tile_engine": [
+    17.01,
+    19.62
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.105",
+   "match": 11,
+   "frame": 154290,
+   "t": 259.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    195
+   ],
+   "tile_yolo": [
+    2.99,
+    25.94
+   ],
+   "tile_engine": [
+    2.99,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.106",
+   "match": 11,
+   "frame": 154500,
+   "t": 262.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    385
+   ],
+   "tile_yolo": [
+    8.04,
+    16.85
+   ],
+   "tile_engine": [
+    8.04,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.107",
+   "match": 11,
+   "frame": 154830,
+   "t": 268.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    104,
+    384
+   ],
+   "tile_yolo": [
+    2.0,
+    16.9
+   ],
+   "tile_engine": [
+    2.0,
+    17.9
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.108",
+   "match": 11,
+   "frame": 155010,
+   "t": 271.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    344
+   ],
+   "tile_yolo": [
+    8.99,
+    18.81
+   ],
+   "tile_engine": [
+    8.99,
+    20.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.109",
+   "match": 11,
+   "frame": 155025,
+   "t": 271.5,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    436,
+    486
+   ],
+   "tile_yolo": [
+    14.68,
+    12.03
+   ],
+   "tile_engine": [
+    14.68,
+    12.03
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.111",
+   "match": 11,
+   "frame": 155100,
+   "t": 272.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    262
+   ],
+   "tile_yolo": [
+    14.99,
+    22.73
+   ],
+   "tile_engine": [
+    14.99,
+    24.73
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.112",
+   "match": 11,
+   "frame": 155355,
+   "t": 277.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    195
+   ],
+   "tile_yolo": [
+    2.99,
+    25.94
+   ],
+   "tile_engine": [
+    2.99,
+    27.94
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.113",
+   "match": 11,
+   "frame": 155550,
+   "t": 280.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    261,
+    385
+   ],
+   "tile_yolo": [
+    8.0,
+    16.85
+   ],
+   "tile_engine": [
+    8.0,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.115",
+   "match": 11,
+   "frame": 155730,
+   "t": 283.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    385
+   ],
+   "tile_yolo": [
+    2.99,
+    16.85
+   ],
+   "tile_engine": [
+    2.99,
+    17.85
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "11.117",
+   "match": 11,
+   "frame": 156210,
+   "t": 291.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    303
+   ],
+   "tile_yolo": [
+    8.99,
+    20.77
+   ],
+   "tile_engine": [
+    8.99,
+    22.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "12.0",
+   "match": 12,
+   "frame": 157335,
+   "t": 24.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    94
+   ],
+   "tile_yolo": [
+    8.99,
+    30.77
+   ],
+   "tile_engine": [
+    8.99,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "12.1",
+   "match": 12,
+   "frame": 158715,
+   "t": 47.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    116
+   ],
+   "tile_yolo": [
+    17.01,
+    29.71
+   ],
+   "tile_engine": [
+    17.01,
+    31.71
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "12.2",
+   "match": 12,
+   "frame": 159120,
+   "t": 54.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    105,
+    303
+   ],
+   "tile_yolo": [
+    2.04,
+    20.77
+   ],
+   "tile_engine": [
+    2.04,
+    22.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "12.3",
+   "match": 12,
+   "frame": 160500,
+   "t": 77.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    93
+   ],
+   "tile_yolo": [
+    8.99,
+    30.81
+   ],
+   "tile_engine": [
+    8.99,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "12.4",
+   "match": 12,
+   "frame": 161220,
+   "t": 89.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    94
+   ],
+   "tile_yolo": [
+    8.04,
+    30.77
+   ],
+   "tile_engine": [
+    8.04,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "12.5",
+   "match": 12,
+   "frame": 161505,
+   "t": 93.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    444,
+    303
+   ],
+   "tile_yolo": [
+    14.99,
+    20.77
+   ],
+   "tile_engine": [
+    14.99,
+    22.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "12.6",
+   "match": 12,
+   "frame": 162480,
+   "t": 110.0,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    240
+   ],
+   "tile_yolo": [
+    17.01,
+    23.79
+   ],
+   "tile_engine": [
+    17.01,
+    25.79
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "12.7",
+   "match": 12,
+   "frame": 163515,
+   "t": 127.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    262,
+    94
+   ],
+   "tile_yolo": [
+    8.04,
+    30.77
+   ],
+   "tile_engine": [
+    8.04,
+    32.77
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "12.8",
+   "match": 12,
+   "frame": 163965,
+   "t": 134.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    92
+   ],
+   "tile_yolo": [
+    8.99,
+    30.86
+   ],
+   "tile_engine": [
+    8.99,
+    32.86
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "12.9",
+   "match": 12,
+   "frame": 164535,
+   "t": 144.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    287,
+    93
+   ],
+   "tile_yolo": [
+    8.99,
+    30.81
+   ],
+   "tile_engine": [
+    8.99,
+    32.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "12.10",
+   "match": 12,
+   "frame": 164775,
+   "t": 148.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    497,
+    137
+   ],
+   "tile_yolo": [
+    17.01,
+    28.71
+   ],
+   "tile_engine": [
+    17.01,
+    30.71
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "12.11",
+   "match": 12,
+   "frame": 165555,
+   "t": 161.25,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    386
+   ],
+   "tile_yolo": [
+    2.99,
+    16.81
+   ],
+   "tile_engine": [
+    2.99,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  },
+  {
+   "id": "12.12",
+   "match": 12,
+   "frame": 165825,
+   "t": 165.75,
+   "card": "?",
+   "form": "base",
+   "cat": "troop",
+   "ref": [
+    130,
+    386
+   ],
+   "tile_yolo": [
+    2.99,
+    16.81
+   ],
+   "tile_engine": [
+    2.99,
+    17.81
+   ],
+   "hidden": false,
+   "t_unknown": false,
+   "note": "",
+   "tier": "silver",
+   "id_source": "none",
+   "src_event": "stopwatch"
+  }
+ ]
+}

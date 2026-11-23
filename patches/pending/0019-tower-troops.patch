@@ -1,0 +1,731 @@
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index 756b7ed..b720e77 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -29,7 +29,7 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     // its own). Set here because every troop and building passes through;
+     // spells and deploy effects do not, since a spell has its own delay.
+     entity->deployTicksRemaining = stats.deployTicks;
+-    entity->loadTicks = LoadTimes::forName(stats.name);
++    entity->loadTicks = stats.loadTicksOverride >= 0 ? stats.loadTicksOverride : LoadTimes::forName(stats.name);
+     entity->isFlying = stats.isFlying;
+     entity->targetsAir = stats.targetsAir;
+     entity->deathEffect = stats.deathEffect;
+@@ -107,6 +107,8 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     entity->hitSpeedRampMidFraction = stats.hitSpeedRampMidFraction;
+     entity->hitSpeedRampFullFraction = stats.hitSpeedRampFullFraction;
+     entity->burstEveryNAttacks = stats.burstEveryNAttacks;
++    entity->magazineSize = stats.magazineSize;
++    entity->magazineReloadTicks = stats.magazineReloadTicks;
+     entity->burstDamageMultiplier = stats.burstDamageMultiplier;
+     entity->onDamageTakenEffect = stats.onDamageTaken;
+     entity->healOnHitAmount = stats.healOnHitAmount;
+diff --git a/include/core/CardStats.h b/include/core/CardStats.h
+index da96107..fa7174d 100644
+--- a/include/core/CardStats.h
++++ b/include/core/CardStats.h
+@@ -347,6 +347,12 @@ struct CardStats {
+ 
+     // A burst every Nth attack (Dagger Duchess, some Evolutions).
+     int burstEveryNAttacks = 0;
++    // CombatEntity's magazine (Dagger Duchess); 0 = none.
++    int magazineSize = 0;
++    int magazineReloadTicks = 0;
++    // A load time for bodies the name-keyed LoadTimes table cannot reach (the
++    // Tower Troops, which are all named "Princess Tower"); -1 = use the table.
++    int loadTicksOverride = -1;
+     float burstDamageMultiplier = 1.0f;
+ 
+     // An effect on taking damage (some Evolutions, e.g. Barbarians).
+@@ -683,6 +689,15 @@ struct CardStats {
+         hitSpeedRampFullFraction = fullFraction;
+         return *this;
+     }
++    CardStats& withMagazine(int size, int reloadTicks) {
++        magazineSize = size;
++        magazineReloadTicks = reloadTicks;
++        return *this;
++    }
++    CardStats& withLoadTicks(int ticks) {
++        loadTicksOverride = ticks;
++        return *this;
++    }
+     CardStats& withBurstAttack(int everyNAttacks, float multiplier) {
+         burstEveryNAttacks = everyNAttacks;
+         burstDamageMultiplier = multiplier;
+diff --git a/include/core/GameManager.h b/include/core/GameManager.h
+index 4ba11ce..ed3b5e3 100644
+--- a/include/core/GameManager.h
++++ b/include/core/GameManager.h
+@@ -8,6 +8,7 @@
+ #include "TimeoutRules.h"
+ #include "MatchStatistics.h"
+ #include "TowerTroops.h"
++#include "RoyalChefBuffEffect.h"
+ #include "CardFactories.h"
+ #include "SpiritEmpressForms.h"
+ #include <algorithm>
+@@ -89,6 +90,28 @@ private:
+     // Tower.
+     TowerTroopType aiTowerTroop = TowerTroopType::None;
+     TowerTroopType oppTowerTroop = TowerTroopType::None;
++    // Royal Chef's pancake, per team: the fraction cooked (1 = ready, held
++    // until a troop qualifies). See cookRoyalChef.
++    float chefCookProgress[2] = { 0.0f, 0.0f };
++
++    // Royal Chef (TowerTroops.h RoyalChef): one pancake cooks per team, at the
++    // rate of how many of that team's Princess Towers are busy (attacking, or
++    // destroyed); with both destroyed it stops.
++    void cookRoyalChef(int team) {
++        if ((team == 0 ? aiTowerTroop : oppTowerTroop) != TowerTroopType::RoyalChef) return;
++        if (currentTick < RoyalChef::COOK_START_TICKS) return;
++        int standing = 0, attacking = 0;
++        for (const auto& e : board.getEntities()) {
++            if (e->team != team || !e->isAlive() || !e->isTower() || e->symbol == 'R') continue;
++            standing++;
++            if (auto t = std::dynamic_pointer_cast<CombatEntity>(e); t && t->isAttacking()) attacking++;
++        }
++        if (standing == 0) return;
++        const int busy = std::min(2, attacking + (2 - standing));
++        float& progress = chefCookProgress[team];
++        if (progress < 1.0f) progress += 1.0f / static_cast<float>(RoyalChef::COOK_TICKS[busy]);
++        if (progress >= 1.0f && RoyalChefBuffEffect::serve(board, team)) progress = 0.0f;
++    }
+ 
+     void addTower(float x, float y, int hp, int team, float attackRange, int damage, int attackCooldown,
+         char symbol, const std::string& towerName) {
+@@ -755,6 +778,7 @@ public:
+         currentTick = 0;
+         gameOver = false;
+         loserTeam = -1;
++        chefCookProgress[0] = chefCookProgress[1] = 0.0f;
+         // Cleared per match, or the agent would see cards the opponent has not
+         // shown.
+         for (auto& perTeam : lastPlayedTick) perTeam.fill(-1);
+@@ -808,6 +832,8 @@ public:
+         for (auto& entity : board.getEntities()) {
+             if (entity->isAlive()) entity->update(board);
+         }
++        cookRoyalChef(0);
++        cookRoyalChef(1);
+ 
+         // Elixir Collector: drain this tick's grants into the players, with the
+         // same cap.
+diff --git a/include/core/RoyalChefBuffEffect.h b/include/core/RoyalChefBuffEffect.h
+index 926e1cd..6f6b15f 100644
+--- a/include/core/RoyalChefBuffEffect.h
++++ b/include/core/RoyalChefBuffEffect.h
+@@ -3,36 +3,39 @@
+ #include "CombatEntity.h"
+ #include "Board.h"
+ 
+-// Royal Chef's periodic pancake: buffs the nearest ally's damage and tops up
+-// its hp by 10%, approximating the real "+1 level" (there are no levels). Its
+-// own scan instead of applyAreaBuff, which cannot exclude the tower at distance
+-// 0.
++// Royal Chef's pancake (patch 0019; Clash Royale wiki, Royal Chef): +1 Level
++// for one allied troop anywhere in the arena (CombatEntity::gainLevel, past the
++// level cap too). Buildings, Crown Towers and troops under 33% of their full
++// hp are never fed. Troops with fewer pancakes come first, then higher hp, so
++// a push's tank is fed before its support and the pancakes spread out. When
++// the pancake is cooked is GameManager's (cookRoyalChef); this only serves.
++//
++// It was a +10% hp top-up with a permanent 1.10x damage buff, once per troop,
++// fed to the nearest ally within 6 tiles of the tower every 28 s, before the
++// engine had levels.
+ class RoyalChefBuffEffect : public IPeriodicEffect {
+-    float radius;
+-    float damageMultiplier;
+-
+ public:
+-    RoyalChefBuffEffect(float radius, float damageMultiplier)
+-        : radius(radius), damageMultiplier(damageMultiplier) {}
++    static constexpr float MIN_HP_FRACTION = 0.33f;
+ 
+-    void apply(Board& board, const Vector2D& position, int team) const override {
+-        std::shared_ptr<CombatEntity> nearest;
+-        float nearestDist = radius;
++    // Feeds one troop of `team`; false if none qualifies (the pancake waits).
++    static bool serve(Board& board, int team) {
++        std::shared_ptr<CombatEntity> best;
+         for (const auto& entity : board.getEntities()) {
+-            if (entity->team != team || !entity->isAlive()) continue;
+-            float dist = position.distanceTo(entity->position);
+-            if (dist <= 0.01f || dist > nearestDist) continue;
+-            auto combatEntity = std::dynamic_pointer_cast<CombatEntity>(entity);
+-            if (!combatEntity) continue;
+-            // Each ally is served once; repeat servings would compound without
+-            // bound. See CombatEntity::royalChefServed.
+-            if (combatEntity->royalChefServed) continue;
+-            nearest = combatEntity;
+-            nearestDist = dist;
++            if (entity->team != team || !entity->isAlive() || entity->isTower() || entity->isBuilding()) continue;
++            auto c = std::dynamic_pointer_cast<CombatEntity>(entity);
++            if (!c) continue;
++            const int full = c->fullHp > 0 ? c->fullHp : c->hp;
++            if (static_cast<float>(c->hp) < MIN_HP_FRACTION * static_cast<float>(full)) continue;
++            if (!best || c->royalChefServings < best->royalChefServings
++                || (c->royalChefServings == best->royalChefServings && c->hp > best->hp)) {
++                best = c;
++            }
+         }
+-        if (!nearest) return;
+-        nearest->royalChefServed = true;
+-        nearest->applyBuff(damageMultiplier, 999999);
+-        nearest->hp += nearest->hp / 10;
++        if (!best) return false;
++        best->royalChefServings++;
++        best->gainLevel();
++        return true;
+     }
++
++    void apply(Board& board, const Vector2D&, int team) const override { serve(board, team); }
+ };
+diff --git a/include/core/TowerTroops.h b/include/core/TowerTroops.h
+index 29db148..3cffec5 100644
+--- a/include/core/TowerTroops.h
++++ b/include/core/TowerTroops.h
+@@ -1,6 +1,5 @@
+ #pragma once
+ #include "CardStats.h"
+-#include "RoyalChefBuffEffect.h"
+ #include <memory>
+ 
+ // Crown Tower stats at level 11, the level the registry's card stats are
+@@ -20,7 +19,7 @@ namespace CrownTower {
+ 
+ // The four selectable Tower Troops; one replaces both Princess Towers for the
+ // match (GameManager::addTower, reset). None is the default: the plain
+-// Princess Tower (CrownTower, 7.5 range).
++// Princess Tower (CrownTower, 7.5 range), kept byte-for-byte as it was.
+ enum class TowerTroopType {
+     None,
+     TowerPrincess,
+@@ -29,8 +28,23 @@ enum class TowerTroopType {
+     RoyalChef
+ };
+ 
++// Royal Chef's cooking (Clash Royale wiki, Royal Chef, 4 Aug 2025 values):
++// none for the first 7 s, then a pancake every 23 s while neither of his
++// towers attacks and 38 s while both do (a destroyed tower counts as
++// attacking); 30.5 s for one is interpolated, the wiki gives only the range.
++// Both towers down: no more cooking. GameManager::cookRoyalChef runs it.
++namespace RoyalChef {
++    constexpr int COOK_START_TICKS = 70;
++    constexpr int COOK_TICKS[3] = { 230, 305, 380 };   // 0, 1, 2 towers busy
++}
++
+ // Symbol stays 'P' for every variant (see GameManager::addTower). Fields are
+ // set directly because towers are built by GameManager, not registered cards.
++//
++// Level-11 stats from the Clash Royale wiki pages (current as of the 4 Aug and
++// 1 Sep 2025 balance changes; the 2026 notes did not touch Tower Troops).
++// "First hit" is the sourced first-attack time, as a load time (LoadTimes.h)
++// the name-keyed table cannot give a tower.
+ inline CardStats towerTroopStats(TowerTroopType type) {
+     CardStats stats;
+     stats.spawnOffsets = { {0.0f, 0.0f} };
+@@ -42,26 +56,29 @@ inline CardStats towerTroopStats(TowerTroopType type) {
+ 
+     switch (type) {
+         case TowerTroopType::TowerPrincess:
+-            // Level 11: 3204 hp / 153 dmg / 437 dps. A whole-tick cooldown
+-            // cannot hit 437 dps at 153 damage; 4 ticks (~382 dps) is closest.
+-            stats.hp = 3204; stats.attackRange = 7.5f; stats.damage = 153; stats.attackCooldown = 4;
++            // 3052 hp / 109 dmg, 0.8 s, first hit 0.8 s, range 7.5: the plain
++            // Princess Tower's numbers plus its first-hit time.
++            stats.hp = CrownTower::PRINCESS_HP; stats.attackRange = 7.5f;
++            stats.damage = CrownTower::PRINCESS_DAMAGE; stats.attackCooldown = CrownTower::PRINCESS_COOLDOWN_TICKS;
++            stats.withLoadTicks(8);
+             break;
+         case TowerTroopType::Cannoneer:
+-            // Level 11: 3052 hp / 109 dmg / 0.8 s, no splash.
+-            stats.hp = 3052; stats.attackRange = 7.5f; stats.damage = 109; stats.attackCooldown = 8;
++            // 2616 hp / 320 dmg, 2.2 s (1 Sep 2025), first hit 0.8 s, no splash.
++            stats.hp = 2616; stats.attackRange = 7.5f; stats.damage = 320; stats.attackCooldown = 22;
++            stats.withLoadTicks(8);
+             break;
+         case TowerTroopType::DaggerDuchess:
+-            // Liquipedia: 2298 hp, range 7.5, 0.5 s, 89 per dagger, 8 daggers.
+-            // Modelled as a burst on the 8th attack; the 8x multiplier is an
+-            // approximation, since sources disagree on the split.
+-            stats.hp = 2298; stats.attackRange = 7.5f; stats.damage = 89; stats.attackCooldown = 5;
+-            stats.withBurstAttack(8, 8.0f);
++            // 2768 hp / 107 dmg per dagger, 0.5 s, 8 daggers, 0.9 s per dagger
++            // to reload: 1.4 s a dagger once empty (the wiki's 76 "empty dagger"
++            // dps = 107 / 1.4).
++            stats.hp = 2768; stats.attackRange = 7.5f; stats.damage = 107; stats.attackCooldown = 5;
++            stats.withMagazine(8, 9);
+             break;
+         case TowerTroopType::RoyalChef:
+-            // Combat stats unsourced, so Tower Princess's are reused. Feeds an
+-            // ally every ~21-35 s (28 s here); see RoyalChefBuffEffect.
+-            stats.hp = 3204; stats.attackRange = 7.5f; stats.damage = 153; stats.attackCooldown = 4;
+-            stats.withPeriodicEffect(280, std::make_shared<RoyalChefBuffEffect>(6.0f, 1.10f));
++            // 2703 hp / 109 dmg, 1.0 s, first hit 0.8 s. The pancake is
++            // GameManager's (RoyalChef above, RoyalChefBuffEffect.h).
++            stats.hp = 2703; stats.attackRange = 7.5f; stats.damage = 109; stats.attackCooldown = 10;
++            stats.withLoadTicks(8);
+             break;
+         case TowerTroopType::None:
+         default:
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index 6917237..06db671 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -279,8 +279,18 @@ public:
+     // Latch: Mother Witch's hog spawn is armed once (see CursedHogOnHit); the
+     // curse's duration still refreshes.
+     bool curseDeathSpawnAttached = false;
+-    // Latch: the Royal Chef serves each ally once (see RoyalChefBuffEffect).
+-    bool royalChefServed = false;
++    // Pancakes this body has eaten (Royal Chef, RoyalChefBuffEffect.h): the
++    // Chef prefers troops that have none.
++    int royalChefServings = 0;
++
++    // A magazine of shots (Dagger Duchess, patch 0019): magazineSize > 0 holds
++    // that many, each attack spends one, and none left means no attack. One
++    // comes back every magazineReloadTicks, counted only while the attack
++    // cooldown is at 0, so an empty magazine fires every cooldown + reload.
++    int magazineSize = 0;
++    int magazineReloadTicks = 0;
++    int magazineRounds = -1;           // -1: fill to magazineSize on the first update
++    int magazineReloadProgress = 0;
+ 
+     // Ally auras on landed attacks: Rune Giant's every-Nth buff, Battle
+     // Healer's heal. Independent opt-ins.
+@@ -492,6 +502,8 @@ public:
+         }
+     }
+     bool inAbilityWindow() const { return abilityWindowTicksRemaining > 0; }
++    // An attack started within the last attack interval (GameManager::cookRoyalChef).
++    bool isAttacking() const { return ticksSinceAttack <= attackCooldown; }
+     // The multiplier on this unit's hit against `target` for Crown Towers.
+     float crownTowerHitFactor(const Entity& target) const {
+         if (!target.isTower()) return 1.0f;
+@@ -684,6 +696,16 @@ public:
+             if (transformTicksRemaining <= 0) hp = 0;
+         }
+ 
++        // Magazine reload: counted on ticks the cooldown was already at 0, so
++        // it never runs during the attack interval.
++        if (magazineSize > 0) {
++            if (magazineRounds < 0) magazineRounds = magazineSize;
++            if (magazineRounds < magazineSize && currentCooldown <= 0.0f
++                && ++magazineReloadProgress >= magazineReloadTicks) {
++                magazineRounds++;
++                magazineReloadProgress = 0;
++            }
++        }
+         if (wasFrozen) {
+             for (auto& s : freezeSlots) {
+                 if (s.ticks > 0) s.ticks--;
+@@ -836,13 +858,15 @@ public:
+                 }
+                 // Not while stunned: a stun holds the cooldown still, and a
+                 // unit that was already ready must not swing through it.
+-                if (!stunned && !loading && currentCooldown == 0.0f && !windowSuppressAttack) {
++                if (!stunned && !loading && currentCooldown == 0.0f && !windowSuppressAttack
++                    && (magazineSize <= 0 || magazineRounds != 0)) {
+                     // Effects are applied by performAttack, since when they
+                     // fire depends on when the damage lands (at once for a
+                     // direct hit, on arrival for a projectile).
+                     lastAttackDistance = dist;
+                     ticksSinceAttack = 0;
+                     attacksStarted++;
++                    if (magazineSize > 0 && magazineRounds > 0) magazineRounds--;
+                     // Reset here, not on projectile arrival: the only
+                     // grace-period card (Inferno Dragon Evolution) attacks
+                     // instantly.
+@@ -1155,6 +1179,23 @@ public:
+         return true;
+     }
+ 
++    // One level up (Royal Chef's pancake, patch 0019): the inverse of
++    // loseLevel. The pancake goes past the level cap; beyond MAX_LEVEL each
++    // step repeats the table's last ratio (409 / 372, about +10%), an
++    // extrapolation since the table stops at 16.
++    virtual void gainLevel() {
++        const int at = std::max(currentLevel, CardLevels::MIN_LEVEL);
++        const int i = std::min(at, CardLevels::MAX_LEVEL - 1);
++        const double f = static_cast<double>(CardLevels::MULTIPLIER_PERCENT[i])
++                       / CardLevels::MULTIPLIER_PERCENT[i - 1];
++        auto up = [f](int v) { return v > 0 ? static_cast<int>(std::lround(v * f)) : v; };
++        currentLevel = at + 1;
++        hp = up(hp);
++        fullHp = up(fullHp);
++        damage = up(damage);
++        shieldHp = up(shieldHp);
++    }
++
+ protected:
+ 
+     int getCurrentDamage() const {
+diff --git a/tests/core/test_cards_0019.cpp b/tests/core/test_cards_0019.cpp
+new file mode 100644
+index 0000000..1ba5e32
+--- /dev/null
++++ b/tests/core/test_cards_0019.cpp
+@@ -0,0 +1,212 @@
++#include <catch_amalgamated.hpp>
++#include "test_helpers.h"
++#include "Board.h"
++#include "GameManager.h"
++#include "TowerTroops.h"
++#include "ArenaLayout.h"
++#include "CardLevels.h"
++#include "CombatEntity.h"
++#include "Tower.h"
++#include <memory>
++#include <vector>
++
++// Patch 0019: the four Tower Troops with their wiki level-11 stats, per side
++// (GameManager's aiTowerTroop / oppTowerTroop), Dagger Duchess's magazine,
++// the first-hit load times, and Royal Chef's pancake as a real +1 level.
++
++namespace {
++
++std::vector<int> deck() { return { 0, 1, 2, 3, 4, 5, 6, 7 }; }
++
++// An enemy (team 1) target 4 tiles in front of team 0's left Princess Tower,
++// out of every other tower's range. Tracks the ticks its hp dropped and by how
++// much.
++struct TowerShots {
++    GameManager game;
++    std::shared_ptr<StationaryCombatant> foe;
++    std::vector<std::pair<int, int>> hits;   // (tick, damage)
++
++    explicit TowerShots(TowerTroopType ours)
++        : game(deck(), deck(), ours, TowerTroopType::None) {
++        game.seed(1);
++        game.reset();
++        foe = std::make_shared<StationaryCombatant>(game.getBoard().allocateId(),
++            ArenaLayout::LEFT_LANE_X, ArenaLayout::princessY(0) + 4.0f, 1000000, 1, 0.5f, 0, 1000);
++        spawn(game.getBoard(), foe);
++    }
++    void run(int ticks) {
++        for (int t = 1; t <= ticks; ++t) {
++            const int before = foe->hp;
++            game.step();
++            if (foe->hp < before) hits.emplace_back(t, before - foe->hp);
++        }
++    }
++    std::vector<int> gaps() const {
++        std::vector<int> g;
++        for (size_t i = 1; i < hits.size(); ++i) g.push_back(hits[i].first - hits[i - 1].first);
++        return g;
++    }
++};
++
++// The plain tower's first hit on the same setup: the engine's own engagement
++// and projectile latency, before any load time.
++int plainFirstHit() {
++    TowerShots s(TowerTroopType::None);
++    s.run(40);
++    REQUIRE_FALSE(s.hits.empty());
++    return s.hits[0].first;
++}
++
++std::shared_ptr<Entity> leftPrincess(GameManager& game, int team) {
++    for (const auto& e : game.getBoard().getEntities())
++        if (e->isTower() && e->symbol != 'R' && e->team == team && e->position.x < ArenaLayout::CENTER_X) return e;
++    return nullptr;
++}
++
++}  // namespace
++
++TEST_CASE("each side's Tower Troop is its own: hp per team", "[tower_troops][patch0019]") {
++    const std::vector<std::pair<TowerTroopType, int>> rows = {
++        { TowerTroopType::None, 3052 }, { TowerTroopType::TowerPrincess, 3052 }, { TowerTroopType::Cannoneer, 2616 },
++        { TowerTroopType::DaggerDuchess, 2768 }, { TowerTroopType::RoyalChef, 2703 } };
++    for (const auto& [ai, aiHp] : rows) {
++        for (const auto& [opp, oppHp] : rows) {
++            GameManager game(deck(), deck(), ai, opp);
++            for (const auto& e : game.getBoard().getEntities()) {
++                if (!e->isTower() || e->symbol == 'R') continue;
++                REQUIRE(e->hp == (e->team == 0 ? aiHp : oppHp));
++            }
++        }
++    }
++}
++
++TEST_CASE("Tower Princess: 109 every 0.8 s, the first 0.8 s after engaging", "[tower_troops][patch0019]") {
++    const int plain = plainFirstHit();
++    TowerShots s(TowerTroopType::TowerPrincess);
++    s.run(60);
++    REQUIRE(s.hits.size() >= 5);
++    REQUIRE(s.hits[0].first == plain + 8);
++    for (const auto& [tick, dmg] : s.hits) REQUIRE(dmg == 109);
++    for (int g : s.gaps()) REQUIRE(g == 8);
++}
++
++TEST_CASE("Cannoneer: 320 every 2.2 s, the first 0.8 s after engaging", "[tower_troops][patch0019]") {
++    const int plain = plainFirstHit();
++    TowerShots s(TowerTroopType::Cannoneer);
++    s.run(plain + 8 + 3 * 22);
++    REQUIRE(s.hits.size() == 4);
++    REQUIRE(s.hits[0].first == plain + 8);
++    for (const auto& [tick, dmg] : s.hits) REQUIRE(dmg == 320);
++    for (int g : s.gaps()) REQUIRE(g == 22);
++}
++
++TEST_CASE("Dagger Duchess: 8 daggers of 107 at 0.5 s, then one per 1.4 s", "[tower_troops][patch0019]") {
++    const int plain = plainFirstHit();
++    TowerShots s(TowerTroopType::DaggerDuchess);
++    s.run(120);
++    REQUIRE(s.hits[0].first == plain);   // no load time
++    for (const auto& [tick, dmg] : s.hits) REQUIRE(dmg == 107);
++    const auto g = s.gaps();
++    REQUIRE(g.size() >= 10);
++    for (int i = 0; i < 7; ++i) REQUIRE(g[i] == 5);    // the full magazine
++    for (size_t i = 7; i < g.size(); ++i) REQUIRE(g[i] == 14);   // 0.5 s + 0.9 s reload
++}
++
++TEST_CASE("Dagger Duchess reloads while idle, one dagger per 0.9 s", "[tower_troops][patch0019]") {
++    TowerShots s(TowerTroopType::DaggerDuchess);
++    s.run(60);                     // empties the magazine
++    auto duchess = std::dynamic_pointer_cast<CombatEntity>(leftPrincess(s.game, 0));
++    REQUIRE(duchess != nullptr);
++    s.foe->hp = 0;
++    for (int i = 0; i < 100; ++i) s.game.step();
++    REQUIRE(duchess->magazineRounds == 8);
++}
++
++TEST_CASE("CombatEntity::gainLevel is loseLevel's inverse, and goes past the cap", "[level][patch0019]") {
++    StationaryCombatant a(1, 0.0f, 0.0f, 1000, 0, 1.0f, 100, 10);
++    a.gainLevel();
++    REQUIRE(a.currentLevel == 12);
++    REQUIRE(a.hp == 1098);
++    REQUIRE(a.getDamagePerTick() == Catch::Approx(11.0f / 1.0f).epsilon(0.01));   // 110 / 10
++    a.loseLevel();
++    REQUIRE(a.currentLevel == 11);
++    REQUIRE(a.hp == 1000);
++
++    StationaryCombatant capped(2, 0.0f, 0.0f, 4090, 0, 1.0f, 409, 10);
++    capped.currentLevel = CardLevels::MAX_LEVEL;
++    capped.gainLevel();
++    REQUIRE(capped.currentLevel == CardLevels::MAX_LEVEL + 1);
++    REQUIRE(capped.hp == 4497);   // 4090 * 409 / 372
++}
++
++TEST_CASE("Royal Chef: the first pancake 7 s + 23 s in with no tower busy, to the biggest unfed troop",
++        "[tower_troops][royal_chef][patch0019]") {
++    GameManager game(deck(), deck(), TowerTroopType::RoyalChef, TowerTroopType::RoyalChef);
++    game.seed(1);
++    game.reset();
++    Board& board = game.getBoard();
++    // Team 0's own half, beside the King, out of every enemy's reach.
++    auto tank = std::make_shared<StationaryCombatant>(board.allocateId(), 6.0f, 9.0f, 3000, 0, 0.5f, 0, 1000);
++    auto small = std::make_shared<StationaryCombatant>(board.allocateId(), 11.0f, 9.0f, 500, 0, 0.5f, 0, 1000);
++    auto weak = std::make_shared<StationaryCombatant>(board.allocateId(), 8.0f, 10.0f, 5000, 0, 0.5f, 0, 1000);
++    spawn(board, tank);
++    spawn(board, small);
++    spawn(board, weak);
++    game.step();
++    weak->hp = 1000;   // under 33% of its 5000: never fed
++
++    int fedAt = -1;
++    for (int t = 2; t <= 320 && fedAt < 0; ++t) {
++        game.step();
++        if (tank->currentLevel > 11) fedAt = t;
++    }
++    REQUIRE(fedAt >= 299);
++    REQUIRE(fedAt <= 302);
++    REQUIRE(tank->hp == CardLevels::scale(3000, 12));
++    REQUIRE(small->currentLevel == 11);
++
++    for (int i = 0; i < 240; ++i) game.step();   // the second goes to the unfed troop
++    REQUIRE(small->currentLevel == 12);
++    REQUIRE(tank->currentLevel == 12);
++    REQUIRE(weak->currentLevel == 11);
++}
++
++TEST_CASE("Royal Chef cooks slower while a tower attacks and stops with both towers down",
++        "[tower_troops][royal_chef][patch0019]") {
++    SECTION("one tower busy: 30.5 s") {
++        TowerShots s(TowerTroopType::RoyalChef);
++        Board& board = s.game.getBoard();
++        auto ally = std::make_shared<StationaryCombatant>(board.allocateId(), 11.0f, 9.0f, 3000, 0, 0.5f, 0, 1000);
++        spawn(board, ally);
++        int fedAt = -1;
++        for (int t = 1; t <= 400 && fedAt < 0; ++t) {
++            s.game.step();
++            if (ally->currentLevel > 11) fedAt = t;
++        }
++        // From tick 70, about 8 ticks of 1/230 before the tower engages, then 1/305.
++        REQUIRE(fedAt >= 370);
++        REQUIRE(fedAt <= 378);
++    }
++    SECTION("both Princess Towers destroyed: no pancake") {
++        GameManager game(deck(), deck(), TowerTroopType::RoyalChef, TowerTroopType::None);
++        game.seed(1);
++        game.reset();
++        Board& board = game.getBoard();
++        for (const auto& e : board.getEntities())
++            if (e->isTower() && e->symbol != 'R' && e->team == 0) e->hp = 0;
++        auto ally = std::make_shared<StationaryCombatant>(board.allocateId(), 9.0f, 9.0f, 3000, 0, 0.5f, 0, 1000);
++        spawn(board, ally);
++        for (int i = 0; i < 500; ++i) game.step();
++        REQUIRE(ally->currentLevel == 11);
++    }
++    SECTION("an opponent without the Chef never cooks") {
++        GameManager game(deck(), deck(), TowerTroopType::None, TowerTroopType::None);
++        game.seed(1);
++        game.reset();
++        Board& board = game.getBoard();
++        auto ally = std::make_shared<StationaryCombatant>(board.allocateId(), 9.0f, 9.0f, 3000, 0, 0.5f, 0, 1000);
++        spawn(board, ally);
++        for (int i = 0; i < 400; ++i) game.step();
++        REQUIRE(ally->currentLevel == 11);
++    }
++}
+diff --git a/tests/core/test_tower_troops.cpp b/tests/core/test_tower_troops.cpp
+index d1d81fa..3175701 100644
+--- a/tests/core/test_tower_troops.cpp
++++ b/tests/core/test_tower_troops.cpp
+@@ -6,6 +6,7 @@
+ #include "CombatEntity.h"
+ #include "MeleeTroop.h"
+ #include "RoyalChefBuffEffect.h"
++#include "Tower.h"
+ #include <memory>
+ 
+ TEST_CASE("towerTroopStats(None) is the plain level-11 Princess Tower",
+@@ -17,31 +18,46 @@ TEST_CASE("towerTroopStats(None) is the plain level-11 Princess Tower",
+     REQUIRE(stats.attackCooldown == 8);
+ }
+ 
+-TEST_CASE("towerTroopStats(TowerPrincess) gives the sourced, stronger stats", "[tower_troops]") {
++// Patch 0019: the wiki's level-11 values (TowerTroops.h). The old ones were
++// 3204 / 153 for Tower Princess, the plain tower's 3052 / 109 / 0.8 s for
++// Cannoneer, 2298 hp and an 8x burst for Dagger Duchess, and a periodic
++// effect for Royal Chef.
++TEST_CASE("towerTroopStats(TowerPrincess) is the plain tower's stats with its 0.8 s first hit", "[tower_troops]") {
+     CardStats stats = towerTroopStats(TowerTroopType::TowerPrincess);
+-    REQUIRE(stats.hp == 3204);
+-    REQUIRE(stats.damage == 153);
++    REQUIRE(stats.hp == 3052);
++    REQUIRE(stats.damage == 109);
++    REQUIRE(stats.attackCooldown == 8);
++    REQUIRE(stats.loadTicksOverride == 8);
+ }
+ 
+ TEST_CASE("towerTroopStats(Cannoneer) gives the sourced stats with no splash", "[tower_troops]") {
+     CardStats stats = towerTroopStats(TowerTroopType::Cannoneer);
+-    REQUIRE(stats.hp == 3052);
+-    REQUIRE(stats.damage == 109);
+-    REQUIRE(stats.attackCooldown == 8);
++    REQUIRE(stats.hp == 2616);
++    REQUIRE(stats.damage == 320);
++    REQUIRE(stats.attackCooldown == 22);
++    REQUIRE(stats.loadTicksOverride == 8);
+     REQUIRE(stats.splashRadius == Catch::Approx(0.0f));
+ }
+ 
+-TEST_CASE("towerTroopStats(DaggerDuchess) carries the burst-attack fields", "[tower_troops]") {
++TEST_CASE("towerTroopStats(DaggerDuchess) carries an 8-dagger magazine", "[tower_troops]") {
+     CardStats stats = towerTroopStats(TowerTroopType::DaggerDuchess);
+-    REQUIRE(stats.hp == 2298);
+-    REQUIRE(stats.burstEveryNAttacks == 8);
+-    REQUIRE(stats.burstDamageMultiplier == Catch::Approx(8.0f));
++    REQUIRE(stats.hp == 2768);
++    REQUIRE(stats.damage == 107);
++    REQUIRE(stats.attackCooldown == 5);
++    REQUIRE(stats.magazineSize == 8);
++    REQUIRE(stats.magazineReloadTicks == 9);
++    REQUIRE(stats.burstEveryNAttacks == 0);
+ }
+ 
+-TEST_CASE("towerTroopStats(RoyalChef) carries a periodic buff effect", "[tower_troops]") {
++TEST_CASE("towerTroopStats(RoyalChef): sourced combat stats; the pancake is cooked by GameManager", "[tower_troops]") {
+     CardStats stats = towerTroopStats(TowerTroopType::RoyalChef);
+-    REQUIRE(stats.periodicEffect != nullptr);
+-    REQUIRE(stats.periodicIntervalTicks == 280);
++    REQUIRE(stats.hp == 2703);
++    REQUIRE(stats.damage == 109);
++    REQUIRE(stats.attackCooldown == 10);
++    REQUIRE(stats.periodicEffect == nullptr);
++    REQUIRE(RoyalChef::COOK_START_TICKS == 70);
++    REQUIRE(RoyalChef::COOK_TICKS[0] == 230);
++    REQUIRE(RoyalChef::COOK_TICKS[2] == 380);
+ }
+ 
+ TEST_CASE("GameManager defaults to TowerTroopType::None -- existing behavior byte-for-byte unaffected",
+@@ -66,48 +82,59 @@ TEST_CASE("GameManager wires the selected Tower Troop onto both of that team's P
+     int aiPrincessCount = 0, oppPrincessCount = 0;
+     for (const auto& e : game.getBoard().getEntities()) {
+         if (e->name != "Princess Tower") continue;
+-        if (e->team == 0) { aiPrincessCount++; REQUIRE(e->hp == 3052); }       // Cannoneer
+-        if (e->team == 1) { oppPrincessCount++; REQUIRE(e->hp == 3204); }     // Tower Princess
++        if (e->team == 0) { aiPrincessCount++; REQUIRE(e->hp == 2616); }       // Cannoneer
++        if (e->team == 1) { oppPrincessCount++; REQUIRE(e->hp == 3052); }     // Tower Princess
+     }
+     REQUIRE(aiPrincessCount == 2);
+     REQUIRE(oppPrincessCount == 2);
+ }
+ 
+-TEST_CASE("RoyalChefBuffEffect buffs the nearest ally, not itself", "[tower_troops][royal_chef]") {
++TEST_CASE("RoyalChefBuffEffect feeds an allied troop +1 level, never a building or tower", "[tower_troops][royal_chef]") {
++    // Patch 0019: +1 Level (wiki), was a +10% hp top-up with a damage buff.
+     Board board;
+-    auto combatAlly = std::make_shared<StationaryCombatant>(2, 3.0f, 0.0f, 1000, 0, 1.0f, 0, 100);
++    auto combatAlly = std::make_shared<StationaryCombatant>(2, 3.0f, 0.0f, 1000, 0, 1.0f, 100, 100);
+     spawn(board, combatAlly);
++    auto tower = std::make_shared<Tower>(3, 0.0f, 0.0f, 3000, 0, 7.5f, 109, 8, 'P');
++    spawn(board, tower);
+ 
+-    RoyalChefBuffEffect effect(6.0f, 1.10f);
++    RoyalChefBuffEffect effect;
+     effect.apply(board, Vector2D{ 0.0f, 0.0f }, 0); // fires from the tower's own position
+ 
+-    REQUIRE(combatAlly->buffTicksRemaining > 0);
+-    REQUIRE(combatAlly->hp == 1100); // +10% hp top-up
++    REQUIRE(combatAlly->currentLevel == 12);
++    REQUIRE(combatAlly->hp == 1098);   // 1000 * 281 / 256
++    REQUIRE(combatAlly->buffTicksRemaining == 0);
++    REQUIRE(tower->hp == 3000);
++    REQUIRE(tower->royalChefServings == 0);
+ }
+ 
+ 
+ TEST_CASE("the Royal Chef feeds an ally once, not compounding forever",
+           "[tower_troops][royal_chef][regression]") {
+-    // RoyalChefBuffEffect feeds the nearest ally `hp += hp / 10` with a
+-    // permanent damage buff. The real card grants "+1 Level" once per troop, so
+-    // a tank parked beside the tower must not be fed again and again.
++    // The original concern: a tank parked beside the tower fed every time
++    // the effect fired. Since patch 0019 one pancake is one level, the Chef
++    // spreads them (fewest pancakes first), and GameManager cooks at most one
++    // per 23 s (test_cards_0019.cpp). A repeat feeding of the same troop
++    // happens only when no unfed troop qualifies, as in the game (wiki: "It's
++    // possible to level up a single troop multiple times").
+     Board board;
+     auto ally = std::make_shared<MeleeTroop>(1, 5.0f, 6.0f, 1000, 0, 0.1f, 1.0f, 100, 10, 'a');
+     spawn(board, ally);
++    auto other = std::make_shared<MeleeTroop>(2, 6.0f, 6.0f, 500, 0, 0.1f, 1.0f, 100, 10, 'b');
++    spawn(board, other);
+ 
+-    RoyalChefBuffEffect chef(6.0f, 1.10f);
++    RoyalChefBuffEffect chef;
+     chef.apply(board, Vector2D{ 5.0f, 5.0f }, 0);
+     const int afterFirst = ally->hp;
+ 
+-    // Control: the first serving must have done something, or "did not
+-    // compound" is vacuous.
+-    REQUIRE(afterFirst > 1000);
+-    REQUIRE(ally->buffTicksRemaining > 0);
++    // Control: the first serving did something, and went to the bigger troop.
++    REQUIRE(afterFirst == 1098);
++    REQUIRE(ally->currentLevel == 12);
+ 
+-    for (int i = 0; i < 5; ++i) chef.apply(board, Vector2D{ 5.0f, 5.0f }, 0);
+-
+-    INFO("hp after one serving = " << afterFirst << ", after six = " << ally->hp);
++    // The second goes to the troop not yet fed, not the tank again.
++    chef.apply(board, Vector2D{ 5.0f, 5.0f }, 0);
++    INFO("hp after one serving = " << afterFirst << ", after two = " << ally->hp);
+     REQUIRE(ally->hp == afterFirst);
++    REQUIRE(other->currentLevel == 12);
+ }
+ 
+ TEST_CASE("Crown Towers are level 11, the level of the registry's card stats", "[tower_troops][level]") {

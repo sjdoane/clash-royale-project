@@ -1,0 +1,128 @@
+diff --git a/python_ai/envs/gym_wrapper.py b/python_ai/envs/gym_wrapper.py
+index a3d7f62..1e3098c 100644
+--- a/python_ai/envs/gym_wrapper.py
++++ b/python_ai/envs/gym_wrapper.py
+@@ -60,6 +60,12 @@ DEFAULT_DECK_ABILITY_SLOTS = sum(
+     or clash_royale_env.get_card_info(_cid)["is_hero"]
+ )
+ 
++# Offsets that derive each Python-side generator from the env seed, so one seed
++# reproduces a whole match (UPSTREAM_REQUESTS.md item 45). Distinct, so the
++# streams are not the same sequence; arbitrary otherwise.
++DECK_SEED_OFFSET = 7
++TEACHER_SEED_OFFSET = 1013
++
+ # Per-card spell flags, from the engine.
+ SPELL_BY_CARD_ID = {
+     _cid: clash_royale_env.get_card_info(_cid)["is_spell"]
+@@ -132,10 +138,11 @@ class MicroRoyaleEnv(gym.Env):
+             #: Matches this worker has played per deck, for the count-weighted
+             #: update.
+             self._deck_pool_counts = {d.name: 0 for d in all_decks}
+-            # `is None`, not `or`: worker 0's seed is 0.
+-            seed_cfg = env_config.get("scenario_seed")
+-            self._deck_rng = random.Random(
+-                random.randrange(1 << 30) if seed_cfg is None else seed_cfg)
++        # Deck draws (pool and randomize_opp_deck alike). `is None`, not `or`:
++        # worker 0's seed is 0. Unseeded only when no seed is ever given.
++        seed_cfg = env_config.get("scenario_seed")
++        self._deck_rng = random.Random(
++            random.randrange(1 << 30) if seed_cfg is None else seed_cfg)
+         max_ticks = env_config.get("max_ticks", 3600)
+         # The opponent's elixir-rate multiplier (1.0 = normal). Measurement
+         # harnesses only; the curriculum does not use it.
+@@ -173,7 +180,11 @@ class MicroRoyaleEnv(gym.Env):
+         self.scenario_defensive = False
+         if self.opponent_kind == "teacher":
+             from python_ai.opponents.teacher import UtilityTeacher
+-            self.teacher = UtilityTeacher(self.opp_deck, team=1)
++            # Seeded from the env seed: its profile, lane bias and epsilon
++            # draws were the last unseeded generator in a teacher match.
++            self.teacher = UtilityTeacher(
++                self.opp_deck, team=1,
++                seed=None if seed_cfg is None else int(seed_cfg) + TEACHER_SEED_OFFSET)
+             self.teacher.set_stage(int(env_config.get("teacher_stage", 0)))
+             self.teacher.reset()
+ 
+@@ -202,11 +213,16 @@ class MicroRoyaleEnv(gym.Env):
+         # super().reset() seeds only the wrapper's np_random, which nothing
+         # reads; ClashEnv::seed seeds both engine generators (heuristic
+         # opponent, opening hand) and resets. Only when a seed is given: later
+-        # resets continue the stream. sample_random_deck() is not seedable, so
+-        # randomize_opp_deck runs are not reproducible (UPSTREAM_REQUESTS.md
+-        # item 23C).
++        # resets continue the stream. randomize_opp_deck draws its deck with a
++        # seed from _deck_rng, so it reproduces too (item 23C, item 45).
+         if seed is not None:
+             self.game.seed(int(seed))
++            # Every Python-side generator restarts from the same seed too, so
++            # reset(seed=s) replays the match whatever this env played before.
++            self._deck_rng.seed(int(seed) + DECK_SEED_OFFSET)
++            self._scenario_rng = np.random.default_rng(int(seed))
++            if self.teacher is not None and hasattr(self.teacher, "rng"):
++                self.teacher.rng = np.random.default_rng(int(seed) + TEACHER_SEED_OFFSET)
+         if self.deck_pool is not None:
+             # Sampled per worker, per episode: workers are separate processes,
+             # and per-episode sampling keeps each PPO batch a mix of matchups.
+@@ -224,7 +240,8 @@ class MicroRoyaleEnv(gym.Env):
+         elif self.randomize_opp_deck:
+             # The engine's sampler respects Champion/Evolution slot rules,
+             # which a naive random.sample would violate.
+-            random_deck = list(clash_royale_env.sample_random_deck())
++            random_deck = list(clash_royale_env.sample_random_deck(
++                seed=self._deck_rng.randrange(1 << 31)))
+             self.game.set_opponent_deck(random_deck)
+             # The deck actually faced this episode; self.opp_deck stays the
+             # fixed fallback.
+diff --git a/python_ai/tests/test_seed_reproducible.py b/python_ai/tests/test_seed_reproducible.py
+new file mode 100644
+index 0000000..825ae68
+--- /dev/null
++++ b/python_ai/tests/test_seed_reproducible.py
+@@ -0,0 +1,46 @@
++"""One seed, one match: reset(seed=s) replays a teacher match bit for bit,
++whatever the env played before (UPSTREAM_REQUESTS.md item 45).
++
++Before item 45 the UtilityTeacher's generator was never seeded, so its
++profile, lane bias and epsilon draws differed between runs of the same seed.
++"""
++import numpy as np
++import pytest
++
++from python_ai.envs.gym_wrapper import MicroRoyaleEnv
++
++
++def _match(env, seed, steps=60):
++    rng = np.random.default_rng(seed)
++    obs, _ = env.reset(seed=seed)
++    trace = [np.asarray(obs, np.float32).tobytes()]
++    for _ in range(steps):
++        a = {"card_index": int(rng.integers(5)), "target_x": float(rng.uniform(0, 17)),
++             "target_y": float(rng.uniform(0, 14))}
++        obs, r, term, trunc, _ = env.step(a)
++        trace.append(np.asarray(obs, np.float32).tobytes() + np.float64(r).tobytes())
++        if term or trunc:
++            break
++    return trace
++
++
++@pytest.mark.parametrize("cfg", [
++    {"opponent": "teacher", "teacher_stage": 2},
++    {"opponent": "teacher", "teacher_stage": 0, "deck_pool": True},
++    {"opponent": "teacher", "teacher_stage": 2, "randomize_opp_deck": True},
++    {"opponent": "builtin"},
++])
++def test_same_seed_same_match(cfg):
++    a = MicroRoyaleEnv(dict(cfg, scenario_seed=5))
++    b = MicroRoyaleEnv(dict(cfg, scenario_seed=99))
++    _match(b, 1234)                      # b has history a lacks
++    assert _match(a, 777) == _match(b, 777)
++
++
++def test_teacher_draws_follow_the_seed():
++    env = MicroRoyaleEnv({"opponent": "teacher", "teacher_stage": 2, "scenario_seed": 3})
++    picks = []
++    for _ in range(2):
++        env.reset(seed=42)
++        picks.append((env.teacher.lane_bias, id(env.teacher.profile) and sorted(env.teacher.profile.items())))
++    assert picks[0] == picks[1]

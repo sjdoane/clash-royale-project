@@ -1,0 +1,4352 @@
+{
+ "src": "vid_QD_1suWFNKo",
+ "protocol": "DEV labels (vid_QD_1suWFNKo; dev only, used to calibrate the YOLO box -> ground-point offset; never scored as held-out). Same schema and protocol as labels_units_vid_uVf1EUszTIM.json: frames chosen as the busiest in-match frames per match (>= 8 detections, two per match, >= 450 frames apart; detector counts used for selection only), each labelled by eye blind to the detector on a render with only the 18x32 detector tile grid, then on 4x zoom crops with tile-centre and tile-boundary lines; no detector boxes or side-car output were looked at. tile = continuous detector-grid ground point (x 0..17, y 0..31 from our King side, tile centres at integers, as common.ref_to_tile). Troops: feet. Flyers: bottom of the body. Buildings: footprint centre. ref = tile_to_ref(tile) in 549x976 ref px. Classes are detector class names; -ev1/-hero distinct; 'unknown' = class unreadable. Flags: swarm, fly, bld, occ, spell, tower, river, deploy, formq, sideq, spl (spell area/projectile, excluded), gpq (ground point not read from pixels: placed 1.0 row below the HP badge in a dense overlap; excluded from the calibration fit). Labelled 2026-11-18 by four parallel by-eye passes.",
+ "frames": {
+  "2355": [
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     4.3,
+     16.4
+    ],
+    "ref": [
+     164.2,
+     394.5
+    ],
+    "flags": [
+     "deploy",
+     "river"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     5.5,
+     16.8
+    ],
+    "ref": [
+     195.6,
+     386.1
+    ],
+    "flags": [
+     "deploy",
+     "river"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     6.7,
+     17.8
+    ],
+    "ref": [
+     227.0,
+     365.2
+    ],
+    "flags": [
+     "deploy"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     8.0,
+     19.8
+    ],
+    "ref": [
+     261.0,
+     323.4
+    ],
+    "flags": [
+     "deploy"
+    ]
+   },
+   {
+    "cls": "goblin-hut",
+    "side": 1,
+    "tile": [
+     8.4,
+     23.0
+    ],
+    "ref": [
+     271.5,
+     256.4
+    ],
+    "flags": [
+     "bld",
+     "formq"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     8.7,
+     21.3
+    ],
+    "ref": [
+     279.4,
+     292.0
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     9.4,
+     22.0
+    ],
+    "ref": [
+     297.7,
+     277.4
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     9.8,
+     22.4
+    ],
+    "ref": [
+     308.1,
+     269.0
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     10.0,
+     20.3
+    ],
+    "ref": [
+     313.4,
+     312.9
+    ],
+    "flags": []
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     11.3,
+     20.3
+    ],
+    "ref": [
+     347.4,
+     312.9
+    ],
+    "flags": []
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     12.4,
+     20.8
+    ],
+    "ref": [
+     376.2,
+     302.5
+    ],
+    "flags": []
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     10.8,
+     22.0
+    ],
+    "ref": [
+     334.3,
+     277.4
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     10.3,
+     18.9
+    ],
+    "ref": [
+     321.2,
+     342.2
+    ],
+    "flags": [
+     "spl"
+    ]
+   }
+  ],
+  "7545": [
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     6.1,
+     10.1
+    ],
+    "ref": [
+     211.3,
+     526.3
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     3.4,
+     9.6
+    ],
+    "ref": [
+     140.6,
+     536.7
+    ],
+    "flags": [
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     4.4,
+     9.5
+    ],
+    "ref": [
+     166.8,
+     538.8
+    ],
+    "flags": [
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     4.9,
+     9.4
+    ],
+    "ref": [
+     179.9,
+     540.9
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "goblin-hut",
+    "side": 1,
+    "tile": [
+     9.1,
+     22.2
+    ],
+    "ref": [
+     289.8,
+     273.2
+    ],
+    "flags": [
+     "bld",
+     "formq"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     11.0,
+     21.6
+    ],
+    "ref": [
+     339.6,
+     285.7
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     11.3,
+     22.6
+    ],
+    "ref": [
+     347.4,
+     264.8
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     14.0,
+     23.9
+    ],
+    "ref": [
+     418.1,
+     237.6
+    ],
+    "flags": [
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     14.2,
+     22.0
+    ],
+    "ref": [
+     423.3,
+     277.4
+    ],
+    "flags": [
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     15.6,
+     24.3
+    ],
+    "ref": [
+     460.0,
+     229.3
+    ],
+    "flags": [
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "the-log",
+    "side": 0,
+    "tile": [
+     13.5,
+     14.0
+    ],
+    "ref": [
+     405.0,
+     444.7
+    ],
+    "flags": [
+     "spl"
+    ]
+   }
+  ],
+  "18795": [
+   {
+    "cls": "goblin-hut",
+    "side": 1,
+    "tile": [
+     8.3,
+     22.3
+    ],
+    "ref": [
+     268.9,
+     271.1
+    ],
+    "flags": [
+     "bld",
+     "formq"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     3.3,
+     16.4
+    ],
+    "ref": [
+     138.0,
+     394.5
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     2.3,
+     15.0
+    ],
+    "ref": [
+     111.8,
+     423.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     3.3,
+     15.1
+    ],
+    "ref": [
+     138.0,
+     421.7
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "spear-goblin",
+    "side": 1,
+    "tile": [
+     4.2,
+     15.3
+    ],
+    "ref": [
+     161.5,
+     417.5
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     3.3,
+     13.6
+    ],
+    "ref": [
+     138.0,
+     453.1
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     3.2,
+     12.6
+    ],
+    "ref": [
+     135.4,
+     474.0
+    ],
+    "flags": []
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     12.0,
+     11.8
+    ],
+    "ref": [
+     365.7,
+     490.7
+    ],
+    "flags": []
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     10.2,
+     9.9
+    ],
+    "ref": [
+     318.6,
+     530.5
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     13.7,
+     3.1
+    ],
+    "ref": [
+     410.2,
+     672.7
+    ],
+    "flags": [
+     "spell",
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     15.2,
+     3.4
+    ],
+    "ref": [
+     449.5,
+     666.4
+    ],
+    "flags": [
+     "spell",
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     17.3,
+     3.2
+    ],
+    "ref": [
+     504.5,
+     670.6
+    ],
+    "flags": [
+     "spell",
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     16.0,
+     2.1
+    ],
+    "ref": [
+     470.5,
+     693.6
+    ],
+    "flags": [
+     "spell",
+     "tower"
+    ]
+   }
+  ],
+  "25560": [
+   {
+    "cls": "goblin-hut",
+    "side": 1,
+    "tile": [
+     7.4,
+     18.6
+    ],
+    "ref": [
+     245.3,
+     348.5
+    ],
+    "flags": [
+     "bld",
+     "formq",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     4.6,
+     18.2
+    ],
+    "ref": [
+     172.0,
+     356.9
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     5.5,
+     18.0
+    ],
+    "ref": [
+     195.6,
+     361.0
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     2.5,
+     16.6
+    ],
+    "ref": [
+     117.0,
+     390.3
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     2.3,
+     14.8
+    ],
+    "ref": [
+     111.8,
+     428.0
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     3.4,
+     17.5
+    ],
+    "ref": [
+     140.6,
+     371.5
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     1.2,
+     9.6
+    ],
+    "ref": [
+     83.0,
+     536.7
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     0.0,
+     6.6
+    ],
+    "ref": [
+     51.6,
+     599.5
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     0.0,
+     8.4
+    ],
+    "ref": [
+     51.6,
+     561.8
+    ],
+    "flags": [
+     "tower",
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     2.2,
+     9.5
+    ],
+    "ref": [
+     109.2,
+     538.8
+    ],
+    "flags": [
+     "tower",
+     "spell"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     2.2,
+     8.4
+    ],
+    "ref": [
+     109.2,
+     561.8
+    ],
+    "flags": [
+     "tower",
+     "spell"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     5.4,
+     9.3
+    ],
+    "ref": [
+     193.0,
+     543.0
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     4.7,
+     6.4
+    ],
+    "ref": [
+     174.6,
+     603.7
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     5.9,
+     7.6
+    ],
+    "ref": [
+     206.1,
+     578.6
+    ],
+    "flags": [
+     "tower",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     6.6,
+     10.9
+    ],
+    "ref": [
+     224.4,
+     509.6
+    ],
+    "flags": []
+   }
+  ],
+  "34260": [
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     8.0,
+     19.2
+    ],
+    "ref": [
+     261.0,
+     335.9
+    ],
+    "flags": [
+     "swarm",
+     "deploy",
+     "formq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     6.7,
+     18.1
+    ],
+    "ref": [
+     227.0,
+     358.9
+    ],
+    "flags": [
+     "swarm",
+     "deploy",
+     "formq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     9.7,
+     18.1
+    ],
+    "ref": [
+     305.5,
+     358.9
+    ],
+    "flags": [
+     "swarm",
+     "deploy",
+     "formq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     7.3,
+     16.8
+    ],
+    "ref": [
+     242.7,
+     386.1
+    ],
+    "flags": [
+     "swarm",
+     "deploy",
+     "formq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     9.3,
+     16.5
+    ],
+    "ref": [
+     295.1,
+     392.4
+    ],
+    "flags": [
+     "swarm",
+     "deploy",
+     "formq",
+     "river"
+    ]
+   },
+   {
+    "cls": "giant",
+    "side": 1,
+    "tile": [
+     4.5,
+     13.0
+    ],
+    "ref": [
+     169.4,
+     465.6
+    ],
+    "flags": []
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     2.9,
+     16.0
+    ],
+    "ref": [
+     127.5,
+     402.9
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     8.3,
+     9.3
+    ],
+    "ref": [
+     268.9,
+     543.0
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "ice-spirit",
+    "side": 0,
+    "tile": [
+     5.9,
+     10.8
+    ],
+    "ref": [
+     206.1,
+     511.6
+    ],
+    "flags": []
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     6.0,
+     7.3
+    ],
+    "ref": [
+     208.7,
+     584.9
+    ],
+    "flags": []
+   }
+  ],
+  "35970": [
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     16.6,
+     25.9
+    ],
+    "ref": [
+     486.2,
+     195.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "formq",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     17.4,
+     25.6
+    ],
+    "ref": [
+     507.1,
+     202.1
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "formq",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     15.9,
+     25.2
+    ],
+    "ref": [
+     467.8,
+     210.4
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "formq",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     16.9,
+     24.7
+    ],
+    "ref": [
+     494.0,
+     220.9
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "formq",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     15.3,
+     24.3
+    ],
+    "ref": [
+     452.1,
+     229.3
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "formq",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     15.7,
+     24.4
+    ],
+    "ref": [
+     462.6,
+     227.2
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "formq",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     16.3,
+     23.8
+    ],
+    "ref": [
+     478.3,
+     239.7
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "formq",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     13.2,
+     23.5
+    ],
+    "ref": [
+     397.2,
+     246.0
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "formq",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     14.0,
+     23.7
+    ],
+    "ref": [
+     418.1,
+     241.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "formq",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     14.9,
+     23.7
+    ],
+    "ref": [
+     441.7,
+     241.8
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "formq",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     15.4,
+     23.2
+    ],
+    "ref": [
+     454.8,
+     252.3
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "formq",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     17.0,
+     23.0
+    ],
+    "ref": [
+     496.6,
+     256.4
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "formq",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     13.7,
+     22.7
+    ],
+    "ref": [
+     410.2,
+     262.7
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "formq",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     16.2,
+     22.2
+    ],
+    "ref": [
+     475.7,
+     273.2
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "tower",
+     "formq",
+     "gpq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     14.4,
+     23.6
+    ],
+    "ref": [
+     428.6,
+     243.9
+    ],
+    "flags": [
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     4.1,
+     12.2
+    ],
+    "ref": [
+     158.9,
+     482.4
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     5.0,
+     11.9
+    ],
+    "ref": [
+     182.5,
+     488.6
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     5.7,
+     13.0
+    ],
+    "ref": [
+     200.8,
+     465.6
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     8.4,
+     9.6
+    ],
+    "ref": [
+     271.5,
+     536.7
+    ],
+    "flags": [
+     "deploy"
+    ]
+   }
+  ],
+  "46560": [
+   {
+    "cls": "ice-golem",
+    "side": 0,
+    "tile": [
+     1.8,
+     13.4
+    ],
+    "ref": [
+     98.7,
+     457.3
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     4.0,
+     15.9
+    ],
+    "ref": [
+     156.3,
+     405.0
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "royal-recruit",
+    "side": 1,
+    "tile": [
+     2.7,
+     16.6
+    ],
+    "ref": [
+     122.3,
+     390.3
+    ],
+    "flags": [
+     "river",
+     "occ"
+    ]
+   },
+   {
+    "cls": "royal-recruit",
+    "side": 1,
+    "tile": [
+     2.9,
+     14.4
+    ],
+    "ref": [
+     127.5,
+     436.3
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "royal-recruit",
+    "side": 1,
+    "tile": [
+     3.7,
+     13.9
+    ],
+    "ref": [
+     148.5,
+     446.8
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "royal-recruit",
+    "side": 1,
+    "tile": [
+     3.4,
+     12.6
+    ],
+    "ref": [
+     140.6,
+     474.0
+    ],
+    "flags": []
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     2.2,
+     15.6
+    ],
+    "ref": [
+     109.2,
+     411.2
+    ],
+    "flags": [
+     "occ",
+     "river",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "giant",
+    "side": 1,
+    "tile": [
+     6.0,
+     11.2
+    ],
+    "ref": [
+     208.7,
+     503.3
+    ],
+    "flags": []
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     9.1,
+     9.4
+    ],
+    "ref": [
+     289.8,
+     540.9
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "royal-recruit",
+    "side": 1,
+    "tile": [
+     10.2,
+     12.5
+    ],
+    "ref": [
+     318.6,
+     476.1
+    ],
+    "flags": []
+   },
+   {
+    "cls": "royal-recruit",
+    "side": 1,
+    "tile": [
+     12.4,
+     11.5
+    ],
+    "ref": [
+     376.2,
+     497.0
+    ],
+    "flags": []
+   }
+  ],
+  "51465": [
+   {
+    "cls": "royal-recruit",
+    "side": 1,
+    "tile": [
+     1.9,
+     9.3
+    ],
+    "ref": [
+     101.3,
+     543.0
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "royal-recruit",
+    "side": 1,
+    "tile": [
+     2.8,
+     9.7
+    ],
+    "ref": [
+     124.9,
+     534.7
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "the-log",
+    "side": 0,
+    "tile": [
+     3.3,
+     14.3
+    ],
+    "ref": [
+     138.0,
+     438.4
+    ],
+    "flags": [
+     "spl"
+    ]
+   },
+   {
+    "cls": "royal-recruit",
+    "side": 1,
+    "tile": [
+     13.0,
+     22.6
+    ],
+    "ref": [
+     391.9,
+     264.8
+    ],
+    "flags": [
+     "tower",
+     "occ"
+    ]
+   },
+   {
+    "cls": "royal-recruit",
+    "side": 1,
+    "tile": [
+     13.7,
+     21.0
+    ],
+    "ref": [
+     410.2,
+     298.3
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "royal-recruit",
+    "side": 1,
+    "tile": [
+     15.4,
+     22.9
+    ],
+    "ref": [
+     454.8,
+     258.5
+    ],
+    "flags": [
+     "tower",
+     "occ"
+    ]
+   },
+   {
+    "cls": "hog-rider",
+    "side": 0,
+    "tile": [
+     14.5,
+     22.6
+    ],
+    "ref": [
+     431.2,
+     264.8
+    ],
+    "flags": [
+     "tower",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     13.1,
+     12.6
+    ],
+    "ref": [
+     394.5,
+     474.0
+    ],
+    "flags": [
+     "swarm",
+     "small",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     12.5,
+     11.8
+    ],
+    "ref": [
+     378.8,
+     490.7
+    ],
+    "flags": [
+     "swarm",
+     "small",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     14.0,
+     12.0
+    ],
+    "ref": [
+     418.1,
+     486.5
+    ],
+    "flags": [
+     "swarm",
+     "small",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     13.3,
+     10.9
+    ],
+    "ref": [
+     399.8,
+     509.6
+    ],
+    "flags": [
+     "swarm",
+     "small",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     14.7,
+     11.4
+    ],
+    "ref": [
+     436.4,
+     499.1
+    ],
+    "flags": [
+     "swarm",
+     "small",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     14.0,
+     13.3
+    ],
+    "ref": [
+     418.1,
+     459.3
+    ],
+    "flags": [
+     "swarm",
+     "small",
+     "sideq",
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     14.6,
+     14.1
+    ],
+    "ref": [
+     433.8,
+     442.6
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     15.3,
+     13.5
+    ],
+    "ref": [
+     452.1,
+     455.2
+    ],
+    "flags": [
+     "small"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     12.3,
+     14.3
+    ],
+    "ref": [
+     373.6,
+     438.4
+    ],
+    "flags": [
+     "small",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     13.6,
+     15.3
+    ],
+    "ref": [
+     407.6,
+     417.5
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "musketeer-hero",
+    "side": 0,
+    "tile": [
+     12.9,
+     6.3
+    ],
+    "ref": [
+     389.3,
+     605.8
+    ],
+    "flags": [
+     "tower",
+     "occ",
+     "formq"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     15.7,
+     7.5
+    ],
+    "ref": [
+     462.6,
+     580.7
+    ],
+    "flags": [
+     "bld",
+     "tower"
+    ]
+   }
+  ],
+  "57615": [
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     13.2,
+     21.3
+    ],
+    "ref": [
+     397.2,
+     292.0
+    ],
+    "flags": [
+     "small",
+     "swarm",
+     "sideq",
+     "formq"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     14.8,
+     19.6
+    ],
+    "ref": [
+     439.0,
+     327.6
+    ],
+    "flags": [
+     "small",
+     "swarm",
+     "sideq",
+     "formq"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     14.3,
+     17.8
+    ],
+    "ref": [
+     426.0,
+     365.2
+    ],
+    "flags": [
+     "small",
+     "swarm",
+     "sideq",
+     "formq",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     14.3,
+     16.8
+    ],
+    "ref": [
+     426.0,
+     386.1
+    ],
+    "flags": [
+     "small",
+     "swarm",
+     "sideq",
+     "formq",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     13.4,
+     16.8
+    ],
+    "ref": [
+     402.4,
+     386.1
+    ],
+    "flags": [
+     "small",
+     "swarm",
+     "sideq",
+     "formq"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     14.4,
+     15.5
+    ],
+    "ref": [
+     428.6,
+     413.3
+    ],
+    "flags": [
+     "small",
+     "swarm",
+     "sideq",
+     "formq",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     15.5,
+     23.9
+    ],
+    "ref": [
+     457.4,
+     237.6
+    ],
+    "flags": [
+     "small",
+     "swarm",
+     "sideq",
+     "formq",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     15.9,
+     22.3
+    ],
+    "ref": [
+     467.8,
+     271.1
+    ],
+    "flags": [
+     "small",
+     "swarm",
+     "sideq",
+     "formq",
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     15.0,
+     22.3
+    ],
+    "ref": [
+     444.3,
+     271.1
+    ],
+    "flags": [
+     "tower",
+     "occ"
+    ]
+   }
+  ],
+  "62550": [
+   {
+    "cls": "witch",
+    "side": 1,
+    "tile": [
+     11.9,
+     27.6
+    ],
+    "ref": [
+     363.1,
+     160.2
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     10.7,
+     28.5
+    ],
+    "ref": [
+     331.7,
+     141.4
+    ],
+    "flags": [
+     "small",
+     "swarm",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     13.3,
+     27.1
+    ],
+    "ref": [
+     399.8,
+     170.7
+    ],
+    "flags": [
+     "small",
+     "swarm",
+     "tower"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 1,
+    "tile": [
+     12.8,
+     25.8
+    ],
+    "ref": [
+     386.7,
+     197.9
+    ],
+    "flags": [
+     "small",
+     "swarm",
+     "tower"
+    ]
+   },
+   {
+    "cls": "tombstone",
+    "side": 1,
+    "tile": [
+     13.2,
+     29.6
+    ],
+    "ref": [
+     397.2,
+     118.4
+    ],
+    "flags": [
+     "bld",
+     "tower",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     11.8,
+     30.6
+    ],
+    "ref": [
+     360.5,
+     97.5
+    ],
+    "flags": [
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "the-log",
+    "side": 1,
+    "tile": [
+     12.9,
+     20.5
+    ],
+    "ref": [
+     389.3,
+     308.7
+    ],
+    "flags": [
+     "spl"
+    ]
+   },
+   {
+    "cls": "musketeer-hero",
+    "side": 0,
+    "tile": [
+     13.2,
+     11.5
+    ],
+    "ref": [
+     397.2,
+     497.0
+    ],
+    "flags": []
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     9.2,
+     9.3
+    ],
+    "ref": [
+     292.4,
+     543.0
+    ],
+    "flags": [
+     "bld"
+    ]
+   }
+  ],
+  "76170": [
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     6.0,
+     14.9
+    ],
+    "ref": [
+     208.7,
+     425.9
+    ],
+    "flags": [
+     "fly",
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     7.2,
+     14.0
+    ],
+    "ref": [
+     240.1,
+     444.7
+    ],
+    "flags": [
+     "fly",
+     "swarm"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     8.3,
+     14.6
+    ],
+    "ref": [
+     268.9,
+     432.2
+    ],
+    "flags": [
+     "fly",
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     5.8,
+     12.3
+    ],
+    "ref": [
+     203.4,
+     480.3
+    ],
+    "flags": [
+     "spell"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     10.8,
+     12.6
+    ],
+    "ref": [
+     334.3,
+     474.0
+    ],
+    "flags": [
+     "spell"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     8.1,
+     9.1
+    ],
+    "ref": [
+     263.6,
+     547.2
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     2.1,
+     16.2
+    ],
+    "ref": [
+     106.6,
+     398.7
+    ],
+    "flags": [
+     "river",
+     "occ"
+    ]
+   },
+   {
+    "cls": "musketeer-hero",
+    "side": 0,
+    "tile": [
+     15.9,
+     8.7
+    ],
+    "ref": [
+     467.8,
+     555.6
+    ],
+    "flags": [
+     "tower",
+     "occ"
+    ]
+   }
+  ],
+  "77985": [
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     10.0,
+     24.6
+    ],
+    "ref": [
+     313.4,
+     223.0
+    ],
+    "flags": [
+     "fly"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     6.5,
+     23.8
+    ],
+    "ref": [
+     221.8,
+     239.7
+    ],
+    "flags": [
+     "fly",
+     "swarm"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     6.0,
+     24.3
+    ],
+    "ref": [
+     208.7,
+     229.3
+    ],
+    "flags": [
+     "fly",
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     5.9,
+     13.9
+    ],
+    "ref": [
+     206.1,
+     446.8
+    ],
+    "flags": []
+   },
+   {
+    "cls": "ice-golem",
+    "side": 0,
+    "tile": [
+     9.5,
+     14.1
+    ],
+    "ref": [
+     300.3,
+     442.6
+    ],
+    "flags": [
+     "deploy",
+     "occ"
+    ]
+   },
+   {
+    "cls": "elite-barbarian",
+    "side": 1,
+    "tile": [
+     12.8,
+     13.9
+    ],
+    "ref": [
+     386.7,
+     446.8
+    ],
+    "flags": [
+     "formq"
+    ]
+   },
+   {
+    "cls": "elite-barbarian",
+    "side": 1,
+    "tile": [
+     13.9,
+     14.1
+    ],
+    "ref": [
+     415.5,
+     442.6
+    ],
+    "flags": [
+     "occ",
+     "formq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     14.9,
+     14.2
+    ],
+    "ref": [
+     441.7,
+     440.5
+    ],
+    "flags": [
+     "deploy",
+     "occ"
+    ]
+   },
+   {
+    "cls": "musketeer-hero",
+    "side": 0,
+    "tile": [
+     13.3,
+     9.0
+    ],
+    "ref": [
+     399.8,
+     549.3
+    ],
+    "flags": [
+     "tower",
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.8,
+     9.0
+    ],
+    "ref": [
+     439.0,
+     549.3
+    ],
+    "flags": [
+     "small",
+     "tower",
+     "occ",
+     "formq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     4.0,
+     10.7
+    ],
+    "ref": [
+     156.3,
+     513.7
+    ],
+    "flags": [
+     "small",
+     "swarm",
+     "formq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     4.1,
+     9.3
+    ],
+    "ref": [
+     158.9,
+     543.0
+    ],
+    "flags": [
+     "small",
+     "swarm",
+     "tower",
+     "formq"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     8.1,
+     9.1
+    ],
+    "ref": [
+     263.6,
+     547.2
+    ],
+    "flags": [
+     "bld"
+    ]
+   }
+  ],
+  "86520": [
+   {
+    "cls": "fire-spirit",
+    "side": 1,
+    "tile": [
+     0.5,
+     13.3
+    ],
+    "ref": [
+     64.7,
+     459.3
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "fire-spirit",
+    "side": 1,
+    "tile": [
+     0.6,
+     12.1
+    ],
+    "ref": [
+     67.3,
+     484.4
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "fire-spirit",
+    "side": 1,
+    "tile": [
+     0.1,
+     10.9
+    ],
+    "ref": [
+     54.2,
+     509.6
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "fire-spirit",
+    "side": 1,
+    "tile": [
+     2.1,
+     13.2
+    ],
+    "ref": [
+     106.6,
+     461.4
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "fire-spirit",
+    "side": 1,
+    "tile": [
+     3.4,
+     12.2
+    ],
+    "ref": [
+     140.6,
+     482.4
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "fire-spirit",
+    "side": 1,
+    "tile": [
+     2.5,
+     11.0
+    ],
+    "ref": [
+     117.0,
+     507.5
+    ],
+    "flags": [
+     "swarm"
+    ]
+   },
+   {
+    "cls": "ice-golem",
+    "side": 0,
+    "tile": [
+     1.9,
+     7.7
+    ],
+    "ref": [
+     101.3,
+     576.5
+    ],
+    "flags": [
+     "tower",
+     "occ"
+    ]
+   },
+   {
+    "cls": "hog-rider",
+    "side": 1,
+    "tile": [
+     12.6,
+     6.1
+    ],
+    "ref": [
+     381.5,
+     610.0
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "goblin-cage",
+    "side": 1,
+    "tile": [
+     9.0,
+     22.4
+    ],
+    "ref": [
+     287.2,
+     269.0
+    ],
+    "flags": [
+     "bld",
+     "deploy"
+    ]
+   }
+  ],
+  "94365": [
+   {
+    "cls": "ice-golem",
+    "side": 0,
+    "tile": [
+     14.4,
+     17.6
+    ],
+    "ref": [
+     428.6,
+     369.4
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     13.3,
+     17.9
+    ],
+    "ref": [
+     399.8,
+     363.1
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     14.1,
+     16.7
+    ],
+    "ref": [
+     420.7,
+     388.2
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     14.9,
+     16.7
+    ],
+    "ref": [
+     441.7,
+     388.2
+    ],
+    "flags": [
+     "swarm",
+     "occ",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "hog-rider",
+    "side": 0,
+    "tile": [
+     15.8,
+     16.5
+    ],
+    "ref": [
+     465.2,
+     392.4
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     13.3,
+     20.3
+    ],
+    "ref": [
+     399.8,
+     312.9
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     14.8,
+     20.0
+    ],
+    "ref": [
+     439.0,
+     319.2
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "the-log",
+    "side": 0,
+    "tile": [
+     15.6,
+     20.7
+    ],
+    "ref": [
+     460.0,
+     304.6
+    ],
+    "flags": [
+     "spl"
+    ]
+   },
+   {
+    "cls": "ice-spirit",
+    "side": 0,
+    "tile": [
+     13.5,
+     13.2
+    ],
+    "ref": [
+     405.0,
+     461.4
+    ],
+    "flags": [
+     "sideq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     16.9,
+     26.6
+    ],
+    "ref": [
+     494.0,
+     181.1
+    ],
+    "flags": [
+     "bld",
+     "tower"
+    ]
+   }
+  ],
+  "102555": [
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     3.9,
+     22.4
+    ],
+    "ref": [
+     153.7,
+     269.0
+    ],
+    "flags": [
+     "tower",
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     2.3,
+     21.9
+    ],
+    "ref": [
+     111.8,
+     279.5
+    ],
+    "flags": [
+     "tower",
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     3.1,
+     22.9
+    ],
+    "ref": [
+     132.8,
+     258.5
+    ],
+    "flags": [
+     "tower",
+     "occ",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     14.6,
+     20.5
+    ],
+    "ref": [
+     433.8,
+     308.7
+    ],
+    "flags": [
+     "swarm",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     15.3,
+     19.4
+    ],
+    "ref": [
+     452.1,
+     331.8
+    ],
+    "flags": [
+     "swarm",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     14.4,
+     18.4
+    ],
+    "ref": [
+     428.6,
+     352.7
+    ],
+    "flags": [
+     "swarm",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     14.0,
+     17.4
+    ],
+    "ref": [
+     418.1,
+     373.6
+    ],
+    "flags": [
+     "swarm",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     14.9,
+     16.6
+    ],
+    "ref": [
+     441.7,
+     390.3
+    ],
+    "flags": [
+     "swarm",
+     "sideq",
+     "river"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     14.4,
+     15.5
+    ],
+    "ref": [
+     428.6,
+     413.3
+    ],
+    "flags": [
+     "swarm",
+     "sideq",
+     "river"
+    ]
+   },
+   {
+    "cls": "bomb",
+    "side": 1,
+    "tile": [
+     13.5,
+     15.9
+    ],
+    "ref": [
+     405.0,
+     405.0
+    ],
+    "flags": [
+     "river",
+     "sideq",
+     "deploy"
+    ]
+   }
+  ],
+  "110400": [
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     4.2,
+     11.1
+    ],
+    "ref": [
+     161.5,
+     505.4
+    ],
+    "flags": []
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     6.0,
+     11.7
+    ],
+    "ref": [
+     208.7,
+     492.8
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     5.3,
+     10.5
+    ],
+    "ref": [
+     190.3,
+     517.9
+    ],
+    "flags": [
+     "swarm",
+     "small",
+     "formq"
+    ]
+   },
+   {
+    "cls": "skeleton-ev1",
+    "side": 0,
+    "tile": [
+     6.6,
+     10.5
+    ],
+    "ref": [
+     224.4,
+     517.9
+    ],
+    "flags": [
+     "swarm",
+     "small",
+     "formq"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     8.2,
+     10.2
+    ],
+    "ref": [
+     266.3,
+     524.2
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "musketeer-hero",
+    "side": 0,
+    "tile": [
+     1.8,
+     6.8
+    ],
+    "ref": [
+     98.7,
+     595.3
+    ],
+    "flags": [
+     "tower",
+     "formq"
+    ]
+   },
+   {
+    "cls": "battle-ram",
+    "side": 1,
+    "tile": [
+     2.8,
+     15.6
+    ],
+    "ref": [
+     124.9,
+     411.2
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "dark-prince",
+    "side": 1,
+    "tile": [
+     9.3,
+     16.8
+    ],
+    "ref": [
+     295.1,
+     386.1
+    ],
+    "flags": []
+   },
+   {
+    "cls": "bomb",
+    "side": 0,
+    "tile": [
+     14.7,
+     15.9
+    ],
+    "ref": [
+     436.4,
+     405.0
+    ],
+    "flags": [
+     "river",
+     "sideq",
+     "deploy"
+    ]
+   },
+   {
+    "cls": "musketeer",
+    "side": 0,
+    "tile": [
+     13.5,
+     12.1
+    ],
+    "ref": [
+     405.0,
+     484.4
+    ],
+    "flags": [
+     "sideq"
+    ]
+   },
+   {
+    "cls": "musketeer",
+    "side": 0,
+    "tile": [
+     14.7,
+     11.1
+    ],
+    "ref": [
+     436.4,
+     505.4
+    ],
+    "flags": [
+     "sideq"
+    ]
+   }
+  ],
+  "112830": [
+   {
+    "cls": "ice-golem",
+    "side": 0,
+    "tile": [
+     13.8,
+     17.5
+    ],
+    "ref": [
+     412.9,
+     371.5
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "ice-spirit",
+    "side": 0,
+    "tile": [
+     14.0,
+     16.7
+    ],
+    "ref": [
+     418.1,
+     388.2
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.8,
+     15.6
+    ],
+    "ref": [
+     412.9,
+     411.2
+    ],
+    "flags": [
+     "swarm",
+     "small",
+     "river",
+     "formq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.8,
+     14.7
+    ],
+    "ref": [
+     412.9,
+     430.1
+    ],
+    "flags": [
+     "swarm",
+     "small",
+     "formq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     14.8,
+     17.1
+    ],
+    "ref": [
+     439.0,
+     379.9
+    ],
+    "flags": [
+     "swarm",
+     "small",
+     "occ",
+     "formq"
+    ]
+   },
+   {
+    "cls": "skeleton-barrel",
+    "side": 1,
+    "tile": [
+     14.0,
+     20.8
+    ],
+    "ref": [
+     418.1,
+     302.5
+    ],
+    "flags": [
+     "fly",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     8.2,
+     10.4
+    ],
+    "ref": [
+     266.3,
+     520.0
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     4.7,
+     23.9
+    ],
+    "ref": [
+     174.6,
+     237.6
+    ],
+    "flags": [
+     "tower"
+    ]
+   }
+  ],
+  "120180": [
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     3.2,
+     20.4
+    ],
+    "ref": [
+     135.4,
+     310.8
+    ],
+    "flags": [
+     "deploy",
+     "occ"
+    ]
+   },
+   {
+    "cls": "pekka",
+    "side": 1,
+    "tile": [
+     4.1,
+     17.9
+    ],
+    "ref": [
+     158.9,
+     363.1
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "ice-golem",
+    "side": 0,
+    "tile": [
+     3.6,
+     15.4
+    ],
+    "ref": [
+     145.8,
+     415.4
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "hog-rider",
+    "side": 1,
+    "tile": [
+     3.4,
+     11.8
+    ],
+    "ref": [
+     140.6,
+     490.7
+    ],
+    "flags": [
+     "sideq"
+    ]
+   },
+   {
+    "cls": "musketeer-hero",
+    "side": 0,
+    "tile": [
+     0.4,
+     9.0
+    ],
+    "ref": [
+     62.1,
+     549.3
+    ],
+    "flags": [
+     "occ",
+     "formq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     5.0,
+     7.0
+    ],
+    "ref": [
+     182.5,
+     591.1
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     8.5,
+     8.7
+    ],
+    "ref": [
+     274.1,
+     555.6
+    ],
+    "flags": [
+     "sideq",
+     "occ"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     9.3,
+     12.1
+    ],
+    "ref": [
+     295.1,
+     484.4
+    ],
+    "flags": [
+     "bld",
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     12.7,
+     20.9
+    ],
+    "ref": [
+     384.1,
+     300.4
+    ],
+    "flags": []
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     16.2,
+     19.3
+    ],
+    "ref": [
+     475.7,
+     333.8
+    ],
+    "flags": []
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     13.1,
+     8.6
+    ],
+    "ref": [
+     394.5,
+     557.7
+    ],
+    "flags": [
+     "swarm",
+     "small",
+     "tower",
+     "formq"
+    ]
+   },
+   {
+    "cls": "skeleton",
+    "side": 0,
+    "tile": [
+     12.7,
+     7.4
+    ],
+    "ref": [
+     384.1,
+     582.8
+    ],
+    "flags": [
+     "swarm",
+     "small",
+     "tower",
+     "formq"
+    ]
+   }
+  ],
+  "134100": [
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     4.3,
+     18.6
+    ],
+    "ref": [
+     164.2,
+     348.5
+    ],
+    "flags": [
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "ice-wizard",
+    "side": 0,
+    "tile": [
+     3.6,
+     16.6
+    ],
+    "ref": [
+     145.8,
+     390.3
+    ],
+    "flags": [
+     "river",
+     "occ"
+    ]
+   },
+   {
+    "cls": "golden-knight",
+    "side": 0,
+    "tile": [
+     4.0,
+     11.8
+    ],
+    "ref": [
+     156.3,
+     490.7
+    ],
+    "flags": []
+   },
+   {
+    "cls": "musketeer",
+    "side": 0,
+    "tile": [
+     9.0,
+     10.6
+    ],
+    "ref": [
+     287.2,
+     515.8
+    ],
+    "flags": [
+     "deploy",
+     "formq"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     12.6,
+     11.9
+    ],
+    "ref": [
+     381.5,
+     488.6
+    ],
+    "flags": [
+     "fly",
+     "swarm"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     13.1,
+     13.3
+    ],
+    "ref": [
+     394.5,
+     459.3
+    ],
+    "flags": [
+     "fly",
+     "swarm"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     14.8,
+     13.4
+    ],
+    "ref": [
+     439.0,
+     457.3
+    ],
+    "flags": [
+     "fly",
+     "swarm",
+     "occ"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     16.3,
+     12.4
+    ],
+    "ref": [
+     478.3,
+     478.2
+    ],
+    "flags": [
+     "fly",
+     "swarm"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     15.3,
+     11.3
+    ],
+    "ref": [
+     452.1,
+     501.2
+    ],
+    "flags": [
+     "fly",
+     "swarm"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     15.2,
+     14.3
+    ],
+    "ref": [
+     449.5,
+     438.4
+    ],
+    "flags": [
+     "fly",
+     "swarm",
+     "occ",
+     "river"
+    ]
+   }
+  ],
+  "136680": [
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     6.6,
+     15.9
+    ],
+    "ref": [
+     224.4,
+     405.0
+    ],
+    "flags": [
+     "fly",
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     7.6,
+     16.6
+    ],
+    "ref": [
+     250.6,
+     390.3
+    ],
+    "flags": [
+     "fly",
+     "swarm",
+     "river",
+     "occ"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     7.6,
+     15.2
+    ],
+    "ref": [
+     250.6,
+     419.6
+    ],
+    "flags": [
+     "fly",
+     "swarm",
+     "river",
+     "occ"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     8.4,
+     14.4
+    ],
+    "ref": [
+     271.5,
+     436.3
+    ],
+    "flags": [
+     "fly",
+     "swarm"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     10.1,
+     16.8
+    ],
+    "ref": [
+     316.0,
+     386.1
+    ],
+    "flags": [
+     "fly",
+     "swarm",
+     "river"
+    ]
+   },
+   {
+    "cls": "minion",
+    "side": 1,
+    "tile": [
+     9.3,
+     15.1
+    ],
+    "ref": [
+     295.1,
+     421.7
+    ],
+    "flags": [
+     "fly",
+     "swarm",
+     "river",
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     11.3,
+     12.4
+    ],
+    "ref": [
+     347.4,
+     478.2
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     9.0,
+     10.3
+    ],
+    "ref": [
+     287.2,
+     522.1
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "golden-knight",
+    "side": 1,
+    "tile": [
+     14.4,
+     15.2
+    ],
+    "ref": [
+     428.6,
+     419.6
+    ],
+    "flags": [
+     "river",
+     "tower"
+    ]
+   }
+  ],
+  "154875": [
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     4.0,
+     11.8
+    ],
+    "ref": [
+     156.3,
+     490.7
+    ],
+    "flags": [
+     "small"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     4.1,
+     10.0
+    ],
+    "ref": [
+     158.9,
+     528.4
+    ],
+    "flags": [
+     "small"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     2.2,
+     17.6
+    ],
+    "ref": [
+     109.2,
+     369.4
+    ],
+    "flags": [
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "the-log",
+    "side": 1,
+    "tile": [
+     2.0,
+     16.6
+    ],
+    "ref": [
+     104.0,
+     390.3
+    ],
+    "flags": [
+     "spl"
+    ]
+   },
+   {
+    "cls": "mighty-miner",
+    "side": 1,
+    "tile": [
+     6.6,
+     16.2
+    ],
+    "ref": [
+     224.4,
+     398.7
+    ],
+    "flags": [
+     "river",
+     "formq"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     8.0,
+     9.9
+    ],
+    "ref": [
+     261.0,
+     530.5
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "hog-rider",
+    "side": 1,
+    "tile": [
+     14.4,
+     12.2
+    ],
+    "ref": [
+     428.6,
+     482.4
+    ],
+    "flags": []
+   },
+   {
+    "cls": "bomb",
+    "side": 1,
+    "tile": [
+     15.3,
+     12.4
+    ],
+    "ref": [
+     452.1,
+     478.2
+    ],
+    "flags": [
+     "spl"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     16.2,
+     13.0
+    ],
+    "ref": [
+     475.7,
+     465.6
+    ],
+    "flags": [
+     "occ"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     13.4,
+     10.6
+    ],
+    "ref": [
+     402.4,
+     515.8
+    ],
+    "flags": []
+   },
+   {
+    "cls": "golden-knight",
+    "side": 0,
+    "tile": [
+     16.0,
+     8.0
+    ],
+    "ref": [
+     470.5,
+     570.2
+    ],
+    "flags": [
+     "tower"
+    ]
+   }
+  ],
+  "156405": [
+   {
+    "cls": "ice-wizard",
+    "side": 0,
+    "tile": [
+     3.3,
+     18.4
+    ],
+    "ref": [
+     138.0,
+     352.7
+    ],
+    "flags": [
+     "occ",
+     "spell",
+     "tower",
+     "formq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     2.4,
+     15.6
+    ],
+    "ref": [
+     114.4,
+     411.2
+    ],
+    "flags": [
+     "occ",
+     "spell",
+     "river"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     3.4,
+     15.8
+    ],
+    "ref": [
+     140.6,
+     407.1
+    ],
+    "flags": [
+     "occ",
+     "spell",
+     "river"
+    ]
+   },
+   {
+    "cls": "fire-spirit",
+    "side": 1,
+    "tile": [
+     10.2,
+     19.5
+    ],
+    "ref": [
+     318.6,
+     329.7
+    ],
+    "flags": [
+     "spell"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     9.0,
+     13.0
+    ],
+    "ref": [
+     287.2,
+     465.6
+    ],
+    "flags": [
+     "deploy",
+     "spell"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     14.8,
+     19.3
+    ],
+    "ref": [
+     439.0,
+     333.8
+    ],
+    "flags": [
+     "spell"
+    ]
+   },
+   {
+    "cls": "golden-knight",
+    "side": 0,
+    "tile": [
+     14.7,
+     14.8
+    ],
+    "ref": [
+     436.4,
+     428.0
+    ],
+    "flags": [
+     "river",
+     "spell"
+    ]
+   }
+  ],
+  "165240": [
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     3.2,
+     15.5
+    ],
+    "ref": [
+     135.4,
+     413.3
+    ],
+    "flags": [
+     "river",
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     8.2,
+     9.3
+    ],
+    "ref": [
+     266.3,
+     543.0
+    ],
+    "flags": [
+     "bld"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     13.6,
+     18.9
+    ],
+    "ref": [
+     407.6,
+     342.2
+    ],
+    "flags": []
+   },
+   {
+    "cls": "bat",
+    "side": 1,
+    "tile": [
+     11.6,
+     20.0
+    ],
+    "ref": [
+     355.3,
+     319.2
+    ],
+    "flags": [
+     "fly"
+    ]
+   },
+   {
+    "cls": "bat",
+    "side": 1,
+    "tile": [
+     14.8,
+     20.0
+    ],
+    "ref": [
+     439.0,
+     319.2
+    ],
+    "flags": [
+     "fly"
+    ]
+   },
+   {
+    "cls": "giant",
+    "side": 1,
+    "tile": [
+     13.3,
+     15.2
+    ],
+    "ref": [
+     399.8,
+     419.6
+    ],
+    "flags": [
+     "river"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     14.7,
+     14.8
+    ],
+    "ref": [
+     436.4,
+     428.0
+    ],
+    "flags": [
+     "occ",
+     "river"
+    ]
+   },
+   {
+    "cls": "ice-golem",
+    "side": 0,
+    "tile": [
+     14.1,
+     11.9
+    ],
+    "ref": [
+     420.7,
+     488.6
+    ],
+    "flags": [
+     "formq"
+    ]
+   },
+   {
+    "cls": "golden-knight",
+    "side": 0,
+    "tile": [
+     15.4,
+     9.4
+    ],
+    "ref": [
+     454.8,
+     540.9
+    ],
+    "flags": [
+     "tower",
+     "spell"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     15.4,
+     23.8
+    ],
+    "ref": [
+     454.8,
+     239.7
+    ],
+    "flags": [
+     "tower"
+    ]
+   },
+   {
+    "cls": "poison",
+    "side": 1,
+    "tile": [
+     14.5,
+     6.5
+    ],
+    "ref": [
+     431.2,
+     601.6
+    ],
+    "flags": [
+     "spl"
+    ]
+   }
+  ],
+  "165900": [
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     2.3,
+     16.6
+    ],
+    "ref": [
+     111.8,
+     390.3
+    ],
+    "flags": [
+     "deploy",
+     "occ",
+     "swarm",
+     "river",
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     3.2,
+     16.2
+    ],
+    "ref": [
+     135.4,
+     398.7
+    ],
+    "flags": [
+     "deploy",
+     "occ",
+     "swarm",
+     "river",
+     "tower"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     4.1,
+     16.6
+    ],
+    "ref": [
+     158.9,
+     390.3
+    ],
+    "flags": [
+     "deploy",
+     "occ",
+     "swarm",
+     "river",
+     "tower"
+    ]
+   },
+   {
+    "cls": "giant",
+    "side": 1,
+    "tile": [
+     3.1,
+     11.3
+    ],
+    "ref": [
+     132.8,
+     501.2
+    ],
+    "flags": [
+     "spell"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 0,
+    "tile": [
+     5.0,
+     12.2
+    ],
+    "ref": [
+     182.5,
+     482.4
+    ],
+    "flags": [
+     "deploy",
+     "spell"
+    ]
+   },
+   {
+    "cls": "cannon",
+    "side": 0,
+    "tile": [
+     9.0,
+     10.9
+    ],
+    "ref": [
+     287.2,
+     509.6
+    ],
+    "flags": [
+     "bld",
+     "spell",
+     "sideq"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     14.6,
+     14.0
+    ],
+    "ref": [
+     433.8,
+     444.7
+    ],
+    "flags": [
+     "spell"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     13.8,
+     10.8
+    ],
+    "ref": [
+     412.9,
+     511.6
+    ],
+    "flags": [
+     "occ",
+     "spell"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     12.3,
+     10.6
+    ],
+    "ref": [
+     373.6,
+     515.8
+    ],
+    "flags": [
+     "occ",
+     "spell"
+    ]
+   },
+   {
+    "cls": "unknown",
+    "side": 1,
+    "tile": [
+     14.7,
+     9.4
+    ],
+    "ref": [
+     436.4,
+     540.9
+    ],
+    "flags": [
+     "occ",
+     "spell",
+     "tower"
+    ]
+   },
+   {
+    "cls": "ice-golem",
+    "side": 0,
+    "tile": [
+     13.1,
+     8.7
+    ],
+    "ref": [
+     394.5,
+     555.6
+    ],
+    "flags": [
+     "occ",
+     "tower"
+    ]
+   },
+   {
+    "cls": "golden-knight",
+    "side": 0,
+    "tile": [
+     13.4,
+     3.9
+    ],
+    "ref": [
+     402.4,
+     656.0
+    ],
+    "flags": [
+     "tower"
+    ]
+   }
+  ]
+ }
+}

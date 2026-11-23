@@ -1,0 +1,28 @@
+# Round-2 real-frame sources (search 2026-11-18/19, late-2026 top ladder / Path of Legends, portrait arena, >=1080 wide or 1920 tall).
+# Downloaded with .venv-tools/bin/yt-dlp into data/video/raw_r2/<id>/ (one dir per video, treated as untrusted data).
+# id | channel | upload | WxH | seconds | deck/note | download | frames extracted | role | title
+01vk2MSqcvg | YersonCz | 20261118 | 886x1920 | 3600 | hog2.6 | downloaded | 2304 | train | HOG 2.6 TOP 8 IN THE WORLD🏆
+RmI0e_5u16o | Rage Clash | 20261118 | 886x1920 | 1969 | golem | downloaded | 576 | train (w15 end-screen pruned) | Top 20 with Double Golem Deck.!
+1hPVVO6VZHA | Rolex - Clash Royale | 20261118 | 1080x1546 | 1722 |  | downloaded | 1152 | train | 97% Win Rate with this Annoying Deck!
+RSwH6hSuvAs | Alina CR | 20261117 | 980x1920 | 4810 | hogEQ | downloaded | 1824 | train | Top Ladder with Hog EQ
+kaLMeKpsuGY | Darth 6 | 20261117 | 938x1920 | 905 | ranked-nocomm | downloaded | 960 | TEST (new held-out, auto labels need human-grade check) | Compilation of 1v1 Ranked Clash Royale Matches!! No commentary, Master League.
+LekrcVeQjiw | SIR SUNOOT | 20261117 | 1080x1554 | 1156 | hog2.6 | downloaded | 864 | TEST (new held-out, auto labels need human-grade check) | Noob to Pro: Road to 10K Trophies with Hog 2.6
+1MO8aGbpLWU | o my days | 20261116 | 884x1920 | 2196 | hog2.6 | downloaded | 1056 | train | HOG 2.6 PUSH RANKED TOP LADDER
+SiJ8KB6bKY8 | Rolex - Clash Royale | 20261116 | 1080x1546 | 1558 | icewiz-drill | downloaded | 960 | train | Top Ladder Push with Ice Wiz Goblin Drill!
+ebaSyPT_b8g | Rage Clash | 20261114 | 884x1920 | 1567 | graveyard | downloaded | 960 | train | #1 IN the World🌍 with*New* Graveyard Deck.!
+zP731PkR3SY | Moyer-Clash Royale | 20261108 | 886x1920 | 643 | evo-goblin-barrel | downloaded | 2463 | train (fixed --arena; 52 hand-placed goblin-barrel-ev1) | The BEST evo goblin barrel deck
+l3V1hvTfWWo | Rox CR Live | 20261107 | 862x1920 | 1566 | hog2.6 | downloaded | 864 | train | Mastering 2.6 Hog Cycle Deck
+TDaBy_WABGE | Ryley - Clash Royale | 20261105 | 896x1920 | 1258 | logbait | downloaded | 768 | train | This BEST Log Bait Deck is 100% SPAM!!
+NgJALUmrgO0 | SkullShack | 20261027 | 872x1920 | 2003 | logbait | downloaded | 1152 | train | We go 5-10 with this broken logbait deck on top ladder 😍😍
+0SAIHMx-aFA | Ryley - Clash Royale | 20261026 | 896x1920 | 1784 | logbait | downloaded | 1056 | train (fixed --arena, crown badge) | I Got 20 Wins with Log Bait!!
+xS__hqez6eE | Extra Ian77 | 20261022 | 1080x1920 | 4504 | topladder | downloaded | 2208 | train (only w10,w18-20; rest facecam layout pruned) | Top Ladder until I LOSE - Clash Royale
+nm9RTQZBqoE | Kamikaze CR | 20261019 | 1080x1572 | 1671 | giant | downloaded | 768 | train | 2600🏅Broken Giant deck In Top Ladder Gameplay - Clash Royale
+3pusfaULNfo | RemiEli CR | 20261015 | 886x1920 | 743 | magicarcher-goblinstein | downloaded | 576 | train | TOP LADDER GAMEPLAY WITH MAGIC ARCHER GOBLINSTEIN !
+NAiCmSnGjfM | Rage Clash | 20261011 | 886x1920 | 1444 | recruits | downloaded | 864 | train | #1 IN the World🌍 with Recruits Spam Deck.!
+qb7MqNM8-64 | Ryley - Clash Royale | 20261009 | 896x1920 | 1402 | logbait | downloaded | 864 | train | This Log Bait Deck is ABSOLUTELY BUSTED!!
+1Cv6QLezOOE | CR Elixro  | 20261005 | 886x1920 | 1265 | hog2.6 | downloaded | 768 | train | HOG 2.6 FRST PUSH SESONE 🔥
+baGUsdsHZg8 | Specter - Clash Royale | 20260905 | 886x1920 | 1216 | golem-evo-ebarbs | downloaded | 480 | train | +3700 WITH GOLEM EVO ELITE BARBARIANS 🔥 PURE TOP LADDER GAMEPLAY | Clash Royale
+kFaSq1-Ax5c | Amane playz | 20261102 | 1080x1920 | 1869 | vertical-live | downloaded | 960 | train | 🔥 CLASH ROYALE LIVE 🔥 | Road to Victory 🏆 | Vertical Gameplay 📱
+7kPe7fRopDg | YersonCz | 20261030 | 886x1920 | 3012 | hog2.6 | downloaded | 1728 | train | BEST HOG 2.6 VS HARD COUNTERS TOP LADDER🏆
+LAH6cHPM-IY | Ryley - Clash Royale | 20260926 | 896x1920 | 1323 | goblinbarrel | downloaded | 672 | train | Level 17 Goblin Barrel is UNSTOPPABLE!!
+rzmMBdSfn_w | TouristCR - Clash Royale  | 20260917 | 1080x1550 | 797 | top1 | downloaded | 576 | train | TOP 1 IN THE WORLD With My BEST DECK! | Clash Royale

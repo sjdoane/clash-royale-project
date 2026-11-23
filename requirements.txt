@@ -1,0 +1,16 @@
+# Main environment (.venv, Python 3.11). Tested on macOS 26 / Apple Silicon with the
+# versions in the comments; newer versions are expected to work.
+numpy>=2.0            # 2.4.6
+gymnasium>=1.0        # 1.4.0
+torch>=2.5            # 2.14.1
+tensorboard>=2.17     # 2.21.0
+pandas>=2.2           # 3.1.1
+pyarrow>=16           # 26.0.1
+scipy>=1.13           # 1.17.1
+opencv-python-headless>=4.9   # 5.0.0.93
+pillow>=10            # 13.0.0
+onnxruntime>=1.18     # 1.31.1
+loguru>=0.7           # 0.7.3
+pytest>=8             # 9.2.0
+# live play on a Mac (iPhone Mirroring capture and clicks)
+pyobjc-framework-Quartz>=10; sys_platform == "darwin"

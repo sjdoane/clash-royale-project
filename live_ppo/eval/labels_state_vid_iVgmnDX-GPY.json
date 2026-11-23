@@ -1,0 +1,185 @@
+{
+ "fix_spans": [
+  {
+   "from": 14940,
+   "to": 15015,
+   "set": {
+    "next": "ice_golem"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 24090,
+   "to": 24135,
+   "set": {
+    "next": "ice_golem"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 34605,
+   "to": 34770,
+   "set": {
+    "next": "ice_golem"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 51735,
+   "to": 51795,
+   "set": {
+    "next": "the_log"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 62220,
+   "to": 62295,
+   "set": {
+    "next": "skeletons"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 80100,
+   "to": 80160,
+   "set": {
+    "next": "fireball"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 91035,
+   "to": 91095,
+   "set": {
+    "next": "ice_golem"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 108810,
+   "to": 108945,
+   "set": {
+    "next": "ice_spirit"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 119805,
+   "to": 119880,
+   "set": {
+    "next": "the_log"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 137610,
+   "to": 137685,
+   "set": {
+    "next": "skeletons"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 165525,
+   "to": 165615,
+   "set": {
+    "next": "the_log"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 174510,
+   "to": 174555,
+   "set": {
+    "next": "musketeer"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 200715,
+   "to": 200775,
+   "set": {
+    "next": "the_log"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 215250,
+   "to": 215355,
+   "set": {
+    "next": "ice_spirit"
+   },
+   "by": "rule_next_in_hand"
+  },
+  {
+   "from": 60765,
+   "to": 60855,
+   "set": {
+    "next": "ice_spirit"
+   },
+   "why": "preview shows Ice Spirit 60855-60945 after the Skeletons play at 60765; label skipped the Ice Spirit cycle",
+   "by": "eye"
+  },
+  {
+   "from": 60870,
+   "to": 60960,
+   "set": {
+    "hand": [
+     "hog_rider",
+     "ice_spirit",
+     "the_log",
+     "fireball"
+    ],
+    "next": "ice_golem"
+   },
+   "why": "Musketeer played at 60870 brings Ice Spirit (shown raised in slot 2 at 60960, played at 60975); Ice Golem flies in at 61050",
+   "by": "eye"
+  },
+  {
+   "from": 62025,
+   "to": 62100,
+   "set": {
+    "next": "ice_golem"
+   },
+   "why": "preview Ice Golem 62100-62175; label skipped the Ice Golem cycle",
+   "by": "eye"
+  },
+  {
+   "from": 62115,
+   "to": 62190,
+   "set": {
+    "hand": [
+     "hog_rider",
+     "musketeer",
+     "cannon",
+     "ice_golem"
+    ],
+    "next": "fireball"
+   },
+   "why": "Ice Spirit (slot 4, shown 62100) played at 62115 brings Ice Golem (shown 62190, played at 62205); preview Fireball from 62190",
+   "by": "eye"
+  },
+  {
+   "from": 62205,
+   "to": 62205,
+   "set": {
+    "hand": [
+     "hog_rider",
+     "musketeer",
+     "cannon",
+     "fireball"
+    ],
+    "next": "skeletons"
+   },
+   "why": "Ice Golem played at 62205 (slot blank) brings Fireball",
+   "by": "eye"
+  }
+ ],
+ "exclude": [
+  [
+   61905,
+   61920
+  ]
+ ]
+}

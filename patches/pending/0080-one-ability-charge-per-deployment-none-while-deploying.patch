@@ -1,0 +1,845 @@
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index 2e6041c..7e83ab0 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -1172,21 +1172,29 @@ private:
+             .withSpellClone());
+ 
+         // === Champions ===
++        // ONE CHARGE PER DEPLOYMENT (patch 0080). The published ability records
++        // of release 15.535.13 give every Champion `MaxCharges: 1` and no
++        // cooldown (only Boss Bandit has one: 2 charges, 3000 ms), exactly as
++        // they do for the Heroes; and in 60,000 recorded sides no Champion is
++        // pressed twice on one deployment (Golden Knight 0 of 7,247 chances,
++        // Mighty Miner 0 of 3,778, ...) while Boss Bandit is, 599 times. The
++        // 12-30 s cooldowns with unlimited uses that stood here were the game
++        // of 2025. A redeployed Champion has a fresh charge.
+         // Mighty Miner: MeleeSquad like the Miner, but not deploy-anywhere.
+         // Damage ramps 40 -> 204 -> 409 on one target, 2 s per stage
+         // (Liquipedia, 2025-01-08 patch), so mid 20 and full 40 ticks; `damage`
+-        // is the max. "Explosive Escape" (1 elixir, ~13 s cooldown): a lane
++        // is the max. "Explosive Escape" (1 elixir, one charge per deployment): a lane
+         // swap leaving a bomb that detonates after ~1 s for 332 with 1.8-tile
+         // knockback. The bomb radius (2.5) is not sourced. See
+         // MightyMinerEscapeEffect.
+         add(troop(115, "Mighty Miner", 4.0f, Archetype::MeleeSquad, 2250, SPEED_MEDIUM, 1.6f, 409, 4, '\'')
+             .withDamageRamp(20, 40, 40.0f / 409.0f, 204.0f / 409.0f)
+-            .withChampionAbility(1.0f, 130, std::make_shared<MightyMinerEscapeEffect>(2.5f, 332, 10, 1.8f)));
++            .withChampionAbility(1.0f, 0, std::make_shared<MightyMinerEscapeEffect>(2.5f, 332, 10, 1.8f), 1));
+ 
+         // Golden Knight's "Dashing Dash": up to 10 dashes to the nearest enemy
+         // within 5.5 tiles, stopping at a Crown Tower (GoldenKnightDashEffect).
+         add(troop(116, "Golden Knight", 4.0f, Archetype::MeleeSquad, 1799, SPEED_MEDIUM, 1.2f, 168, 9, 'k')
+-            .withChampionAbility(1.0f, 120, std::make_shared<GoldenKnightDashEffect>(335, 5.5f, 10)));
++            .withChampionAbility(1.0f, 0, std::make_shared<GoldenKnightDashEffect>(335, 5.5f, 10), 1));
+ 
+         // Skeleton King: collects up to 10 souls from any death within
+         // soulCollectionRadius (not sourced); "Soul Summoning" spawns 6 + 1 per
+@@ -1194,19 +1202,19 @@ private:
+         add(troop(117, "Skeleton King", 4.0f, Archetype::MeleeSquad, 2298, SPEED_MEDIUM, 1.2f, 204, 16, 'K')
+             .withSplash(1.3f)
+             .withSoulCollection(5.0f, 10)
+-            .withChampionAbility(2.0f, 200,
+-                std::make_shared<SkeletonKingSoulSummonEffect>(skeletonKingSummonedSkeletonStats(), 6, 3.5f)) /* audit 0003: wiki Skeleton King, level 11 */);
++            .withChampionAbility(2.0f, 0,
++                std::make_shared<SkeletonKingSoulSummonEffect>(skeletonKingSummonedSkeletonStats(), 6, 3.5f), 1) /* audit 0003: wiki Skeleton King, level 11 */);
+ 
+         // Archer Queen's "Cloaking Cape": untargetable and ~2.8x attack speed
+         // for 3.5 s.
+         add(troop(118, "Archer Queen", 5.0f, Archetype::RangedSquad, 1000, SPEED_MEDIUM, 5.0f, 232, 12, 'Q')
+             .withTargetsAir()
+-            .withChampionAbility(1.0f, 170, std::make_shared<ArcherQueenCloakEffect>(35, 1.0f / 2.8f)));
++            .withChampionAbility(1.0f, 0, std::make_shared<ArcherQueenCloakEffect>(35, 1.0f / 2.8f), 1));
+ 
+         // Monk: his 3-hit combo is flat damage here. "Pensive Protection" (65%
+         // damage reduction for 4 s): see MonkDeflectEffect.
+         add(troop(119, "Monk", 5.0f, Archetype::MeleeSquad, 2214, SPEED_MEDIUM, 1.2f, 140, 8, 'M')
+-            .withChampionAbility(1.0f, 170, std::make_shared<MonkDeflectEffect>(0.35f, 40)) /* audit 0003: wiki Monk, level 11 */);
++            .withChampionAbility(1.0f, 0, std::make_shared<MonkDeflectEffect>(0.35f, 40), 1) /* audit 0003: wiki Monk, level 11 */);
+ 
+         // Little Prince: hit speed ramps 1.2 s -> 0.8 s -> 0.4 s on one target
+         // (3 attacks per stage, as tick thresholds). "Royal Rescue" summons the
+@@ -1214,7 +1222,7 @@ private:
+         add(troop(120, "Little Prince", 3.0f, Archetype::RangedSquad, 698, SPEED_MEDIUM, 5.5f, 104, 12, 'p')
+             .withTargetsAir()
+             .withHitSpeedRamp(36, 60, 8.0f / 12.0f, 4.0f / 12.0f)
+-            .withChampionAbility(3.0f, 300, std::make_shared<SpawnOnAbility>(guardienneStats())) /* audit 0003: wiki Little Prince, level 11 */);
++            .withChampionAbility(3.0f, 0, std::make_shared<SpawnOnAbility>(guardienneStats()), 1) /* audit 0003: wiki Little Prince, level 11 */);
+ 
+         // Goblinstein: the Monster (front, building-only tank, carries the
+         // ability) plus the Doctor (secondary, 3 tiles behind at a fixed
+@@ -1222,7 +1230,7 @@ private:
+         // (patch 0037; it was +3, which put team 0's Doctor in front). "Lightning Link": see
+         // GoblinsteinLightningLinkEffect.
+         add(troop(121, "Goblinstein", 5.0f, Archetype::MeleeBuildingTargeter, 2240, SPEED_MEDIUM, 1.2f, 128, 15, 'G').withSightRange(7.5f)
+-            .withChampionAbility(2.0f, 170, std::make_shared<GoblinsteinLightningLinkEffect>(2.0f, 107, 5, 40))
++            .withChampionAbility(2.0f, 0, std::make_shared<GoblinsteinLightningLinkEffect>(2.0f, 107, 5, 40), 1)
+             .withSecondaryUnit(
+                 troop(-40, "Goblinstein", 0.0f, Archetype::RangedSquad, 721, SPEED_MEDIUM, 5.5f, 135, 18, 'D').withLoadTicks(5)
+                     .withOffsets({ {0.0f, -3.0f} })
+diff --git a/include/core/GameManager.h b/include/core/GameManager.h
+index 534f25a..3ed2481 100644
+--- a/include/core/GameManager.h
++++ b/include/core/GameManager.h
+@@ -163,8 +163,9 @@ private:
+     }
+ 
+     // Once per tick per team: copies the tracked Champion's live cooldown into
+-    // persistedCooldownRemaining. After it dies the last value stays, so a
+-    // redeploy continues the timer.
++    // persistedCooldownRemaining. Since patch 0080 a redeploy no longer resumes
++    // it (see trackSlotEntities): the value is the slot's record of its live
++    // body, nothing more.
+     void syncChampionCooldowns(int team) {
+         PlayerState& player = (team == 0) ? playerAI : playerOpponent;
+         const std::vector<int>& deckConfig = (team == 0) ? aiDeckConfig : oppDeckConfig;
+@@ -695,7 +696,14 @@ public:
+                 const int slotCard = (ce->abilitySlotCardId != 0) ? ce->abilitySlotCardId : ce->cardId;
+                 if (slotCard != deckConfig[slot]) continue;
+                 PlayerState::ChampionSlotState& slotState = player.championSlots[slot];
+-                ce->abilityCooldownRemaining = slotState.persistedCooldownRemaining;
++                // A new body brings its own charges and its own lockout after
++                // landing (Hero Mega Minion), and inherits nothing (patch
++                // 0080). This used to assign the slot's cooldown to it, which
++                // (a) carried the previous body's cooldown over, frozen while
++                // that body was dead -- recorded presses come 2 s after a
++                // redeploy, 251 Golden Knight ones inside his old 12 s -- and
++                // (b) wiped Hero Mega Minion's lockout on every deploy.
++                slotState.persistedCooldownRemaining = ce->abilityCooldownRemaining;
+                 slotState.trackedEntityId = ce->id;
+                 break;
+             }
+@@ -703,24 +711,26 @@ public:
+     }
+ 
+     // Whether `team`'s Champion/Hero in `slot` has a live body, and its
+-    // ability cooldown left (the live body's, else the persisted one a redeploy
+-    // resumes). For the observation's own-ability section (item 46).
++    // ability cooldown left: the live body's, and 0 with none on the field (a
++    // redeploy starts fresh, patch 0080). For the observation's own-ability
++    // section (item 46).
+     bool isChampionDeployed(int team, int slot) const {
+         return findChampionInSlot(team, slot) != nullptr;
+     }
+     int championCooldownRemaining(int team, int slot) const {
+         if (auto champion = findChampionInSlot(team, slot)) return champion->abilityCooldownRemaining;
+-        const PlayerState& player = (team == 0) ? playerAI : playerOpponent;
+-        auto it = player.championSlots.find(slot);
+-        return it == player.championSlots.end() ? 0 : it->second.persistedCooldownRemaining;
++        return 0;
+     }
+ 
+     // Whether `team`'s Champion in `slot` (1 = Heroic, 2 = Wild Card) could
+-    // activate now: deployed, off cooldown, uses left, affordable. The two
+-    // slots are independent.
++    // activate now: deployed (its deploy time over, patch 0080: the ability
++    // belongs to the deployed character, and of 33,848 recorded presses 99 %
++    // come 1.2 s or more after the card), off cooldown, uses left, affordable.
++    // The two slots are independent.
+     bool isChampionAbilityReady(int team, int slot = 1) const {
+         auto champion = findChampionInSlot(team, slot);
+         if (champion && champion->abilityEffect) {
++            if (champion->deployTicksRemaining > 0) return false;
+             if (champion->abilityCooldownRemaining > 0) return false;
+             if (champion->abilityUsesRemaining == 0) return false;
+             const PlayerState& player = (team == 0) ? playerAI : playerOpponent;
+@@ -739,6 +749,7 @@ public:
+ 
+         auto champion = findChampionInSlot(team, slot);
+         if (champion && champion->abilityEffect) {
++            if (champion->deployTicksRemaining > 0) return false;
+             if (champion->abilityCooldownRemaining > 0) return false;
+             // Without this, a uses-limited ability with a zero cooldown would
+             // keep charging elixir for a no-op activation.
+diff --git a/include/core/PlayerState.h b/include/core/PlayerState.h
+index 642caa8..a2f474a 100644
+--- a/include/core/PlayerState.h
++++ b/include/core/PlayerState.h
+@@ -32,8 +32,8 @@ public:
+     // Clone-spell copy never does.
+     //
+     // persistedCooldownRemaining follows the tracked entity's cooldown while it
+-    // lives (GameManager::syncChampionCooldowns) and persists after it dies, so
+-    // a redeploy resumes the cooldown.
++    // lives (GameManager::syncChampionCooldowns). A redeploy does not resume it
++    // (patch 0080): every body has its own charges.
+     struct ChampionSlotState {
+         int trackedEntityId = -1;
+         int persistedCooldownRemaining = 0;
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index 2a666c9..1eb8ef3 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -484,8 +484,10 @@ public:
+     // Elixir charged on each activation, on top of the card's deploy cost. 0
+     // with a null abilityEffect means no ability.
+     float abilityElixirCost = 0.0f;
+-    // Cooldown between activations. Starts at 0 (ready at deploy) and resets to
+-    // abilityCooldownTicks on each activation.
++    // Cooldown between activations. Starts at 0 (ready once deployed) and
++    // resets to abilityCooldownTicks on each activation. Since patch 0080 only
++    // Boss Bandit has one (two charges, 3 s apart); every other Champion and
++    // Hero has one charge per deployment and no cooldown.
+     int abilityCooldownTicks = 0;
+     int abilityCooldownRemaining = 0;
+     // What the ability does (e.g. MightyMinerEscapeEffect in core/). nullptr
+@@ -819,7 +821,10 @@ public:
+         if (startsInvisible && visibleTicksRemaining > 0) visibleTicksRemaining--;
+         if (buffTicksRemaining > 0) buffTicksRemaining--;
+         if (curseTicksRemaining > 0) curseTicksRemaining--;
+-        if (abilityCooldownRemaining > 0) abilityCooldownRemaining--;
++        // The ability's own timer starts when the body has landed (patch
++        // 0080): Hero Mega Minion's lockout is counted from there, and no
++        // ability can be used during the deploy anyway.
++        if (abilityCooldownRemaining > 0 && !deploying) abilityCooldownRemaining--;
+         if (temporaryInvisibilityTicksRemaining > 0) temporaryInvisibilityTicksRemaining--;
+         if (selfHasteTicksRemaining > 0) selfHasteTicksRemaining--;
+         if (temporaryFlightTicksRemaining > 0) {
+diff --git a/python_ai/tests/test_ability_charges_and_deploy.py b/python_ai/tests/test_ability_charges_and_deploy.py
+new file mode 100644
+index 0000000..b10eafe
+--- /dev/null
++++ b/python_ai/tests/test_ability_charges_and_deploy.py
+@@ -0,0 +1,210 @@
++"""Champion / Hero abilities: when one can be pressed, how often, at what cost.
++
++Patch 0080. Three rules, each checked against two independent sources:
++
++* ONE CHARGE PER DEPLOYMENT, NO COOLDOWN, for every Champion and Hero but Boss
++  Bandit (two charges, 3 s apart). Published: card_specs.json of release
++  15.535.13 (4 Aug 2026) gives every ability `MaxCharges: 1` and no `Cooldown`,
++  Boss Bandit `MaxCharges: 2, Cooldown: 3000`. Recorded: on 60,000 human sides
++  holding one such card, no press is repeated on one deployment (Golden Knight 0
++  with 7,247 press / redeploy / press sequences, Mighty Miner 0 / 3,778, Hero
++  Berserker 0 / 11,299), Boss Bandit 599 repeats, never closer than 3.9 s.
++  The engine used to give the seven older Champions a 12-30 s cooldown and
++  unlimited uses, carried over to the next body and frozen while it was dead.
++* A FRESH CHARGE ON EVERY DEPLOYMENT. Recorded: 251 Golden Knight presses come
++  less than 12 s after the previous one, each on a new body (Mighty Miner 221
++  under 13 s, Archer Queen 229 under 17 s).
++* NOTHING DURING THE DEPLOY. The ability belongs to the deployed character
++  (published: every carrier has `DeployTime: 1000`). Recorded: of 33,848 presses
++  the 1st percentile is 1.2 s after the card or later for every card.
++
++Published costs are the same file's `ManaCost` of each ability.
++Hero Goblins is left out: its Banner is pressed after the Goblins die (its own
++tests), and Hero Ice Wizard / Hero Electro Wizard have no published ability
++record in that release, so only the rules above are checked for them.
++"""
++import pytest
++
++import clash_royale_env as E
++
++CE = E.ClashRoyaleEnv
++H = CE.HAND_SIZE
++FILL = [3, 6, 40, 24, 72, 33, 7, 0, 15, 25]
++OPP = [3, 6, 40, 24, 72, 33, 7, 0]
++
++SPOTS = [(9.0, 8.0), (4.0, 8.0), (14.0, 8.0), (9.0, 11.0), (5.0, 11.0), (13.0, 11.0), (9.0, 5.0)]
++
++HERO_GOBLINS = 172
++BOSS_BANDIT = 122
++SLOT_CARDS = sorted(c for c in E.get_all_card_ids()
++                    if E.get_card_info(c)["is_champion"] or E.get_card_info(c)["is_hero"])
++NAMES = {c: E.get_card_info(c)["name"] for c in SLOT_CARDS}
++PRESSABLE = [c for c in SLOT_CARDS if c != HERO_GOBLINS]
++
++# card_specs.json, release nr_15.535.13: the ability's ManaCost.
++PUBLISHED_COST = {
++    "Mighty Miner": 1, "Golden Knight": 1, "Skeleton King": 2, "Archer Queen": 1,
++    "Monk": 1, "Little Prince": 3, "Goblinstein": 2, "Boss Bandit": 1,
++    "Hero Knight": 2, "Hero Wizard": 1, "Hero Musketeer": 3, "Hero Giant": 2,
++    "Hero Mini P.E.K.K.A.": 1, "Hero Magic Archer": 2, "Hero Mega Minion": 2,
++    "Hero Barbarian Barrel": 1, "Hero Ice Golem": 2, "Hero Balloon": 2,
++    "Hero Valkyrie": 3, "Hero Dark Prince": 3, "Hero Bowler": 2,
++    "Hero Berserker": 3, "Hero Tombstone": 5,
++}
++
++# Ticks from the card to the first tick the ability can be pressed. 10 is the
++# body's deploy time. Hero Mega Minion is locked for a further 1.5 s after
++# landing; Hero Barbarian Barrel's Barbarian lands 17 ticks after the card.
++FIRST_READY = {"Hero Mega Minion": 25, "Hero Barbarian Barrel": 27}
++
++
++def _ids(cards):
++    return [NAMES[c] for c in cards]
++
++
++def _game(cid):
++    rest = [f for f in FILL if f != cid]
++    deck = rest[:1] + [cid] + rest[1:7]
++    assert not E.validate_deck_slots(deck)
++    env = CE(deck, OPP, 3600)
++    env.seed(1)
++    return env, deck
++
++
++def _play(env, deck, cid):
++    """Play `cid` from team 0's hand on the first free spot; one tick passes."""
++    assert env.set_hand_for_team(0, [cid] + [c for c in deck if c != cid][:3])
++    env.set_elixir_for_team(0, 10.0)
++    # A building (the card itself, or what an ability left) holds its tiles.
++    spots = [(9.0, 14.0)] if E.get_card_info(cid)["is_spell"] else SPOTS
++    x, y = next((x, y) for x, y in spots if env.is_valid_placement(cid, x, y, 0))
++    env.step_self_play(0, x, y, H, 0.0, 0.0, 1)
++
++
++def _tick(env, n=1):
++    for _ in range(n):
++        env.step_self_play(H, 0.0, 0.0, H, 0.0, 0.0, 1)
++        env.set_elixir_for_team(0, 10.0)
++
++
++def _bodies(env, cid):
++    # By name too: Hero Barbarian Barrel's Barbarian is a helper of the spell.
++    return [u for u in env.get_units()
++            if u["team"] == 0 and (u["card_id"] == cid or u["name"] == NAMES[cid])]
++
++
++def _wait_ready(env, limit=60):
++    """Ticks stepped until the ability is ready, refusing a press on the way."""
++    for waited in range(limit):
++        env.set_elixir_for_team(0, 10.0)
++        if env.is_champion_ability_ready(0, 1):
++            return waited
++        assert not env.activate_champion_ability(0, 1)
++        assert env.get_elixir_for_team(0) == pytest.approx(10.0)   # nothing charged
++        _tick(env)
++    return None
++
++
++@pytest.mark.parametrize("cid", PRESSABLE, ids=_ids(PRESSABLE))
++def test_no_ability_can_be_pressed_before_its_body_has_deployed(cid):
++    env, deck = _game(cid)
++    assert not env.is_champion_ability_ready(0, 1)       # nothing on the field
++    _play(env, deck, cid)
++    waited = _wait_ready(env)
++    assert waited is not None
++    assert 1 + waited == FIRST_READY.get(NAMES[cid], 10)
++
++
++@pytest.mark.parametrize("cid", [c for c in PRESSABLE if NAMES[c] in PUBLISHED_COST],
++                         ids=[NAMES[c] for c in PRESSABLE if NAMES[c] in PUBLISHED_COST])
++def test_every_ability_costs_what_the_release_publishes(cid):
++    env, deck = _game(cid)
++    _play(env, deck, cid)
++    assert _wait_ready(env) is not None
++    env.set_elixir_for_team(0, 10.0)
++    assert env.activate_champion_ability(0, 1)
++    assert 10.0 - env.get_elixir_for_team(0) == pytest.approx(PUBLISHED_COST[NAMES[cid]])
++
++
++def test_the_cost_table_covers_every_card_the_release_publishes():
++    unpublished = {"Hero Ice Wizard", "Hero Electro Wizard", "Hero Goblins"}
++    assert {NAMES[c] for c in SLOT_CARDS} - set(PUBLISHED_COST) == unpublished
++
++
++ONE_CHARGE = [c for c in PRESSABLE if c != BOSS_BANDIT]
++
++
++@pytest.mark.parametrize("cid", ONE_CHARGE, ids=_ids(ONE_CHARGE))
++def test_one_charge_per_deployment_and_nothing_to_wait_out(cid):
++    env, deck = _game(cid)
++    _play(env, deck, cid)
++    assert _wait_ready(env) is not None
++    assert env.activate_champion_ability(0, 1)
++    env.set_elixir_for_team(0, 10.0)
++    assert not env.is_champion_ability_ready(0, 1)
++    assert not env.activate_champion_ability(0, 1)
++    assert env.get_elixir_for_team(0) == pytest.approx(10.0)
++    # 40 s: longer than the longest cooldown the engine ever had (30 s).
++    alive = 0
++    for _ in range(400):
++        _tick(env)
++        alive += bool(_bodies(env, cid))
++        assert not env.is_champion_ability_ready(0, 1)
++    assert alive >= 30          # the body was there to press with, not just gone
++
++
++def test_boss_bandit_has_two_charges_three_seconds_apart():
++    env, deck = _game(BOSS_BANDIT)
++    _play(env, deck, BOSS_BANDIT)
++    assert _wait_ready(env) is not None
++    assert env.activate_champion_ability(0, 1)
++    again = _wait_ready(env)
++    assert again == 30                                   # published Cooldown 3000 ms
++    assert _bodies(env, BOSS_BANDIT)
++    assert env.activate_champion_ability(0, 1)
++    for _ in range(100):
++        _tick(env)
++        assert not env.is_champion_ability_ready(0, 1)   # published MaxCharges 2
++
++
++REDEPLOYED = [c for c in PRESSABLE if NAMES[c] not in FIRST_READY]
++
++
++@pytest.mark.parametrize("cid", REDEPLOYED, ids=_ids(REDEPLOYED))
++def test_a_redeployed_card_has_a_fresh_charge_as_soon_as_it_has_landed(cid):
++    env, deck = _game(cid)
++    _play(env, deck, cid)
++    assert _wait_ready(env) is not None
++    assert env.activate_champion_ability(0, 1)
++    # The card again 2 s after the press: far inside every old cooldown.
++    _tick(env, 20)
++    _play(env, deck, cid)
++    waited = _wait_ready(env)
++    assert waited is not None and 1 + waited == 10
++    assert env.activate_champion_ability(0, 1)
++    env.set_elixir_for_team(0, 10.0)
++    assert not env.is_champion_ability_ready(0, 1)       # and only one
++
++
++def test_a_spent_charge_stays_spent_through_a_redeploy_that_is_still_landing():
++    # The newest body owns the button: while it deploys, nothing can be pressed,
++    # whatever the older body had left.
++    env, deck = _game(116)                               # Golden Knight
++    _play(env, deck, 116)
++    assert _wait_ready(env) is not None                  # old body ready, not pressed
++    _play(env, deck, 116)
++    env.set_elixir_for_team(0, 10.0)
++    assert not env.is_champion_ability_ready(0, 1)
++    assert 1 + _wait_ready(env) == 10
++
++
++def test_hero_mega_minions_lockout_is_counted_from_landing_and_survives_tracking():
++    # trackSlotEntities used to overwrite the body's own 1.5 s lockout with the
++    # slot's (zero) cooldown, so the ability was ready on the first tick.
++    env, deck = _game(173)
++    _play(env, deck, 173)
++    for _ in range(24):
++        env.set_elixir_for_team(0, 10.0)
++        assert not env.is_champion_ability_ready(0, 1)
++        _tick(env)
++    assert env.is_champion_ability_ready(0, 1)
+diff --git a/tests/core/test_card_registry.cpp b/tests/core/test_card_registry.cpp
+index 9f7a84f..679b678 100644
+--- a/tests/core/test_card_registry.cpp
++++ b/tests/core/test_card_registry.cpp
+@@ -1404,9 +1404,10 @@ TEST_CASE("Mighty Miner (115) is a Champion with the correct stats, ramp, and ab
+     REQUIRE(miner->rampMidTick == 20);
+     REQUIRE(miner->rampFullTick == 40);
+     REQUIRE(miner->abilityElixirCost == Catch::Approx(1.0f));
+-    REQUIRE(miner->abilityCooldownTicks == 130);
++    REQUIRE(miner->abilityCooldownTicks == 0);   // one charge, no cooldown (patch 0080)
++    REQUIRE(miner->abilityUsesRemaining == 1);
+     REQUIRE(miner->abilityEffect != nullptr);
+-    REQUIRE(miner->abilityCooldownRemaining == 0); // ready immediately at deploy
++    REQUIRE(miner->abilityCooldownRemaining == 0); // no lockout of its own once deployed
+ }
+ 
+ TEST_CASE("CardDefinition::isChampion is set for all 8 Champions and no ordinary card", "[card_registry][champion]") {
+diff --git a/tests/core/test_champion_abilities.cpp b/tests/core/test_champion_abilities.cpp
+index 35467ae..0a60d7f 100644
+--- a/tests/core/test_champion_abilities.cpp
++++ b/tests/core/test_champion_abilities.cpp
+@@ -26,7 +26,10 @@ TEST_CASE("Golden Knight (116) is registered with the right stats and ability",
+     REQUIRE(knight->hp == 1799);
+     REQUIRE(knight->isChampion);
+     REQUIRE(knight->abilityElixirCost == Catch::Approx(1.0f));
+-    REQUIRE(knight->abilityCooldownTicks == 120);
++    // One charge per deployment and no cooldown (patch 0080; published
++    // MaxCharges 1, no Cooldown, release 15.535.13).
++    REQUIRE(knight->abilityCooldownTicks == 0);
++    REQUIRE(knight->abilityUsesRemaining == 1);
+ }
+ 
+ TEST_CASE("Skeleton King (117) is registered with soul collection and the right ability", "[card_registry][champion]") {
+@@ -55,7 +58,8 @@ TEST_CASE("Archer Queen (118) is registered as air+ground with the right ability
+     REQUIRE(queen != nullptr);
+     REQUIRE(queen->hp == 1000);
+     REQUIRE(queen->targetsAir);
+-    REQUIRE(queen->abilityCooldownTicks == 170);
++    REQUIRE(queen->abilityCooldownTicks == 0);
++    REQUIRE(queen->abilityUsesRemaining == 1);
+ }
+ 
+ TEST_CASE("Monk (119) is registered with the right stats and ability", "[card_registry][champion]") {
+@@ -82,7 +86,8 @@ TEST_CASE("Little Prince (120) is registered with a hit-speed ramp and the Guard
+     REQUIRE(prince != nullptr);
+     REQUIRE(prince->hp == 698);
+     REQUIRE(prince->hitSpeedRampFullTick == 60);
+-    REQUIRE(prince->abilityCooldownTicks == 300);
++    REQUIRE(prince->abilityCooldownTicks == 0);
++    REQUIRE(prince->abilityUsesRemaining == 1);
+ }
+ 
+ TEST_CASE("Goblinstein (121) spawns both the Monster (champion) and the Doctor", "[card_registry][champion]") {
+diff --git a/tests/core/test_clash_env.cpp b/tests/core/test_clash_env.cpp
+index 4b95ab7..7d120d6 100644
+--- a/tests/core/test_clash_env.cpp
++++ b/tests/core/test_clash_env.cpp
+@@ -76,13 +76,15 @@ TEST_CASE("step()'s activateAbility param defaults to false and only fires when
+     env.debugGame().playerAI.hand[1] = 115;
+ 
+     env.step(1, 9.0f, 10.0f, 1); // deploy Mighty Miner; activateAbility defaults to false
++    REQUIRE_FALSE(env.isChampionAbilityReady(0)); // still deploying (patch 0080)
++    env.step(-1, 0.0f, 0.0f, 9); // the rest of his 1 s deploy time
+     REQUIRE(env.isChampionAbilityReady(0)); // deployed, off cooldown, affordable
+ 
+     env.step(-1, 0.0f, 0.0f, 1); // no card, no ability -- default stays false
+     REQUIRE(env.isChampionAbilityReady(0)); // still ready: nothing consumed it
+ 
+     env.step(-1, 0.0f, 0.0f, 1, true); // explicitly activate slot 1's ability now
+-    REQUIRE_FALSE(env.isChampionAbilityReady(0)); // now on cooldown
++    REQUIRE_FALSE(env.isChampionAbilityReady(0)); // the one charge is spent
+ }
+ 
+ TEST_CASE("sampleRandomDeck always produces a deck that passes validateDeckSlots", "[clash_env][random_deck]") {
+diff --git a/tests/core/test_deck_audit_item32.cpp b/tests/core/test_deck_audit_item32.cpp
+index 083e663..c63b24c 100644
+--- a/tests/core/test_deck_audit_item32.cpp
++++ b/tests/core/test_deck_audit_item32.cpp
+@@ -127,7 +127,12 @@ TEST_CASE("Hero Barbarian Barrel's Rowdy Reroll can be activated through the rea
+     REQUIRE(m.game.playCard(0, HERO_BARBARIAN_BARREL, 8.5f, 6.0f));
+     REQUIRE_FALSE(m.game.isChampionAbilityReady(0, 1)); // the barrel is still rolling
+ 
++    // The Barbarian lands 17 ticks after the play and then has his own 1 s
++    // deploy time (patch 0080): ready 27 ticks after the card. Recorded
++    // presses: 1st percentile 26 ticks after the card, 5th 28.
+     m.step(25);
++    REQUIRE_FALSE(m.game.isChampionAbilityReady(0, 1));
++    m.step(2);
+     REQUIRE(m.game.isChampionAbilityReady(0, 1));
+     const float before = m.game.getElixir(0);
+     REQUIRE(m.game.activateChampionAbility(0, 1));
+@@ -148,7 +153,7 @@ TEST_CASE("A cloned Hero Barbarian never gets the ability, even after the origin
+     REQUIRE(m.game.playCard(0, HERO_BARBARIAN_BARREL, 8.5f, 6.0f));
+     auto original = m.stepUntil("Hero Barbarian Barrel", 0, 40);
+     REQUIRE(original);
+-    m.step();
++    m.step(10); // his own deploy time
+     REQUIRE(m.game.isChampionAbilityReady(0, 1));
+ 
+     auto copy = std::dynamic_pointer_cast<CombatEntity>(original->clone(m.board().allocateId()));
+diff --git a/tests/core/test_game_manager.cpp b/tests/core/test_game_manager.cpp
+index d80f480..3585286 100644
+--- a/tests/core/test_game_manager.cpp
++++ b/tests/core/test_game_manager.cpp
+@@ -554,11 +554,17 @@ TEST_CASE("A freshly-cycled-in hand slot is unplayable for CYCLE_IN_COOLDOWN_TIC
+ // affordable (4.0) from the starting 5.0, and activateChampionAbility's slot
+ // defaults to 1.
+ 
+-TEST_CASE("activateChampionAbility fires, deducts elixir, and starts the cooldown", "[game_manager][champion]") {
++// Patch 0080: an ability belongs to the deployed character, so it is usable
++// only once the body's 1 s deploy time is over.
++static void finishDeploy(GameManager& game) {
++    for (int i = 0; i < 10; ++i) game.step();
++}
++
++TEST_CASE("activateChampionAbility fires, deducts elixir, and spends the charge", "[game_manager][champion]") {
+     GameManager game({ 1, 115, 2, 3, 4, 5, 6, 7 }, { 0,1,2,3,4,5,6,7 });
+     game.playerAI.hand[1] = 115;
+     game.playCard(0, 115, 9.0f, 10.0f);
+-    game.step(); // commit, so the Champion is visible
++    finishDeploy(game); // commit and land: no ability during the 1 s deploy (patch 0080)
+     float elixirBefore = game.getElixirAI();
+ 
+     bool activated = game.activateChampionAbility(0);
+@@ -571,7 +577,7 @@ TEST_CASE("activateChampionAbility feeds MatchStatistics' Champion ability track
+     GameManager game({ 1, 115, 2, 3, 4, 5, 6, 7 }, { 0,1,2,3,4,5,6,7 });
+     game.playerAI.hand[1] = 115;
+     game.playCard(0, 115, 9.0f, 10.0f);
+-    game.step(); // commit, so the Champion is visible
++    finishDeploy(game); // commit and land: no ability during the 1 s deploy (patch 0080)
+ 
+     REQUIRE(game.activateChampionAbility(0));
+ 
+@@ -592,7 +598,7 @@ TEST_CASE("activateChampionAbility fails when unaffordable, without deducting an
+     GameManager game({ 1, 115, 2, 3, 4, 5, 6, 7 }, { 0,1,2,3,4,5,6,7 });
+     game.playerAI.hand[1] = 115;
+     game.playCard(0, 115, 9.0f, 10.0f);
+-    game.step(); // commit, so the Champion is visible
++    finishDeploy(game); // commit and land: no ability during the 1 s deploy (patch 0080)
+     game.playerAI.elixir = 0.5f; // below the 1.0 ability cost
+ 
+     bool activated = game.activateChampionAbility(0);
+@@ -601,27 +607,47 @@ TEST_CASE("activateChampionAbility fails when unaffordable, without deducting an
+     REQUIRE(game.getElixirAI() == Catch::Approx(0.5f)); // untouched
+ }
+ 
+-TEST_CASE("activateChampionAbility fails while still on cooldown", "[game_manager][champion]") {
++TEST_CASE("activateChampionAbility fails while the Champion is still deploying", "[game_manager][champion]") {
++    // Of 33,848 recorded presses the 1st percentile comes 1.2 s after the
++    // card for every Champion and Hero: nobody presses during the deploy.
+     GameManager game({ 1, 115, 2, 3, 4, 5, 6, 7 }, { 0,1,2,3,4,5,6,7 });
+     game.playerAI.hand[1] = 115;
+     game.playCard(0, 115, 9.0f, 10.0f);
+-    game.step(); // commit, so the Champion is visible
+-    game.playerAI.elixir = 10.0f; // plenty for a second attempt, if cooldown didn't block it
++    int ticks = 0;
++    while (ticks < 40) {
++        game.step();
++        ++ticks;
++        game.playerAI.elixir = 10.0f;
++        if (game.isChampionAbilityReady(0)) break;
++        REQUIRE_FALSE(game.activateChampionAbility(0)); // and nothing is charged
++        REQUIRE(game.getElixirAI() == Catch::Approx(10.0f));
++    }
++    REQUIRE(ticks == 10); // the 1 s deploy time, to the tick
++    REQUIRE(game.activateChampionAbility(0));
++}
++
++TEST_CASE("activateChampionAbility fails once the one charge is spent", "[game_manager][champion]") {
++    GameManager game({ 1, 115, 2, 3, 4, 5, 6, 7 }, { 0,1,2,3,4,5,6,7 });
++    game.playerAI.hand[1] = 115;
++    game.playCard(0, 115, 9.0f, 10.0f);
++    finishDeploy(game); // commit and land: no ability during the 1 s deploy (patch 0080)
++    game.playerAI.elixir = 10.0f; // plenty for a second attempt, if the charge didn't block it
+ 
+     REQUIRE(game.activateChampionAbility(0));
+     REQUIRE_FALSE(game.activateChampionAbility(0));
+ }
+ 
+-TEST_CASE("activateChampionAbility is ready again once its full cooldown elapses via step()", "[game_manager][champion]") {
++TEST_CASE("A Champion's ability is one charge per deployment: never ready again on that body", "[game_manager][champion]") {
++    // Patch 0080. Published: MaxCharges 1 and no Cooldown for every Champion
++    // but Boss Bandit. Recorded: 0 repeats on one deployment in 60,000 sides
++    // for Mighty Miner (3,778 press-redeploy-press sequences).
+     GameManager game({ 1, 115, 2, 3, 4, 5, 6, 7 }, { 0,1,2,3,4,5,6,7 });
+     game.playerAI.hand[1] = 115;
+     game.playCard(0, 115, 9.0f, 10.0f);
+-    game.step(); // commit, so the Champion is visible
++    finishDeploy(game); // commit and land: no ability during the 1 s deploy (patch 0080)
+     game.playerAI.elixir = 10.0f;
+     REQUIRE(game.activateChampionAbility(0));
+ 
+-    // Fast-forward the cooldown directly: 130 real ticks would let the Miner
+-    // wander into combat and make the timing depend on it.
+     std::shared_ptr<CombatEntity> champion;
+     for (const auto& e : game.getBoard().getEntities()) {
+         auto candidate = std::dynamic_pointer_cast<CombatEntity>(e);
+@@ -629,13 +655,20 @@ TEST_CASE("activateChampionAbility is ready again once its full cooldown elapses
+     }
+     REQUIRE(champion != nullptr);
+ 
+-    champion->abilityCooldownRemaining = 1;
+-    game.playerAI.elixir = 10.0f;
+-    REQUIRE_FALSE(game.activateChampionAbility(0)); // still 1 tick left
++    REQUIRE(champion->abilityUsesRemaining == 0);
++    REQUIRE(champion->abilityCooldownRemaining == 0); // not a cooldown: there is nothing to wait out
+ 
+-    game.step(); // decrements the last tick via CombatEntity::update()
+-    game.playerAI.elixir = 10.0f;
+-    REQUIRE(game.activateChampionAbility(0));
++    // 30 s, longer than any cooldown the engine ever gave a Champion. He is
++    // kept alive and at full health so the answer is about the charge.
++    const int fullHp = champion->hp;
++    for (int i = 0; i < 300; ++i) {
++        game.step();
++        champion->hp = fullHp;
++        game.playerAI.elixir = 10.0f;
++        REQUIRE(champion->isAlive());
++        REQUIRE_FALSE(game.isChampionAbilityReady(0));
++    }
++    REQUIRE_FALSE(game.activateChampionAbility(0));
+ }
+ 
+ TEST_CASE("activateChampionAbility fails once the game is over", "[game_manager][champion]") {
+@@ -663,13 +696,13 @@ TEST_CASE("Two different Champions in slots 1 and 2 have fully independent abili
+     game.playerAI.deckQueue = { 4, 5, 6, 7 };
+     game.playCard(0, 115, 9.0f, 10.0f);  // Mighty Miner -> slot 1
+     game.playCard(0, 118, 12.0f, 10.0f); // Archer Queen -> slot 2
+-    game.step();
++    finishDeploy(game);
+ 
+     REQUIRE(game.isChampionAbilityReady(0, 1));
+     REQUIRE(game.isChampionAbilityReady(0, 2));
+ 
+     REQUIRE(game.activateChampionAbility(0, 1));
+-    REQUIRE_FALSE(game.isChampionAbilityReady(0, 1)); // now on cooldown
++    REQUIRE_FALSE(game.isChampionAbilityReady(0, 1)); // its charge is spent
+     REQUIRE(game.isChampionAbilityReady(0, 2));        // slot 2 completely unaffected
+ 
+     REQUIRE(game.activateChampionAbility(0, 2));
+@@ -693,7 +726,7 @@ TEST_CASE("Redeploying the same Champion tracks the newest instance for ability
+     game.playerAI.hand[1] = 115; // simulate it having cycled back to hand
+     game.playerAI.handCooldownTicks[1] = 0; // skip the cycle-in delay
+     game.playCard(0, 115, 12.0f, 10.0f); // 2nd deploy, while the first is still alive
+-    game.step();
++    finishDeploy(game);
+ 
+     int championCount = 0;
+     std::shared_ptr<CombatEntity> secondInstance;
+@@ -709,33 +742,42 @@ TEST_CASE("Redeploying the same Champion tracks the newest instance for ability
+ 
+     game.playerAI.elixir = 100.0f;
+     REQUIRE(game.activateChampionAbility(0, 1));
+-    REQUIRE(secondInstance->abilityCooldownRemaining > 0); // the newest instance is the one that fired
+-    REQUIRE(firstInstance->abilityCooldownRemaining == 0); // the original, no-longer-tracked instance is untouched
++    REQUIRE(secondInstance->abilityUsesRemaining == 0); // the newest instance is the one that fired
++    REQUIRE(firstInstance->abilityUsesRemaining == 1);  // the original, no-longer-tracked instance is untouched
+ }
+ 
+-TEST_CASE("A Champion's ability cooldown persists across death and redeploy of the same slot", "[game_manager][champion][multi]") {
++TEST_CASE("A redeployed Champion has a fresh charge as soon as it has landed", "[game_manager][champion][multi]") {
++    // Patch 0080. The engine used to carry a 13 s cooldown over to the next
++    // body, frozen while the Champion was dead. Recorded: 221 Mighty Miner
++    // presses come less than 13 s after the previous one, each on a new
++    // deployment (251 Golden Knight under 12 s, 229 Archer Queen under 17 s).
+     GameManager game({ 1, 115, 2, 3, 4, 5, 6, 7 }, { 0,1,2,3,4,5,6,7 });
+     game.playerAI.elixir = 100.0f;
+     game.playerAI.hand[1] = 115; // force into hand: the opening hand is random
+     game.playCard(0, 115, 9.0f, 10.0f);
+-    game.step();
++    finishDeploy(game);
+ 
+-    REQUIRE(game.activateChampionAbility(0, 1)); // cooldown set to 130 on the live entity
+-    game.step(); // synced into persistedCooldownRemaining (129) while still alive
++    REQUIRE(game.activateChampionAbility(0, 1)); // the first body's charge is spent
++    game.step();
+ 
+     for (const auto& e : game.getBoard().getEntities()) {
+         auto ce = std::dynamic_pointer_cast<CombatEntity>(e);
+         if (ce && ce->isChampion) { ce->takeDamage(ce->hp); break; }
+     }
+-    game.step(); // this tick's sync sees it already dead, leaves the persisted value at 129; cleans the corpse up
++    game.step(); // cleans the corpse up
++    REQUIRE_FALSE(game.isChampionAbilityReady(0, 1)); // nobody on the field
+ 
+     game.playerAI.hand[1] = 115;
+     game.playerAI.handCooldownTicks[1] = 0; // skip the cycle-in delay
+     game.playerAI.elixir = 100.0f;
+-    game.playCard(0, 115, 9.0f, 10.0f); // redeploy -- should seed from the persisted cooldown, not start at 0
++    game.playCard(0, 115, 9.0f, 10.0f); // redeploy, 2 ticks after the press
+     game.step();
+-
+-    REQUIRE_FALSE(game.isChampionAbilityReady(0, 1)); // still cooling down, not freshly ready
++    REQUIRE_FALSE(game.isChampionAbilityReady(0, 1)); // deploying
++    for (int i = 0; i < 9; ++i) game.step();
++    game.playerAI.elixir = 100.0f;
++    REQUIRE(game.isChampionAbilityReady(0, 1));       // landed: a new charge
++    REQUIRE(game.activateChampionAbility(0, 1));
++    REQUIRE_FALSE(game.isChampionAbilityReady(0, 1)); // and only one
+ }
+ 
+ TEST_CASE("A cloned Champion can never activate the ability, even after the original dies", "[game_manager][champion][multi]") {
+@@ -756,7 +798,7 @@ TEST_CASE("A cloned Champion can never activate the ability, even after the orig
+     REQUIRE(clone != nullptr);
+     REQUIRE(clone->isChampion); // the clone DOES carry isChampion=true -- it's the tracking that must exclude it
+     game.getBoard().addEntity(clone);
+-    game.step();
++    finishDeploy(game);
+ 
+     REQUIRE(game.isChampionAbilityReady(0, 1)); // still resolves to the original (still alive), not the clone
+ 
+diff --git a/tests/core/test_hero_abilities.cpp b/tests/core/test_hero_abilities.cpp
+index e61c284..6db3ea8 100644
+--- a/tests/core/test_hero_abilities.cpp
++++ b/tests/core/test_hero_abilities.cpp
+@@ -131,10 +131,12 @@ TEST_CASE("activateChampionAbility fires for a Hero (not just a Champion) deploy
+     game.playerAI.elixir = 100.0f;
+     game.playCard(0, 168, 9.0f, 10.0f);
+     game.step(); // commit, so findChampionInSlot can see it
++    REQUIRE_FALSE(game.isChampionAbilityReady(0, 1)); // still deploying (patch 0080)
++    for (int i = 0; i < 9; ++i) game.step();           // the 1 s deploy time
+ 
+     REQUIRE(game.isChampionAbilityReady(0, 1));
+     REQUIRE(game.activateChampionAbility(0, 1));
+-    REQUIRE_FALSE(game.isChampionAbilityReady(0, 1)); // now on cooldown, same as any Champion
++    REQUIRE_FALSE(game.isChampionAbilityReady(0, 1)); // its charge is spent, same as any Champion
+ }
+ 
+ TEST_CASE("A Hero's one-use ability (usesLimit=1) can't be reactivated once spent", "[game_manager][hero]") {
+@@ -142,7 +144,7 @@ TEST_CASE("A Hero's one-use ability (usesLimit=1) can't be reactivated once spen
+     game.playerAI.hand[1] = 170;
+     game.playerAI.elixir = 100.0f;
+     game.playCard(0, 170, 9.0f, 10.0f);
+-    game.step();
++    for (int i = 0; i < 10; ++i) game.step(); // landed (patch 0080)
+ 
+     REQUIRE(game.activateChampionAbility(0, 1));
+     REQUIRE_FALSE(game.activateChampionAbility(0, 1)); // uses exhausted, no cooldown to wait out
+diff --git a/tests/core/test_mirror.cpp b/tests/core/test_mirror.cpp
+index 6753456..1a273e2 100644
+--- a/tests/core/test_mirror.cpp
++++ b/tests/core/test_mirror.cpp
+@@ -118,7 +118,7 @@ TEST_CASE("Mirror can duplicate a Champion, and the ability targets whichever in
+     REQUIRE(game.playerAI.championSlots[1].trackedEntityId == originalId);
+ 
+     REQUIRE(game.playCard(0, 164, 9.0f, 10.0f)); // Mirror duplicates the Champion
+-    game.step();
++    for (int i = 0; i < 10; ++i) game.step();    // the copy lands (patch 0080: no ability while deploying)
+ 
+     int mightyMinerCount = 0;
+     for (const auto& e : game.getBoard().getEntities()) {
+@@ -137,9 +137,9 @@ TEST_CASE("Mirror can duplicate a Champion, and the ability targets whichever in
+         auto ce = std::dynamic_pointer_cast<CombatEntity>(e);
+         if (!ce || !ce->isChampion) continue;
+         if (ce->id == originalId) {
+-            REQUIRE(ce->abilityCooldownRemaining == 0); // original untouched
++            REQUIRE(ce->abilityUsesRemaining == 1); // original untouched
+         } else {
+-            REQUIRE(ce->abilityCooldownRemaining == 130); // the mirrored copy actually activated
++            REQUIRE(ce->abilityUsesRemaining == 0); // the mirrored copy actually activated (one charge, patch 0080)
+         }
+     }
+ }
+@@ -152,12 +152,12 @@ TEST_CASE("Mirror can duplicate a Hero, and the mirrored copy has its own indepe
+     game.playerAI.elixir = 100.0f;
+ 
+     REQUIRE(game.playCard(0, 170, 9.0f, 10.0f)); // original Hero Mini P.E.K.K.A.
+-    game.step();
++    for (int i = 0; i < 10; ++i) game.step();    // landed
+     REQUIRE(game.activateChampionAbility(0, 1)); // consume the original's one use
+     REQUIRE_FALSE(game.isChampionAbilityReady(0, 1)); // original is now spent
+ 
+     REQUIRE(game.playCard(0, 164, 9.0f, 10.0f)); // Mirror duplicates the Hero
+-    game.step();
++    for (int i = 0; i < 10; ++i) game.step();    // landed
+ 
+     // The mirrored copy carries its own fresh one-use ability.
+     REQUIRE(game.isChampionAbilityReady(0, 1));
+diff --git a/tests/core/test_snapshot_champion_state.cpp b/tests/core/test_snapshot_champion_state.cpp
+index b785f19..233f72d 100644
+--- a/tests/core/test_snapshot_champion_state.cpp
++++ b/tests/core/test_snapshot_champion_state.cpp
+@@ -40,6 +40,11 @@ void deployChampion(GameManager& game, int cardId) {
+     game.step();   // commit, so the entity is on the board
+ }
+ 
++// Patch 0080: no ability while the body is deploying (1 s).
++void land(GameManager& game) {
++    for (int i = 0; i < 9; ++i) game.step();
++}
++
+ } // namespace
+ 
+ TEST_CASE("snapshot carries championSlots and the copy can still resolve its Champion",
+@@ -71,6 +76,7 @@ TEST_CASE("a snapshot's Champion ability is independent of the original's",
+           "[snapshot][champion]") {
+     GameManager original(CHAMPION_DECK, CHAMPION_DECK);
+     deployChampion(original, 115);
++    land(original);
+     original.playerAI.elixir = 10.0f;
+     REQUIRE(original.isChampionAbilityReady(0, 1));
+ 
+@@ -82,11 +88,11 @@ TEST_CASE("a snapshot's Champion ability is independent of the original's",
+     REQUIRE(copy.activateChampionAbility(0, 1));
+     REQUIRE_FALSE(copy.isChampionAbilityReady(0, 1));
+ 
+-    // The original is untouched: a rollout must not put the real Champion on
+-    // cooldown.
++    // The original is untouched: a rollout must not spend the real Champion's
++    // charge.
+     REQUIRE(original.isChampionAbilityReady(0, 1));
+ 
+-    // And spending on the original leaves the copy alone: no shared cooldown
++    // And spending on the original leaves the copy alone: no shared charge
+     // counter.
+     REQUIRE(original.activateChampionAbility(0, 1));
+     REQUIRE_FALSE(copy.isChampionAbilityReady(0, 1));
+@@ -94,8 +100,12 @@ TEST_CASE("a snapshot's Champion ability is independent of the original's",
+ 
+ TEST_CASE("persistedCooldownRemaining survives a snapshot rather than resetting",
+           "[snapshot][champion]") {
+-    GameManager original(CHAMPION_DECK, CHAMPION_DECK);
+-    deployChampion(original, 115);
++    // Boss Bandit (122): the one ability that still has a cooldown since
++    // patch 0080 (two charges, 3 s apart).
++    const std::vector<int> banditDeck = { 10, 122, 41, 25, 7, 2, 6, 5 };
++    GameManager original(banditDeck, banditDeck);
++    deployChampion(original, 122);
++    land(original);
+     original.playerAI.elixir = 10.0f;
+     REQUIRE(original.activateChampionAbility(0, 1));
+ 

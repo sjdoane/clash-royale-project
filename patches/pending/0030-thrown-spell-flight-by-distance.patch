@@ -1,0 +1,764 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index e87078d..98b24a1 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -406,6 +406,63 @@ untouched; everything is in `web/lab/`, `tools/lab/` and `tools/promo/cdp.py`.
+   `<meta name="lab-build">`, and the footer shows "Build abc1234." -- the way
+   to confirm a deploy replaced the old page.
+ 
++## 2026-11-21: thrown spells fly from the King Tower (patch 0030)
++
++**Fireball, Arrows, Rocket, Giant Snowball and Goblin Barrel now take a time
++that depends on where they are aimed.** Each was a fixed fuse (Goblin Barrel 8
++ticks, Fireball ~11) from any distance. The real cards are thrown from the
++caster's King Tower, so `spawnSpell` now sets the fuse from the distance.
++
++| | published speed | real tiles/s | ticks to the enemy Princess Tower | was |
++|---|---|---|---|---|
++| Goblin Barrel (109; evolution 132) | 400 | 8.33 | 28 | 8 |
++| Fireball (7) | 600 | 12.5 | 19 | 11 |
++| Rocket (30) | 350 | 7.29 | 32 | fixed |
++| Giant Snowball (100; evolution 158) | 800 | 16.7 | 14 | fixed |
++| Arrows (3) | 1100 | 22.9 | 10 | fixed |
++
++**The divisor is 48, not 60, and it is measured.** A thrown projectile covers
++published speed / 48 real tiles per second: eight Goblin Barrels recorded
++frame by frame flew King Tower to Princess Tower (23.2 real tiles) in
++2.72-2.81 s, which is 8.41 tiles/s (400/48 = 8.33; "60 = 1 tile/s" predicts
++3.48 s). Fireball (7 throws, 12.3 tiles/s), Rocket (2) and Giant Snowball (1)
++fit the same divisor within 7%. Arrows was not measured; it takes the same rule
++on its published 1100. The Log's ROLL is a different motion and does follow
++/60 (see the rolling-spell note below); do not "unify" the two.
++
++How it is built, so nobody re-derives it:
++
++- `CardStats::spellProjectileSpeed` (0 = not thrown), set in the registry with
++  `.withThrownFromKingTower(publishedSpeed)`. `thrownSpellFlightTicks(stats, x,
++  y, team)` in `CardFactories.h` is the one place the rule lives.
++- Distance is measured on the REAL 32-row arena: `ArenaLayout::realRow(y)`
++  squeezes out the engine's two extra rows (14 and 19), so a throw across the
++  river is not charged for rows the real board lacks. Launch point is
++  `(CENTER_X, kingY(team))`. Minimum 1 tick. No randomness.
++- `withSpellDelay` on these five cards is now ignored (the registry keeps it as
++  the fallback); every other spell (The Log, Barbarian Barrel, Zap, Lightning,
++  Poison, Earthquake, Tornado, Freeze, Rage, Graveyard, Royal Delivery, ...)
++  keeps its fixed delay.
++- **A spell in the air is in no observation channel.** Read it with
++  `env.get_pending_spells()`: one dict per spell that has not landed yet, with
++  `team`, `card_id`, `x`, `y`, `ticks_to_impact` (1 = the next step lands it)
++  and `thrown`. `clash_royale_env.spell_flight_ticks(card_id, x, y, team=0,
++  evolved=False)` answers "how long would this take" without casting, and
++  `get_card_stats(id)["base"]["spell_projectile_speed"]` exposes the speed.
++- Tests: `tests/core/test_card_factories.cpp` (`[flight]`),
++  `tests/core/test_arena_layout.cpp` (`[real_row]`),
++  `python_ai/tests/test_thrown_spell_flight.py`.
++
++**GAMEPLAY-AFFECTING, and Fireball is in `DEFAULT_DECK`.** A Goblin Barrel on
++a Princess Tower lands 2.8 s after the cast instead of 0.8 s and its Goblins
++first stab at 4.4 s instead of 2.4 s, so answers that were too late now work
++(a Log 2.0-2.6 s after the throw on the tile in front of the tower) and an
++instant Fireball on the landing tile now lands BEFORE the Goblins and misses.
++A Fireball on our own side lands sooner than before (5 ticks on our own
++Princess Tower), one across the board later. Every win rate earned before this
++date describes different spell timing. Checkpoints still load — the
++observation and the action space did not move.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/ArenaLayout.h b/include/core/ArenaLayout.h
+index 4795021..2f1b183 100644
+--- a/include/core/ArenaLayout.h
++++ b/include/core/ArenaLayout.h
+@@ -33,6 +33,21 @@ inline constexpr float PRINCESS_Y_TEAM0 = 6.0f;
+ constexpr float kingY(int team) { return team == 0 ? KING_Y_TEAM0 : mirrorY(KING_Y_TEAM0); }
+ constexpr float princessY(int team) { return team == 0 ? PRINCESS_Y_TEAM0 : mirrorY(PRINCESS_Y_TEAM0); }
+ 
++// The row of the real 18 x 32 arena an engine y stands for. The engine board
++// has two rows the real arena lacks, 14 and 19, one on each bank of the river
++// (the "tower" mapping of live_ppo/tile_map.py: identity up to row 13, engine
++// 15-18 are real 14-17, engine 20+ are real 18+). Piecewise linear through
++// those rows, so each extra row is squeezed out rather than cut:
++// realRow(mirrorY(y)) == 31 - realRow(y). Distances a real projectile flies
++// are measured in these rows (CardFactories::thrownSpellFlightTicks); the
++// engine's King-to-enemy-Princess line is 25.1 tiles, the real one 23.2.
++constexpr float realRow(float y) {
++    const float a = (y - 13.0f) * 0.5f;
++    const float b = (y - 18.0f) * 0.5f;
++    return y - (a < 0.0f ? 0.0f : (a > 1.0f ? 1.0f : a))
++             - (b < 0.0f ? 0.0f : (b > 1.0f ? 1.0f : b));
++}
++
+ // Which lane a position belongs to: the nearest bridge, the same rule
+ // Board::getNextWaypoint uses, so a unit's lane objective and its crossing
+ // always agree. Evaluated per call, so nothing extra is carried through a
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index b720e77..f97c920 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -10,6 +10,7 @@
+ #include "AreaSpell.h"
+ #include "ArenaLayout.h"
+ #include <algorithm>
++#include <cmath>
+ #include <stdexcept>
+ 
+ // One factory per Archetype (CardStats.h). Nothing here is specific to a card.
+@@ -227,9 +228,44 @@ inline void spawnDefensiveBuilding(const CardStats& stats, float x, float y, int
+     spawnDeployEffect(stats, x, y, team, board);
+ }
+ 
++// Thrown spells: published projectile speed N flies N / 48 real tiles per
++// second, not the N / 60 of the usual reading ("Medium 60 = 1 tile/s").
++// Measured frame by frame on spells leaving a King Tower (launch = first frame
++// the projectile shows on the tower, landing = first frame of the burst):
++//   Goblin Barrel (400): 8 flights onto a Princess Tower, 23.2 tiles, 2.72 to
++//     2.81 s (mean 2.76; /60 predicts 3.48), and one onto the King Tower,
++//     26 tiles, 3.28 s.
++//   Fireball (600): 7 flights of 6.9 to 27 tiles in 0.57 to 2.02 s; a line
++//     through the origin fits at 12.3 tiles/s (/60 predicts 10).
++//   Rocket (350): 15.3 tiles in 2.06 s and ~1.97 s (/60 predicts 2.62).
++//   Giant Snowball (800): 23.2 tiles in 1.30 s (/60 predicts 1.74).
++// Published / measured tiles-per-second is 47.6, 48.8, 46.5 and 45; 48 is
++// within the measurement error of each. The Log's roll is not part of this:
++// it does follow /60 (CardRegistry.h, The Log).
++inline constexpr float THROWN_SPEED_PER_TILE_PER_SECOND = 48.0f;
++inline constexpr float SPELL_TICKS_PER_SECOND = 10.0f;
++
++// Ticks from the cast to the first application of a spell cast by `team` at
++// (x, y). A thrown spell (CardStats::spellProjectileSpeed) leaves the centre of
++// the caster's King Tower -- also when that tower is gone -- and its flight is
++// the straight-line distance in real-arena tiles (ArenaLayout::realRow) over
++// its speed, rounded to the nearest tick and never under one. Every other
++// spell keeps its fixed spellDelayTicks. A pure function of the card and the
++// two points: no board state, no randomness.
++inline int thrownSpellFlightTicks(const CardStats& stats, float x, float y, int team) {
++    if (stats.spellProjectileSpeed <= 0) return stats.spellDelayTicks;
++    const float dx = x - ArenaLayout::CENTER_X;
++    const float dy = ArenaLayout::realRow(y) - ArenaLayout::realRow(ArenaLayout::kingY(team));
++    const float tiles = std::sqrt(dx * dx + dy * dy);
++    const float tilesPerTick = static_cast<float>(stats.spellProjectileSpeed)
++        / (THROWN_SPEED_PER_TILE_PER_SECOND * SPELL_TICKS_PER_SECOND);
++    return std::max(1, static_cast<int>(std::lround(tiles / tilesPerTick)));
++}
++
+ inline void spawnSpell(const CardStats& stats, float x, float y, int team, Board& board) {
+     auto spell = std::make_shared<AreaSpell>(
+-        board.allocateId(), x, y, team, stats.spellRadius, stats.damage, stats.spellDelayTicks, stats.symbol,
++        board.allocateId(), x, y, team, stats.spellRadius, stats.damage,
++        thrownSpellFlightTicks(stats, x, y, team), stats.symbol,
+         stats.spellOnHit, stats.spellGroundOnly, stats.spellRemainingHits, stats.spellTickInterval,
+         stats.spellBuffsAllies, stats.spellBuffMultiplier, stats.spellBuffDurationTicks, stats.spellKnockback,
+         stats.spellSpawnEffect, stats.spellClonesAllies, stats.spellTargetTopHpCount,
+@@ -240,6 +276,7 @@ inline void spawnSpell(const CardStats& stats, float x, float y, int team, Board
+     // constructor is shared with call sites that have no card behind them.
+     spell->crownTowerDamage = stats.spellCrownTowerDamage;
+     spell->spawnRingRadius = stats.spellSpawnRingRadius;
++    spell->thrown = stats.spellProjectileSpeed > 0;
+     // Rolling spells (The Log, Barbarian Barrel) are configured after
+     // construction: configureRoll latches the roll origin from the spawn
+     // position, so it must run before the first update.
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index 6ae443e..34fe98d 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -694,14 +694,26 @@ private:
+             .withDamageRamp(20, 40, 0.05f, 0.1875f).withSightRange(6.0f));
+ 
+         // === Spells ===
+-        // Arrows: 3 volleys of 123, not one 369 hit.
+-        add(spell(3, "Arrows", 3.0f, 3.5f, 123, 10, '*').withRepeats(3, 2).withCrownTowerDamage(31) /* audit 0003: wiki Arrows, level 11 */);
++        // Thrown spells (withThrownFromKingTower: Arrows, Fireball, Rocket,
++        // Giant Snowball, Goblin Barrel) leave the caster's King Tower and land
++        // after a flight that grows with the distance; the number is the
++        // published projectile speed and CardFactories::thrownSpellFlightTicks
++        // holds the measurements and the conversion. Their delayTicks argument
++        // is no longer read: it is the fixed delay each had before (Fireball
++        // 1.0 s and Goblin Barrel 0.8 s from anywhere; a real Fireball takes
++        // 0.6 s to 2.0 s, a real Barrel 2.8 s to an enemy Princess Tower).
++        // Arrows: 3 volleys of 123, not one 369 hit. The flight is to the
++        // first volley; its speed is published only (not measured here).
++        add(spell(3, "Arrows", 3.0f, 3.5f, 123, 10, '*').withRepeats(3, 2).withCrownTowerDamage(31) /* audit 0003: wiki Arrows, level 11 */
++            .withThrownFromKingTower(1100));
+         add(spell(7, "Fireball", 4.0f, 2.5f, 689, 10, 'O')
+             .withKnockback(1.0f)
+-            .withCrownTowerDamage(159)); // audit 0003: wiki Fireball, level 11 (25% since 1/6/2026)
++            .withCrownTowerDamage(159) // audit 0003: wiki Fireball, level 11 (25% since 1/6/2026)
++            .withThrownFromKingTower(600));
+         add(spell(29, "Zap", 2.0f, 2.5f, 192, 3, 'Z').withCrownTowerDamage(48) /* audit 0003: wiki Zap, level 11 */);
+         add(spell(30, "Rocket", 6.0f, 2.0f, 1485, 15, 'r')
+-            .withKnockback(1.0f).withCrownTowerDamage(371) /* audit 0003: wiki Rocket, level 11 */);
++            .withKnockback(1.0f).withCrownTowerDamage(371) /* audit 0003: wiki Rocket, level 11 */
++            .withThrownFromKingTower(350));
+         add(spell(31, "Lightning", 6.0f, 3.5f, 1057, 5, 'j').withCrownTowerDamage(286) /* audit 0003: wiki Lightning, level 11 */);
+         // Poison: 92 damage every second for 8 s; whoever stands in it takes
+         // each pulse. A Crown Tower takes 21 per pulse (168 in all: official
+@@ -1030,7 +1042,8 @@ private:
+         // === Spells (expansion) ===
+         add(spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+             .withSpellOnHit(std::make_shared<FreezeOnHit>(15, 0.5f))
+-            .withKnockback(1.0f).withCrownTowerDamage(45) /* audit 0003: wiki Giant Snowball, level 11 */);
++            .withKnockback(1.0f).withCrownTowerDamage(45) /* audit 0003: wiki Giant Snowball, level 11 */
++            .withThrownFromKingTower(800));
+         // Barbarian Barrel: rolls 4.5 tiles at width 2.6 (published), and its
+         // Barbarian spawns where the barrel stops. No knockback: the real
+         // barrel does not throw what it rolls over. Cast on its own side only,
+@@ -1069,8 +1082,12 @@ private:
+         add(spell(108, "Rage", 2.0f, 3.0f, 0, 8, '(')
+             .withSpellBuff(1.35f, 45));
+         // Goblin Barrel: drops 3 Goblins; the barrel itself deals no damage.
++        // Thrown from the King Tower at published speed 400: 2.8 s onto an
++        // enemy Princess Tower (measured 2.76 s over 8 flights), where it used
++        // to land 0.8 s after the cast from anywhere.
+         add(spell(109, "Goblin Barrel", 3.0f, 0.5f, 0, 8, '[')
+-            .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(goblinBarrelGoblinStats())));
++            .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(goblinBarrelGoblinStats()))
++            .withThrownFromKingTower(400));
+         // Graveyard: 12 Skeletons (official June 2026), the first 2.2 s after
+         // the cast (delay 21: an AreaSpell applies on the update after its
+         // delay reaches 0), then one every 0.5 s, cycling seven fixed points --
+@@ -1299,10 +1316,12 @@ private:
+         // approximated as 6 Goblins at one landing point.
+         addEvolution(132,
+             spell(109, "Goblin Barrel", 3.0f, 0.5f, 0, 8, '[')
+-                .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(goblinBarrelGoblinStats())),
++                .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(goblinBarrelGoblinStats()))
++                .withThrownFromKingTower(400),
+             spell(109, "Goblin Barrel", 3.0f, 0.5f, 0, 8, '[')
+                 .withSpellSpawn(std::make_shared<PeriodicSpawnEffect>(goblinBarrelGoblinStats()
+-                    .withOffsets({ {-0.4f,0.0f},{0.4f,0.0f},{0.0f,0.4f},{-0.4f,0.4f},{0.4f,0.4f},{0.0f,-0.4f} }))),
++                    .withOffsets({ {-0.4f,0.0f},{0.4f,0.0f},{0.0f,0.4f},{-0.4f,0.4f},{0.4f,0.4f},{0.0f,-0.4f} })))
++                .withThrownFromKingTower(400),
+             2, 1);
+ 
+         // Skeleton Army: 16 skeletons (skeletonArmyEvolvedOffsets) and shadows
+@@ -1603,10 +1622,12 @@ private:
+         addEvolution(158,
+             spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+                 .withSpellOnHit(std::make_shared<FreezeOnHit>(15, 0.5f))
+-                .withKnockback(1.0f).withCrownTowerDamage(45) /* audit 0003: wiki Giant Snowball, level 11 */,
++                .withKnockback(1.0f).withCrownTowerDamage(45) /* audit 0003: wiki Giant Snowball, level 11 */
++                .withThrownFromKingTower(800),
+             spell(100, "Giant Snowball", 2.0f, 2.5f, 179, 8, '!')
+                 .withSpellOnHit(std::make_shared<FreezeOnHit>(40, 0.7f))
+-                .withKnockback(-4.5f).withCrownTowerDamage(54) /* audit 0003: wiki Giant Snowball/Evolution, level 11 */,
++                .withKnockback(-4.5f).withCrownTowerDamage(54) /* audit 0003: wiki Giant Snowball/Evolution, level 11 */
++                .withThrownFromKingTower(800),
+             2, 1);
+ 
+         // Goblin Giant ("Sack-trick"): the real knife Goblins every 2.2 s below
+diff --git a/include/core/CardStats.h b/include/core/CardStats.h
+index fa7174d..070adbf 100644
+--- a/include/core/CardStats.h
++++ b/include/core/CardStats.h
+@@ -88,6 +88,12 @@ struct CardStats {
+     // Barrel) opt in; most spells hit air and ground.
+     float spellRadius = 0.0f;
+     int spellDelayTicks = 0;
++    // Thrown spells (Fireball, Goblin Barrel, Rocket, Arrows, Giant Snowball):
++    // the published projectile speed. The spell leaves the caster's King Tower
++    // and lands after a flight that grows with the distance, replacing
++    // spellDelayTicks (CardFactories::thrownSpellFlightTicks). 0 = not thrown:
++    // the effect starts spellDelayTicks after the cast wherever it is cast.
++    int spellProjectileSpeed = 0;
+     bool spellGroundOnly = false;
+     // Multi-hit spells (Poison, Arrows); see AreaSpell::remainingHits.
+     int spellRemainingHits = 1;
+@@ -565,6 +571,12 @@ struct CardStats {
+         spellSpawnEffect = std::move(effect);
+         return *this;
+     }
++    // publishedSpeed is the game-data projectile speed (Fireball 600), not
++    // tiles per tick; see spellProjectileSpeed.
++    CardStats& withThrownFromKingTower(int publishedSpeed) {
++        spellProjectileSpeed = publishedSpeed;
++        return *this;
++    }
+     CardStats& withSecondaryUnit(CardStats unit) {
+         secondaryUnit = std::make_shared<CardStats>(std::move(unit));
+         return *this;
+diff --git a/include/core/ClashEnv.h b/include/core/ClashEnv.h
+index 03d9f49..ee19538 100644
+--- a/include/core/ClashEnv.h
++++ b/include/core/ClashEnv.h
+@@ -939,6 +939,36 @@ public:
+     // The matching read.
+     int getCurrentTick() const { return currentTick; }
+ 
++    // --- spells on their fuse ---
++    // A spell between its cast and its first application is on the board but
++    // in no observation channel (it is not targetable). This is the read-only
++    // list of them, either team's: what a player sees as a Goblin Barrel or a
++    // Fireball in the air. x / y are the target point in board coordinates
++    // (team 0's frame, not mirrored); ticksToImpact is how many more ticks
++    // until the first application (AreaSpell::ticksToImpact), so it reads the
++    // full flight after the step that cast the spell and 1 before the step
++    // that lands it; thrown tells a King-Tower projectile from a fixed-delay
++    // spell (Zap, The Log's wind-up, Graveyard's first skeleton).
++    struct PendingSpell {
++        int team;
++        int cardId;
++        float x;
++        float y;
++        int ticksToImpact;
++        bool thrown;
++    };
++    std::vector<PendingSpell> getPendingSpells() const {
++        std::vector<PendingSpell> out;
++        for (const auto& entity : game.getBoard().getEntities()) {
++            if (!entity->isAlive()) continue;
++            const auto* spell = dynamic_cast<const AreaSpell*>(entity.get());
++            if (!spell || spell->landed) continue;
++            out.push_back({ spell->team, spell->cardId, spell->position.x, spell->position.y,
++                            spell->ticksToImpact(), spell->thrown });
++        }
++        return out;
++    }
++
+     // The elixir phase in force (1.0 / 2.0 / 3.0), so readers need not know the
+     // boundary ticks.
+     float getElixirMultiplier() const { return game.getElixirMultiplier(); }
+diff --git a/include/entities/AreaSpell.h b/include/entities/AreaSpell.h
+index c163564..b120c76 100644
+--- a/include/entities/AreaSpell.h
++++ b/include/entities/AreaSpell.h
+@@ -91,6 +91,19 @@ public:
+     // 2026 notes): with every point on the ring, a Graveyard centred on a
+     // defended tower never connected. 0 spawns every body at the cast point.
+     float spawnRingRadius = 0.0f;
++
++    // Thrown from the caster's King Tower (CardStats::spellProjectileSpeed):
++    // the fuse is then a flight, which the opponent can see. Set by
++    // CardFactories::spawnSpell.
++    bool thrown = false;
++    // False until the first application (or, for a roller, the first tick of
++    // the roll): the spell is still on its fuse and has touched nothing.
++    bool landed = false;
++    // Updates left before the first application, -1 once it has happened. A
++    // spell reading n here applies on the n-th update from now, so n more
++    // ticks of the match. Read-only view for ClashEnv::getPendingSpells.
++    int ticksToImpact() const { return landed ? -1 : delayTicks + 1; }
++
+     AreaSpell(int id, float x, float y, int team, float radius, int damage, int delayTicks, char symbol = '*',
+         std::shared_ptr<IOnHitEffect> onHit = nullptr, bool groundOnly = false,
+         int remainingHits = 1, int tickInterval = 0,
+@@ -148,6 +161,7 @@ public:
+             delayTicks--;
+             return;
+         }
++        landed = true;
+         if (isRolling()) {
+             updateRoll(board);
+             return;
+diff --git a/python_ai/tests/test_thrown_spell_flight.py b/python_ai/tests/test_thrown_spell_flight.py
+new file mode 100644
+index 0000000..388c5b1
+--- /dev/null
++++ b/python_ai/tests/test_thrown_spell_flight.py
+@@ -0,0 +1,164 @@
++"""A thrown spell flies from the caster's King Tower, and its flight is seen.
++
++Fireball, Arrows, Rocket, Giant Snowball and Goblin Barrel take a time that
++grows with the distance from the King Tower (published projectile speed / 48
++real tiles per second). The numbers pinned here are the measured ones: a
++Goblin Barrel thrown onto a Princess Tower was in the air 2.72-2.81 s in eight
++recorded throws.
++"""
++import pytest
++
++import python_ai  # noqa: F401
++import clash_royale_env as E
++
++ID = {E.get_card_info(c)["name"]: c for c in E.get_all_card_ids()}
++NOOP = 4
++THROWN = {"Fireball": 600, "Arrows": 1100, "Rocket": 350, "Giant Snowball": 800,
++          "Goblin Barrel": 400}
++FIXED = ("The Log", "Zap", "Lightning", "Poison", "Earthquake", "Tornado",
++         "Freeze", "Rage", "Graveyard", "Royal Delivery", "Barbarian Barrel")
++
++OURS = [15, 6, 25, 40, 24, 72, 33, 7]                  # holds The Log and Fireball
++BAIT = [ID["Goblin Barrel"], 4, 12, 112, 61, 20, 14, 2]
++LEFT_X, RIGHT_X, CENTER_X = 3.0, 14.0, 8.5
++
++
++def _env(deck0=OURS, deck1=BAIT):
++    env = E.ClashRoyaleEnv(list(deck0), list(deck1), 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    return env
++
++
++def _wait(env, ticks=1):
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, ticks)
++
++
++def _cast(env, team, card, x, y, deck):
++    """Play `card` for `team` at board point (x, y) on this tick."""
++    env.set_elixir_for_team(team, 10.0)
++    assert env.set_hand_for_team(team, [card] + [c for c in deck if c != card][:3])
++    spent = env.get_elixir_spent(team)
++    if team == 0:
++        env.step_self_play(0, x, y, NOOP, 0.0, 0.0, 1)
++    else:   # team 1 acts in its own frame: y mirrored
++        env.step_self_play(NOOP, 0.0, 0.0, 0, x, (E.ClashRoyaleEnv.BOARD_HEIGHT - 1) - y, 1)
++    assert env.get_elixir_spent(team) > spent, "the play was refused"
++
++
++def test_the_thrown_spells_carry_their_published_speeds():
++    for name, speed in THROWN.items():
++        assert E.get_card_stats(ID[name])["base"]["spell_projectile_speed"] == speed, name
++    for name in FIXED:
++        assert E.get_card_stats(ID[name])["base"]["spell_projectile_speed"] == 0, name
++
++
++def test_flight_grows_with_the_distance_from_the_king_tower():
++    # The enemy Princess Towers are 23.2 real tiles from our King Tower, the
++    # enemy King Tower 26, our own Princess Tower 6.5.
++    far = E.arena_princess_y(1)
++    barrel, fireball = ID["Goblin Barrel"], ID["Fireball"]
++    assert E.spell_flight_ticks(barrel, LEFT_X, far) == 28      # measured 2.76 s
++    assert E.spell_flight_ticks(barrel, RIGHT_X, far) == 28
++    assert E.spell_flight_ticks(barrel, CENTER_X, E.arena_king_y(1)) == 31
++    assert E.spell_flight_ticks(fireball, LEFT_X, far) == 19
++    assert E.spell_flight_ticks(fireball, LEFT_X, E.arena_princess_y(0)) == 5
++    assert E.spell_flight_ticks(ID["Rocket"], LEFT_X, far) == 32
++    assert E.spell_flight_ticks(ID["Giant Snowball"], LEFT_X, far) == 14
++    assert E.spell_flight_ticks(ID["Arrows"], LEFT_X, far) == 10
++
++    for name in THROWN:
++        ticks = [E.spell_flight_ticks(ID[name], CENTER_X, float(y)) for y in range(3, 34)]
++        assert ticks == sorted(ticks), name
++        assert ticks[0] >= 1 and ticks[-1] > ticks[0], name
++
++
++def test_flight_is_the_same_for_both_teams():
++    for name in THROWN:
++        for x, y in ((3.0, 27.0), (14.0, 6.0), (8.5, 16.5), (0.0, 33.0), (11.0, 14.0)):
++            assert (E.spell_flight_ticks(ID[name], x, y, 0)
++                    == E.spell_flight_ticks(ID[name], 17.0 - x, 33.0 - y, 1)), (name, x, y)
++
++
++def test_a_spell_that_is_not_thrown_keeps_one_delay_everywhere():
++    for name in FIXED:
++        ticks = {E.spell_flight_ticks(ID[name], x, y)
++                 for x, y in ((3.0, 27.0), (8.5, 3.0), (14.0, 16.0))}
++        assert len(ticks) == 1, name
++    assert E.spell_flight_ticks(ID["The Log"], 3.0, 27.0) == 8
++    with pytest.raises(ValueError):
++        E.spell_flight_ticks(ID["Knight"], 3.0, 27.0)
++
++
++def test_a_goblin_barrel_is_pending_until_it_lands_and_then_the_goblins_appear():
++    env = _env()
++    target_y = E.arena_princess_y(0)
++    hp = env.get_tower_hp(0, 1)
++    assert env.get_pending_spells() == []
++    _cast(env, 1, ID["Goblin Barrel"], LEFT_X, target_y, BAIT)
++
++    flight = E.spell_flight_ticks(ID["Goblin Barrel"], LEFT_X, target_y, 1)
++    assert flight == 28
++    for elapsed in range(1, flight):                 # ticks since the cast step
++        (spell,) = env.get_pending_spells()
++        assert spell["team"] == 1 and spell["card_id"] == ID["Goblin Barrel"]
++        assert spell["thrown"] is True
++        assert (spell["x"], spell["y"]) == (LEFT_X, target_y)
++        assert spell["ticks_to_impact"] == flight - elapsed + 1
++        assert env.get_tower_hp(0, 1) == hp
++        _wait(env)
++    (spell,) = env.get_pending_spells()
++    assert spell["ticks_to_impact"] == 1             # the next step lands it
++    _wait(env)
++    assert env.get_pending_spells() == []
++
++    # The Goblins deploy for a second and stab after their load time: the
++    # tower is first hurt 1.6 s after the landing (1.43-1.53 s measured).
++    for after_landing in range(1, 30):
++        _wait(env)
++        if env.get_tower_hp(0, 1) < hp:
++            break
++    assert after_landing == 16
++
++
++def test_a_fireball_hits_only_when_its_flight_is_over():
++    env = _env()
++    x, y = 12.0, 24.0
++    env.inject(ID["Knight"], x, y, 1, -1.0, 0)
++    _wait(env)
++    _cast(env, 0, ID["Fireball"], x, y, OURS)
++    flight = E.spell_flight_ticks(ID["Fireball"], x, y, 0)
++    assert 10 < flight < 28
++    (spell,) = env.get_pending_spells()
++    assert spell == {"team": 0, "card_id": ID["Fireball"], "x": x, "y": y,
++                     "ticks_to_impact": flight, "thrown": True}
++    dealt = env.get_damage_dealt_by_card(ID["Fireball"], 0)
++    _wait(env, flight - 1)
++    assert env.get_damage_dealt_by_card(ID["Fireball"], 0) == dealt
++    _wait(env)
++    assert env.get_damage_dealt_by_card(ID["Fireball"], 0) > dealt
++    assert env.get_pending_spells() == []
++
++
++def test_the_log_is_listed_while_it_waits_but_is_not_thrown():
++    env = _env()
++    _cast(env, 0, ID["The Log"], LEFT_X, 10.0, OURS)
++    (spell,) = env.get_pending_spells()
++    assert spell["card_id"] == ID["The Log"] and spell["thrown"] is False
++    assert spell["ticks_to_impact"] == 8
++    _wait(env, 8)
++    assert env.get_pending_spells() == []            # rolling now, no longer pending
++
++
++def test_a_snapshot_taken_mid_flight_lands_on_the_same_tick():
++    env = _env()
++    _cast(env, 1, ID["Goblin Barrel"], RIGHT_X, E.arena_princess_y(0), BAIT)
++    _wait(env, 9)
++    copy = env.snapshot()
++    assert copy.get_pending_spells() == env.get_pending_spells()
++    for _ in range(60):
++        _wait(env)
++        _wait(copy)
++        assert copy.get_pending_spells() == env.get_pending_spells()
++        assert copy.get_tower_hp(0, 2) == env.get_tower_hp(0, 2)
++    assert env.get_tower_hp(0, 2) < env.get_tower_max_hp(0, 2)
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index 86652db..2f6d400 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -85,6 +85,9 @@ py::dict statsDict(const CardStats& s, int depth = 0) {
+     // Spells.
+     d["spell_radius"] = s.spellRadius;
+     d["spell_delay_ticks"] = s.spellDelayTicks;
++    // 0 = not thrown: spell_delay_ticks applies. Otherwise the published
++    // projectile speed, and the delay is spell_flight_ticks(card, x, y, team).
++    d["spell_projectile_speed"] = s.spellProjectileSpeed;
+     d["spell_hits"] = s.spellRemainingHits;
+     d["spell_tick_interval"] = s.spellTickInterval;
+     d["spell_knockback"] = s.spellKnockback;
+@@ -412,6 +415,27 @@ PYBIND11_MODULE(clash_royale_env, m) {
+         // Clamped to [0, max_ticks]; sets both engine clocks.
+         .def("set_current_tick", &ClashEnv::setCurrentTick, py::arg("tick"))
+         .def("get_current_tick", &ClashEnv::getCurrentTick)
++        .def("get_pending_spells", [](const ClashEnv& env) {
++                py::list out;
++                for (const auto& p : env.getPendingSpells()) {
++                    py::dict d;
++                    d["team"] = p.team;
++                    d["card_id"] = p.cardId;
++                    d["x"] = p.x;
++                    d["y"] = p.y;
++                    d["ticks_to_impact"] = p.ticksToImpact;
++                    d["thrown"] = p.thrown;
++                    out.append(d);
++                }
++                return out;
++             },
++             "Spells cast but not yet applied, either team's: a list of dicts "
++             "{team, card_id, x, y, ticks_to_impact, thrown}. x / y are the "
++             "target in board coordinates (team 0's frame); ticks_to_impact is "
++             "the number of further ticks until the first application; thrown "
++             "marks a projectile from the caster's King Tower, whose flight "
++             "depends on the distance (spell_flight_ticks). Read-only; these "
++             "spells are in no observation channel.")
+         // The elixir phase (1.0 / 2.0 / 3.0) now.
+         .def("get_elixir_multiplier", &ClashEnv::getElixirMultiplier)
+         // Card-cycle tracking (item 24). `inject` bypasses playCard, where the
+@@ -535,6 +559,19 @@ PYBIND11_MODULE(clash_royale_env, m) {
+     // {"base": stats, "evolved": stats | None, "evolution_cycle_threshold",
+     //  "evolved_uses", "units": {...}}. Units: ticks (10/s), tiles; speeds in
+     // engine tiles/tick plus the wiki tier number they came from.
++    m.def("spell_flight_ticks", [](int cardId, float x, float y, int team, bool evolved) {
++            const CardDefinition* def = CardRegistry::getInstance().getCard(cardId);
++            if (!def || !def->stats || !def->isSpell) {
++                throw std::invalid_argument("spell_flight_ticks: not a spell card id " + std::to_string(cardId));
++            }
++            const CardStats& stats = (evolved && def->evolvedStats) ? *def->evolvedStats : *def->stats;
++            return CardFactories::thrownSpellFlightTicks(stats, x, y, team);
++        }, py::arg("card_id"), py::arg("x"), py::arg("y"), py::arg("team") = 0, py::arg("evolved") = false,
++        "Ticks from casting this spell at board point (x, y) (team 0's frame) "
++        "to its first application. Thrown spells fly from `team`'s King Tower, "
++        "so the answer grows with the distance; every other spell returns its "
++        "fixed spell_delay_ticks.");
++
+     m.def("get_card_stats", [](int cardId) {
+         const CardDefinition* def = CardRegistry::getInstance().getCard(cardId);
+         if (!def || !def->stats) {
+diff --git a/tests/core/test_arena_layout.cpp b/tests/core/test_arena_layout.cpp
+index 55822d9..4561db1 100644
+--- a/tests/core/test_arena_layout.cpp
++++ b/tests/core/test_arena_layout.cpp
+@@ -160,3 +160,26 @@ TEST_CASE("isOnBridge reproduces the real river row WWBBWWWWWWWWWWBBWW",
+     INFO("engine row: " << row);
+     REQUIRE(row == "WWBBWWWWWWWWWWBBWW");
+ }
++
++TEST_CASE("realRow squeezes out the two rows the real 32-row arena lacks", "[arena_layout][real_row]") {
++    // Identity on a team's own half up to row 13, engine 15-18 are real 14-17,
++    // engine 20 and up are real 18 and up (live_ppo/tile_map.py, "tower").
++    REQUIRE(ArenaLayout::realRow(0.0f) == Catch::Approx(0.0f));
++    REQUIRE(ArenaLayout::realRow(13.0f) == Catch::Approx(13.0f));
++    REQUIRE(ArenaLayout::realRow(15.0f) == Catch::Approx(14.0f));
++    REQUIRE(ArenaLayout::realRow(18.0f) == Catch::Approx(17.0f));
++    REQUIRE(ArenaLayout::realRow(20.0f) == Catch::Approx(18.0f));
++    REQUIRE(ArenaLayout::realRow(33.0f) == Catch::Approx(31.0f));
++    // Continuous and never decreasing, and the same from either end.
++    float previous = ArenaLayout::realRow(0.0f);
++    for (float y = 0.25f; y <= 33.0f; y += 0.25f) {
++        const float row = ArenaLayout::realRow(y);
++        REQUIRE(row >= previous);
++        REQUIRE(row - previous <= 0.25f + 1e-4f);
++        REQUIRE(ArenaLayout::realRow(ArenaLayout::mirrorY(y)) == Catch::Approx(31.0f - row).margin(1e-4));
++        previous = row;
++    }
++    // The real King-to-enemy-Princess line: 5.5 across, 22.5 along.
++    REQUIRE(ArenaLayout::realRow(ArenaLayout::princessY(1)) - ArenaLayout::realRow(ArenaLayout::kingY(0))
++            == Catch::Approx(22.5f));
++}
+diff --git a/tests/core/test_card_factories.cpp b/tests/core/test_card_factories.cpp
+index 783ddb6..3a0bcde 100644
+--- a/tests/core/test_card_factories.cpp
++++ b/tests/core/test_card_factories.cpp
+@@ -1,6 +1,8 @@
+ #include <catch_amalgamated.hpp>
+ #include "test_helpers.h"
+ #include "CardFactories.h"
++#include "CardRegistry.h"
++#include "ArenaLayout.h"
+ #include "CardStats.h"
+ #include "MeleeTroop.h"
+ #include "RangedTroop.h"
+@@ -413,3 +415,115 @@ TEST_CASE("ProximityGatedPeriodicSpawnEffect ignores allies when checking for a
+ 
+     REQUIRE(board.getEntities().size() == 1); // no spawn -- the nearby unit is an ally, not an enemy
+ }
++
++// --- thrown spells: the flight from the King Tower ---
++
++namespace {
++    CardStats makeThrownSpellStats(int publishedSpeed) {
++        CardStats stats;
++        stats.name = "TestThrownSpell";
++        stats.archetype = Archetype::Spell;
++        stats.spellRadius = 2.5f;
++        stats.damage = 500;
++        stats.spellDelayTicks = 10;
++        stats.symbol = 'O';
++        stats.withThrownFromKingTower(publishedSpeed);
++        return stats;
++    }
++}
++
++TEST_CASE("A spell that is not thrown keeps its fixed delay wherever it is cast", "[card_factories][flight]") {
++    CardStats stats = makeThrownSpellStats(0);
++    REQUIRE(CardFactories::thrownSpellFlightTicks(stats, 3.0f, 6.0f, 0) == 10);
++    REQUIRE(CardFactories::thrownSpellFlightTicks(stats, 14.0f, 27.0f, 0) == 10);
++    REQUIRE(CardFactories::thrownSpellFlightTicks(stats, 14.0f, 27.0f, 1) == 10);
++}
++
++TEST_CASE("A thrown spell's flight is the real-arena distance from the caster's King Tower over speed / 48", "[card_factories][flight]") {
++    // Goblin Barrel, published speed 400 = 8.33 tiles/s. King Tower to an
++    // enemy Princess Tower is 23.2 real tiles (5.5 across, 22.5 along): 2.8 s,
++    // against 2.76 s measured over 8 flights. Onto the enemy King Tower (26
++    // tiles) 3.1 s, against 3.28 s measured once.
++    CardStats barrel = makeThrownSpellStats(400);
++    REQUIRE(CardFactories::thrownSpellFlightTicks(barrel, ArenaLayout::LEFT_LANE_X, ArenaLayout::princessY(1), 0) == 28);
++    REQUIRE(CardFactories::thrownSpellFlightTicks(barrel, ArenaLayout::RIGHT_LANE_X, ArenaLayout::princessY(1), 0) == 28);
++    REQUIRE(CardFactories::thrownSpellFlightTicks(barrel, ArenaLayout::CENTER_X, ArenaLayout::kingY(1), 0) == 31);
++
++    // Fireball, published 600 = 12.5 tiles/s: 1.9 s onto that tower, under a
++    // second in defence.
++    CardStats fireball = makeThrownSpellStats(600);
++    REQUIRE(CardFactories::thrownSpellFlightTicks(fireball, ArenaLayout::LEFT_LANE_X, ArenaLayout::princessY(1), 0) == 19);
++    REQUIRE(CardFactories::thrownSpellFlightTicks(fireball, ArenaLayout::LEFT_LANE_X, 10.0f, 0) == 7);
++
++    // Never under one tick, even cast on the King Tower itself.
++    REQUIRE(CardFactories::thrownSpellFlightTicks(fireball, ArenaLayout::CENTER_X, ArenaLayout::kingY(0), 0) == 1);
++}
++
++TEST_CASE("A thrown spell's flight is the same for both teams and never shrinks with distance", "[card_factories][flight]") {
++    CardStats stats = makeThrownSpellStats(400);
++    int previous = 0;
++    for (float y = ArenaLayout::kingY(0); y <= 33.0f; y += 0.5f) {
++        const int ticks = CardFactories::thrownSpellFlightTicks(stats, ArenaLayout::CENTER_X, y, 0);
++        REQUIRE(ticks >= previous);
++        previous = ticks;
++        for (float x : { 0.0f, 3.0f, 8.5f, 14.0f, 17.0f }) {
++            REQUIRE(CardFactories::thrownSpellFlightTicks(stats, x, y, 0)
++                    == CardFactories::thrownSpellFlightTicks(stats, ArenaLayout::mirrorX(x), ArenaLayout::mirrorY(y), 1));
++        }
++    }
++}
++
++TEST_CASE("spawnSpell gives a thrown spell its flight as the fuse and reports it until it lands", "[card_factories][flight]") {
++    Board board;
++    auto enemy = std::make_shared<DummyEntity>(99, ArenaLayout::LEFT_LANE_X, 27.0f, 1000, 1);
++    spawn(board, enemy);
++
++    CardStats stats = makeThrownSpellStats(600);
++    const int flight = CardFactories::thrownSpellFlightTicks(stats, ArenaLayout::LEFT_LANE_X, 27.0f, 0);
++    REQUIRE(flight == 19);
++
++    CardFactories::spawnSpell(stats, ArenaLayout::LEFT_LANE_X, 27.0f, 0, board);
++    board.commitPendingEntities();
++    auto spell = std::dynamic_pointer_cast<AreaSpell>(board.getEntities().back());
++    REQUIRE(spell != nullptr);
++    REQUIRE(spell->thrown);
++
++    // ticksToImpact n: the n-th update from now applies the spell.
++    for (int remaining = flight + 1; remaining > 1; --remaining) {
++        REQUIRE_FALSE(spell->landed);
++        REQUIRE(spell->ticksToImpact() == remaining);
++        spell->update(board);
++        REQUIRE(enemy->hp == 1000);   // still in the air
++    }
++    REQUIRE(spell->ticksToImpact() == 1);
++    spell->update(board);
++    REQUIRE(spell->landed);
++    REQUIRE(spell->ticksToImpact() == -1);
++    REQUIRE(enemy->hp == 500);
++
++    // A copy made mid-flight (Board::deepCopy uses snapshot) resumes the fuse.
++    CardFactories::spawnSpell(stats, ArenaLayout::LEFT_LANE_X, 27.0f, 0, board);
++    board.commitPendingEntities();
++    auto second = std::dynamic_pointer_cast<AreaSpell>(board.getEntities().back());
++    for (int i = 0; i < 5; ++i) second->update(board);
++    auto copy = std::dynamic_pointer_cast<AreaSpell>(second->snapshot());
++    REQUIRE(copy->thrown);
++    REQUIRE(copy->ticksToImpact() == second->ticksToImpact());
++}
++
++TEST_CASE("The registry's thrown spells carry their published projectile speeds", "[card_factories][flight][registry]") {
++    // Fireball 600, Goblin Barrel 400, Rocket 350, Arrows 1100, Giant
++    // Snowball 800 (game data); nothing else is thrown from the King Tower.
++    const auto& registry = CardRegistry::getInstance();
++    REQUIRE(registry.getCard(7)->stats->spellProjectileSpeed == 600);
++    REQUIRE(registry.getCard(109)->stats->spellProjectileSpeed == 400);
++    REQUIRE(registry.getCard(30)->stats->spellProjectileSpeed == 350);
++    REQUIRE(registry.getCard(3)->stats->spellProjectileSpeed == 1100);
++    REQUIRE(registry.getCard(100)->stats->spellProjectileSpeed == 800);
++    // Evolved forms fly like their base card.
++    REQUIRE(registry.getCard(132)->evolvedStats->spellProjectileSpeed == 400);
++    REQUIRE(registry.getCard(158)->evolvedStats->spellProjectileSpeed == 800);
++    for (int id : { 29, 31, 32, 33, 101, 103, 106, 107, 110, 111 }) {
++        REQUIRE(registry.getCard(id)->stats->spellProjectileSpeed == 0);
++    }
++}
+diff --git a/tests/core/test_game_manager_snapshot.cpp b/tests/core/test_game_manager_snapshot.cpp
+index dc1a349..ec076d9 100644
+--- a/tests/core/test_game_manager_snapshot.cpp
++++ b/tests/core/test_game_manager_snapshot.cpp
+@@ -231,9 +231,14 @@ TEST_CASE("two snapshots given different actions diverge from each other", "[gam
+     GameManager withPlay = position.snapshot();
+     GameManager withoutPlay = position.snapshot();
+ 
++    // A body, not the deck's Fireball: thrown 2.5 tiles from its own King
++    // Tower a Fireball lands within two ticks and leaves nothing on the board
++    // to tell the branches apart for the rest of the horizon.
+     bool played = false;
+     for (int slot = 0; slot < 4 && !played; ++slot) {
+-        played = withPlay.playCard(0, withPlay.getHand(0)[slot], 9.0f, 5.0f);
++        const int card = withPlay.getHand(0)[slot];
++        if (CardRegistry::getInstance().getCard(card)->isSpell) continue;
++        played = withPlay.playCard(0, card, 9.0f, 5.0f);
+     }
+     REQUIRE(played);
+ 

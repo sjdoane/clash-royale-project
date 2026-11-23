@@ -1,0 +1,385 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index eadea06..8083b51 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -854,6 +854,39 @@ as if it were sourced.
+ - Tests: `python_ai/tests/test_published_sight_of_elite_barbarians_electro_giant_bush.py`,
+   `tests/core/test_sight_range.cpp` (catalogue rows).
+ 
++## 2026-11-22: attached riders ride their carrier (patch 0046)
++
++**GAMEPLAY-AFFECTING.** The game data marks two compound cards `SpawnAttach:
++true` (RoyaleAPI cr-api-data cards_stats.json and FirstLight-Zero
++card_specs.json 15.535.13 agree): the Ram carries one `RamRider`
++(`TargetOnlyTroops: true`, no death spawn) and the Goblin Giant two
++`SpearGoblinGiant` (`DeathSpawnCharacter: SpearGoblin`). The engine spawned
++both as ordinary second units on the same tile. A lone Ram Rider was therefore
++two 1766-HP bodies: the rider stopped at crossbow range, shot the Princess
++Tower untargeted while the ram tanked, then walked on to the King Tower: 3884
++tower damage where the ram alone deals 1750. The Goblin Giant's Spear Goblins
++ran ahead of it at Very Fast and were shot first.
++
++- `CardStats::withAttachedSecondaryUnit(unit, dropsOnCarrierDeath)`:
++  `CardFactories::spawn` links every unit of the secondary to the card's first
++  unit (`CombatEntity::rideOn`, by entity id so snapshots need no remapping).
++- While it rides, a unit is pinned to its carrier at its spawn offset
++  (`CombatEntity::update`), never moves on its own (`Troop::moveTowards`),
++  cannot be targeted (`isTargetable`), takes no area damage
++  (`takesAreaDamage`) and no damage at all (`takeDamage`), and is not a
++  collision body. Its weapon still targets and fires independently.
++- When the carrier is gone the rider dies with it (Ram Rider) or drops off as
++  an ordinary unit where it stood (Goblin Giant's Spear Goblins). This happens
++  on the rider's next update, so it can outlive the carrier by one tick.
++- `CardStats::withTargetsTroopsOnly()` (the rider): buildings and Crown Towers
++  fail `isValidTarget`, so they are not even the walk-to objective.
++- NOT done, and why: Goblin Machine's turret is still a second 2150-HP body
++  (the data has no `SpawnAttach` on it; it is one character with two weapons,
++  which needs a different mechanism). The rider's bola snare (`BolaSnare`,
++  speed -70%) is not modelled. A stun or freeze on the carrier does not reach
++  the rider. A Clone of a riding unit keeps the original carrier's id.
++- Tests: `python_ai/tests/test_attached_riders_ride_their_carrier.py`.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index 09dc133..21d3ced 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -38,6 +38,7 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+         : LoadTimes::firstHitTicks(stats.name, stats.attackCooldown);
+     entity->isFlying = stats.isFlying;
+     entity->targetsAir = stats.targetsAir;
++    entity->targetsTroopsOnly = stats.targetsTroopsOnly;
+     entity->deathEffect = stats.deathEffect;
+     entity->rampMidTick = stats.rampMidTick;
+     entity->rampFullTick = stats.rampFullTick;
+@@ -314,6 +315,7 @@ inline void spawnSpell(const CardStats& stats, float x, float y, int team, Board
+ }
+ 
+ inline void spawn(const CardStats& stats, float x, float y, int team, Board& board) {
++    const size_t firstPrimary = board.pendingEntityCount();
+     switch (stats.archetype) {
+         case Archetype::MeleeSquad:             spawnMeleeSquad(stats, x, y, team, board); break;
+         case Archetype::RangedSquad:             spawnRangedSquad(stats, x, y, team, board); break;
+@@ -327,7 +329,20 @@ inline void spawn(const CardStats& stats, float x, float y, int team, Board& boa
+     // Rascals): the second, independently targeting unit spawns at the same
+     // point.
+     if (stats.secondaryUnit) {
++        const size_t firstSecondary = board.pendingEntityCount();
+         spawn(*stats.secondaryUnit, x, y, team, board);
++        // Attached secondaries (patch 0046) ride the card's first unit.
++        if (stats.secondaryAttached) {
++            std::shared_ptr<Entity> carrier;
++            for (size_t i = firstPrimary; i < firstSecondary && !carrier; ++i) {
++                if (std::dynamic_pointer_cast<Troop>(board.getPendingEntity(i))) carrier = board.getPendingEntity(i);
++            }
++            for (size_t i = firstSecondary; carrier && i < board.pendingEntityCount(); ++i) {
++                if (auto rider = std::dynamic_pointer_cast<Troop>(board.getPendingEntity(i))) {
++                    rider->rideOn(*carrier, stats.secondaryDropsOnCarrierDeath);
++                }
++            }
++        }
+     }
+ }
+ 
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index bc5a97c..fcde4c4 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -286,6 +286,7 @@ private:
+     static CardStats ramRiderCrossbowStats() {
+         return troop(-25, "Ram Rider", 0.0f, Archetype::RangedSquad, 1766, 0.5f, 5.0f, 104, 11, '"')
+             .withTargetsAir()
++            .withTargetsTroopsOnly() // game data, RamRider: TargetOnlyTroops (patch 0046)
+             .withIgnoresRiver();
+     }
+     static CardStats goblinGiantSpearGoblinsStats() {
+@@ -993,11 +994,11 @@ private:
+         // Ram Rider jumps the river.
+         add(troop(87, "Ram Rider", 5.0f, Archetype::MeleeBuildingTargeter, 1766, SPEED_MEDIUM, 0.8f, 250, 18, '"')
+             .withCharge(3.0f, 2.0f).withChargeSpeed(2.0f) // the ram charges at 2x (item 35)
+-            .withSecondaryUnit(ramRiderCrossbowStats()) // the rider's independently targeting crossbow (default 5.5 sight)
++            .withAttachedSecondaryUnit(ramRiderCrossbowStats(), false) // the rider: carried, dies with the ram (patch 0046; default 5.5 sight)
+             .withSightRange(7.5f) // the ram itself
+             .withIgnoresRiver() /* audit 0003: wiki Ram Rider, level 11 */);
+         add(troop(88, "Goblin Giant", 6.0f, Archetype::MeleeBuildingTargeter, 3110, SPEED_MEDIUM, 1.2f, 176, 15, '`')
+-            .withSecondaryUnit(goblinGiantSpearGoblinsStats()).withSightRange(7.5f)); // carried Spear Goblins, independently targeting
++            .withAttachedSecondaryUnit(goblinGiantSpearGoblinsStats(), true).withSightRange(7.5f)); // carried Spear Goblins, independently targeting
+         // Skeleton Barrel releases 2 Skeletons on death.
+         add(troop(89, "Skeleton Barrel", 3.0f, Archetype::MeleeBuildingTargeter, 532, SPEED_FAST, 0.35f, 81, 10, ',')
+             .withFlying()
+@@ -1659,9 +1660,9 @@ private:
+         // effect cannot be gated on hp.
+         addEvolution(159,
+             troop(88, "Goblin Giant", 6.0f, Archetype::MeleeBuildingTargeter, 3110, SPEED_MEDIUM, 1.2f, 176, 15, '`')
+-                .withSecondaryUnit(goblinGiantSpearGoblinsStats()).withSightRange(7.5f),
++                .withAttachedSecondaryUnit(goblinGiantSpearGoblinsStats(), true).withSightRange(7.5f),
+             troop(88, "Goblin Giant", 6.0f, Archetype::MeleeBuildingTargeter, 3110, SPEED_MEDIUM, 1.2f, 176, 15, '`')
+-                .withSecondaryUnit(goblinGiantSpearGoblinsStats()).withSightRange(7.5f)
++                .withAttachedSecondaryUnit(goblinGiantSpearGoblinsStats(), true).withSightRange(7.5f)
+                 .withPeriodicEffect(22, std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats())),
+             1 /* audit 0003: wiki Evolution, level 11: 1 cycle */, 1);
+ 
+diff --git a/include/core/CardStats.h b/include/core/CardStats.h
+index 2cfc7c0..c276b5f 100644
+--- a/include/core/CardStats.h
++++ b/include/core/CardStats.h
+@@ -238,6 +238,18 @@ struct CardStats {
+     // Rascals): a second, independently targeting unit spawned at the same
+     // point by CardFactories::spawn.
+     std::shared_ptr<CardStats> secondaryUnit;
++    // Patch 0046. The game data marks two of those cards `SpawnAttach`: the
++    // Ram carries its rider and the Goblin Giant its two Spear Goblins. An
++    // attached secondary has no body of its own while its carrier lives: it
++    // sits on the carrier, cannot be targeted or damaged, and only its weapon
++    // acts. When the carrier dies it either dies with it (the rider, which has
++    // no death spawn in the data) or drops off as an ordinary unit (the Spear
++    // Goblins, `DeathSpawnCharacter: SpearGoblin`).
++    bool secondaryAttached = false;
++    bool secondaryDropsOnCarrierDeath = false;
++    // The published `TargetOnlyTroops` (the Ram's rider): buildings and Crown
++    // Towers are never targets, not even as the walk-to objective.
++    bool targetsTroopsOnly = false;
+ 
+     // Periodic spawning while alive (Witch, Night Witch, Furnace, Barbarian
+     // Hut, Goblin Hut, Tombstone, Goblin Drill). First fires after one full
+@@ -593,6 +605,16 @@ struct CardStats {
+         secondaryUnit = std::make_shared<CardStats>(std::move(unit));
+         return *this;
+     }
++    CardStats& withAttachedSecondaryUnit(CardStats unit, bool dropsOnCarrierDeath) {
++        secondaryUnit = std::make_shared<CardStats>(std::move(unit));
++        secondaryAttached = true;
++        secondaryDropsOnCarrierDeath = dropsOnCarrierDeath;
++        return *this;
++    }
++    CardStats& withTargetsTroopsOnly() {
++        targetsTroopsOnly = true;
++        return *this;
++    }
+     CardStats& withSpellClone() {
+         spellClonesAllies = true;
+         return *this;
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index d50c0fe..42dc89e 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -131,6 +131,23 @@ public:
+     // Whether findTarget() may pick a flyer. Only read on `this`, unlike
+     // isFlying.
+     bool targetsAir = false;
++    // The published `TargetOnlyTroops` (patch 0046): see isValidTarget().
++    bool targetsTroopsOnly = false;
++
++    // An attached rider (patch 0046, CardStats::secondaryAttached): the id of
++    // the unit that carries it, or -1. An id, not a pointer, so a board
++    // snapshot needs no remapping (ids survive Board::snapshot). While it
++    // rides, update() pins it to the carrier at ridingOffset, it never moves
++    // on its own, and nothing can target or damage it.
++    int carrierEntityId = -1;
++    Vector2D ridingOffset{ 0.0f, 0.0f };
++    bool dropsWhenCarrierDies = false;
++    bool isRiding() const { return carrierEntityId >= 0; }
++    void rideOn(const Entity& carrier, bool dropsOff) {
++        carrierEntityId = carrier.id;
++        ridingOffset = Vector2D{ position.x - carrier.position.x, position.y - carrier.position.y };
++        dropsWhenCarrierDies = dropsOff;
++    }
+ 
+     // Fired once by onDeath() (e.g. Golem spawning Golemites).
+     std::shared_ptr<IDeathEffect> deathEffect;
+@@ -505,11 +522,13 @@ public:
+         attackCooldown(attackCooldown), currentCooldown(0.0f) {}
+ 
+     bool isTargetable() const override {
++        if (isRiding()) return false;
+         return (!startsInvisible || visibleTicksRemaining > 0) && temporaryInvisibilityTicksRemaining <= 0;
+     }
+     // An invisible unit cannot be picked as a target but is still hit by
+-    // whatever lands on its tile (Entity::takesAreaDamage).
+-    bool takesAreaDamage() const override { return true; }
++    // whatever lands on its tile (Entity::takesAreaDamage). A rider is not: it
++    // has no body of its own while it is carried.
++    bool takesAreaDamage() const override { return !isRiding(); }
+ 
+     // Soul collection: any death within radius, ally or enemy.
+     void onNearbyDeath(Board&, const Vector2D& deathPosition, int) override {
+@@ -580,6 +599,7 @@ public:
+     // Parry is checked before shield, so a parried hit costs no shield. The
+     // shield absorbs first and only the excess reaches hp.
+     void takeDamage(int amount) override {
++        if (isRiding()) return; // carried: the carrier's hit points are the card's
+         if (chargeGrantsInvulnerability && chargeThreshold > 0.0f
+             && chargeProgress >= chargeThreshold * 0.5f) {
+             return; // mid-dash: immune
+@@ -690,6 +710,22 @@ public:
+         const bool deploying = deployTicksRemaining > 0;
+         if (deploying) deployTicksRemaining--;
+ 
++        // An attached rider goes where its carrier goes (patch 0046). When the
++        // carrier is gone the rider dies with it, or drops off and carries on
++        // as an ordinary unit from where it stood.
++        if (isRiding()) {
++            const Entity* carrier = nullptr;
++            for (const auto& e : board.getEntities()) {
++                if (e->id == carrierEntityId) { if (e->isAlive()) carrier = e.get(); break; }
++            }
++            if (carrier) {
++                position = Vector2D{ carrier->position.x + ridingOffset.x, carrier->position.y + ridingOffset.y };
++            } else {
++                carrierEntityId = -1;
++                if (!dropsWhenCarrierDies) { hp = 0; return; }
++            }
++        }
++
+         // Captured before the decrement, so the last tick of a freeze still
+         // counts as frozen, at its own strength, for the ramp reset, the
+         // cooldown and movement alike.
+@@ -1045,6 +1081,7 @@ protected:
+     bool isValidTarget(const std::shared_ptr<Entity>& entity) const {
+         return entity && entity->team != this->team && entity->isAlive() && entity->isTargetable()
+             && entity->id != this->id && (!entity->isFlying || targetsAir)
++            && !(targetsTroopsOnly && (entity->isBuilding() || entity->isTower()))
+             && (minAttackRange <= 0.0f || position.distanceTo(entity->position) >= minAttackRange);
+     }
+ 
+diff --git a/include/entities/Troop.h b/include/entities/Troop.h
+index 5834f02..f09a05e 100644
+--- a/include/entities/Troop.h
++++ b/include/entities/Troop.h
+@@ -23,6 +23,7 @@ public:
+ 
+ protected:
+     void moveTowards(Board& board, const Vector2D& dest) override {
++        if (isRiding()) return; // carried (patch 0046): CombatEntity::update pins it to its carrier
+         Vector2D waypoint = riverIgnores ? dest : board.getNextWaypoint(position, dest);
+         float dx = waypoint.x - position.x;
+         float dy = waypoint.y - position.y;
+diff --git a/python_ai/tests/test_attached_riders_ride_their_carrier.py b/python_ai/tests/test_attached_riders_ride_their_carrier.py
+new file mode 100644
+index 0000000..b67964a
+--- /dev/null
++++ b/python_ai/tests/test_attached_riders_ride_their_carrier.py
+@@ -0,0 +1,121 @@
++"""Attached secondaries ride their carrier (patch 0046).
++
++Published game data (RoyaleAPI cr-api-data cards_stats.json; FirstLight-Zero
++card_specs.json, release 15.535.13): the Ram and the Goblin Giant carry
++`SpawnAttach: true` with `SpawnCharacter` RamRider (1) and SpearGoblinGiant
++(2). The RamRider character has `TargetOnlyTroops: true` and no death spawn;
++SpearGoblinGiant has `DeathSpawnCharacter: SpearGoblin`.
++
++Before this patch both were ordinary second units dropped on the same tile: a
++lone Ram Rider was two 1766-HP bodies, its rider stood at range shooting the
++Princess Tower and then walked on to the King Tower (3884 tower damage where
++the ram alone deals 1750), and the Goblin Giant's Spear Goblins ran ahead of it
++and died first.
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++
++NOOP = 4
++RAM_RIDER, GOBLIN_GIANT, KNIGHT, CANNON = 87, 88, 0, 129
++OURS = [129, 168, 125, 15, 40, 72, 33, 7]
++FILL = [4, 12, 112, 61, 20, 14, 26]
++
++
++def _start(attacker, defender_deck=None):
++    env = E.ClashRoyaleEnv(list(defender_deck or OURS), [attacker] + FILL, 3600)
++    env.seed(1)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    env.set_elixir_for_team(0, 10.0)
++    env.set_elixir_for_team(1, 10.0)
++    assert env.set_hand_for_team(1, [attacker] + FILL[:3])
++    return env
++
++
++def _towers(env):
++    return {u["id"]: u for u in env.get_units() if u["tower"] and u["team"] == 0}
++
++
++def _attackers(env):
++    return [u for u in env.get_units() if u["team"] == 1 and not u["tower"]]
++
++
++def test_a_lone_ram_rider_is_one_body_and_only_the_ram_hits_the_tower():
++    env = _start(RAM_RIDER)
++    before = {i: u["hp"] for i, u in _towers(env).items()}
++    env.step_self_play(NOOP, 0.0, 0.0, 0, 3.0, 15.0, 1)
++    rode = orphaned = 0
++    for _ in range(320):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        units = _attackers(env)
++        bodies = [u for u in units if u["targetable"]]
++        riders = [u for u in units if not u["targetable"]]
++        assert len(bodies) <= 1 and len(riders) <= 1
++        if riders and not bodies:
++            orphaned += 1   # the tick the ram fell on; the rider goes on its next update
++            continue
++        for r in riders:
++            rode += 1
++            assert r["hp"] == 1766
++            assert abs(r["x"] - bodies[0]["x"]) < 0.25 and abs(r["y"] - bodies[0]["y"]) < 0.25
++            assert all(t["target_id"] != r["id"] for t in _towers(env).values())
++            assert r["target_id"] not in before, "the rider targets troops only"
++    assert rode > 100
++    assert orphaned <= 1, "the rider outlived its ram"
++    assert not _attackers(env)
++    after = {i: u["hp"] for i, u in _towers(env).items()}
++    lost = sorted(before[i] - after.get(i, 0) for i in before)
++    # one Princess Tower, hit by the ram alone: a 500 charge and then 250s
++    assert lost[0] == 0 and lost[1] == 0
++    assert 1000 <= lost[2] <= 2250 and (lost[2] - 500) % 250 == 0
++
++
++def test_the_rider_shoots_a_troop_beside_the_road_and_leaves_a_building_alone():
++    deck = [CANNON, KNIGHT, 125, 15, 40, 72, 33, 7]
++    env = _start(RAM_RIDER, deck)
++    assert env.set_hand_for_team(0, deck[:4])
++    env.step_self_play(1, 5.0, 11.0, 0, 3.0, 15.0, 1)   # Knight beside the lane
++    env.set_elixir_for_team(0, 10.0)
++    slot = list(env.get_hand_for_team(0)).index(CANNON)
++    env.step_self_play(slot, 3.0, 11.0, NOOP, 0.0, 0.0, 1)   # Cannon in the ram's way
++    knight_lost = 0
++    last = None
++    shot_at_knight = False
++    for _ in range(120):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        units = env.get_units()
++        structures = {u["id"] for u in units if u["team"] == 0 and (u["tower"] or u["building"])}
++        knights = [u for u in units if u["team"] == 0 and u["name"] == "Knight"]
++        for r in (u for u in units if u["team"] == 1 and not u["tower"] and not u["targetable"]):
++            assert r["target_id"] not in structures
++            shot_at_knight |= bool(knights) and r["target_id"] == knights[0]["id"]
++        if knights:
++            # only while the card is on the board: afterwards the Knight walks
++            # on into the other side's Princess Tower
++            if last is not None and knights[0]["hp"] < last and any(u["team"] == 1 and not u["tower"] for u in units):
++                knight_lost += last - knights[0]["hp"]
++            last = knights[0]["hp"]
++    assert shot_at_knight
++    # nothing else on the board attacks troops: every loss is a 104-damage bolt
++    assert knight_lost > 0 and knight_lost % 104 == 0
++
++
++def test_the_goblin_giant_carries_its_spear_goblins_until_it_dies():
++    env = _start(GOBLIN_GIANT)
++    env.step_self_play(NOOP, 0.0, 0.0, 0, 3.0, 15.0, 1)
++    carried = dropped = 0
++    for _ in range(600):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++        units = _attackers(env)
++        giant = [u for u in units if u["name"] == "Goblin Giant"]
++        spears = [u for u in units if u["name"] == "Spear Goblins"]
++        if giant:
++            assert len(spears) == 2
++            for s in spears:
++                carried += 1
++                assert not s["targetable"] and s["hp"] == 133
++                assert abs(s["x"] - giant[0]["x"]) < 0.75 and abs(s["y"] - giant[0]["y"]) < 0.75
++        else:
++            # they drop on their next update, one tick after the Giant falls
++            dropped = max(dropped, sum(1 for s in spears if s["targetable"]))
++    assert carried > 200
++    assert dropped == 2
