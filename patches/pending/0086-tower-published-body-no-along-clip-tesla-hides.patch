@@ -1,0 +1,510 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index e35de60..6bf0ad7 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1956,6 +1956,77 @@ range 6.5, range 4.
+ - Tests: `python_ai/tests/test_hunter_pellets.py`. Suites: 837 cases, 836
+   passed, 1 failed as expected (C++); 1314 passed, 3 skipped (Python).
+ 
++## 2026-11-23: which building pulls a troop: a tower is ranked by its published body, no along-arena sight cut, an underground Tesla is no target (patch 0086)
++
++**GAMEPLAY-AFFECTING for every match.** Three rules about which building or
++Crown Tower a troop turns to. They revise the readings of patch 0042 (sight
++clip) and patch 0043 (towers ranked by their 1.5 / 2.0 collision body).
++
++- **EVIDENCE LEVEL: recordings only.** 117 pull events (a building-targeter
++  with a tower and at least one other building in play) were read frame by
++  frame from the 19 live matches recorded on 2026-11-23; 84 are decided beyond
++  the position error. Before: 60 right, 6 wrong, 18 within error. With all
++  three rules: **70 right, 0 wrong, 14 within error.** The 14 are not used as
++  tests. Nothing published states any of the three as prose.
++- **A Crown Tower is RANKED by its published body.** `Tower::getTargetingRadius`
++  returns `PUBLISHED_PRINCESS_RADIUS` 1.0 / `PUBLISHED_KING_RADIUS` 1.4;
++  `findTarget` ranks by `dist - getTargetingRadius()`. A Cannon (body 0.6) pulls
++  a building-targeter when its centre is more than 0.4 nearer than the tower's;
++  it needed 0.9. Fit: a tower radius of 0.9-1.1 scores best, 0.4-1.1 fits
++  within error, 1.5 is excluded; 1.0 is the published value in that band. It
++  applies to every troop's choice of target, although the evidence is
++  building-targeters only.
++- **The published SightClip no longer cuts the sight box ALONG the arena.**
++  `CombatEntity::withinSightClip` keeps the sideways cut
++  (`sightRange - sightClipSide`, body to body) and nothing else. With the along
++  cut a Hog Rider leaving the bridge could not see the Princess Tower it was
++  running at (9 tiles ahead) but could see a building in the middle, and turned
++  to it; the recorded ones ran to the tower (events m9-j, m12-n, m12-p; Ice
++  Golem m9-i). `sight_clip` is still loaded and reported. **What the published
++  SightClip means is not known.**
++- **A Tesla is underground and cannot be picked as a target unless an enemy is
++  inside its own sight** (events m11-g, m11-l0). `CardStats::withHidesWhenIdle(8)`
++  on the three Tesla rows -> `CombatEntity::hidesWhenIdle` /
++  `hideAfterIdleTicks`, from the published hide time (800 ms). It is above
++  ground for its whole deploy and 8 ticks after, comes up on the tick an enemy
++  is inside its sight, and goes under 8 ticks after the last one left or died.
++  It stays in the observation (`Entity::isSeenOnBoard`, used by `ClashEnv`): it
++  is drawn on the real screen; only a cloaked unit is left out. Exposed as
++  `get_card_stats(id)["base"]["hide_after_idle_ticks"]`.
++
++Measured through the bindings (team-0 Hog Rider, team-1 building, enemy right
++Princess Tower at (14, 27)):
++
++| Hog at | building at | before | now |
++|---|---|---|---|
++| (14.5, 19) | Cannon (9, 24) | Cannon, then the tower | Cannon |
++| (14.5, 19) | Cannon (8.5, 24) or (9, 25) | Cannon, then the tower | tower |
++| (14.5, 18) | Cannon (8, 24) | Cannon | tower |
++| (14.5, 18) | Cannon (8, 23) | Cannon | Cannon |
++| (14.5, 18) | settled Tesla (9, 22) | Tesla from tick 1 | tower, Tesla from tick 3 |
++| (14.5, 18) | settled Tesla (9, 23) | Tesla from tick 1 | tower, Tesla from tick 6 |
++| (14.5, 18) | settled Tesla (9, 24) | Tesla | tower, never the Tesla |
++| (14.5, 18) | Tesla still deploying (9, 24) | Tesla | Tesla |
++
++NOT changed:
++
++- The sideways clip (patch 0042): a Cannon 7 tiles to the side still does not
++  pull.
++- The tower's collision body 1.5 / 2.0: reach, sight and where a unit stops
++  still use it. Only the ranking moved.
++- A Tesla surfaces instantly for targeting and its fire timing is unchanged;
++  the real one takes 0.3-0.5 s to rise. A hidden Tesla still takes area and
++  spell damage and still decays.
++- Seen in the recordings and not modelled: the Hero Ice Golem's inconsistent
++  choices, a retarget when a freeze ends, a troop walking BACK to a Goblin Drill
++  behind it, the Hog Rider's diagonal river jump, a Hog pushing a slower troop.
++- Tesla and Goblin Drill stand on half-tile centres in the real game; nothing
++  here places them there.
++
++Tests: `python_ai/tests/test_building_pull_0086.py` (12; 10 of them fail on the
++engine before this patch). No existing expectation moved. Suites: 837 cases,
++836 passed, 1 failed as expected (C++); 1326 passed, 3 skipped (Python).
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index 0340b62..747a736 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -63,6 +63,10 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     entity->hookRange = stats.hookRange;
+     entity->startsInvisible = stats.startsInvisible;
+     entity->revealTicksAfterAttack = stats.revealTicksAfterAttack;
++    entity->hidesWhenIdle = stats.hidesWhenIdle;
++    entity->hideAfterIdleTicks = stats.hideAfterIdleTicks;
++    // Above ground from the tick it is placed (it deploys in view).
++    if (stats.hidesWhenIdle) entity->visibleTicksRemaining = stats.hideAfterIdleTicks;
+     entity->periodicEffect = stats.periodicEffect;
+     entity->periodicIntervalTicks = stats.periodicIntervalTicks;
+     // First fire one full interval after the deploy, or after the published
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index 6c5cab7..276c57c 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -693,7 +693,7 @@ private:
+ 
+         // === Defensive structures ===
+         add(building(25, "Cannon", 3.0f, 824, 'C', 5.5f, 202, 10));
+-        add(building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir().withLifetime(250) /* audit 0003: wiki Tesla, level 11 */);
++        add(building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir().withLifetime(250).withHidesWhenIdle(8) /* audit 0003: wiki Tesla, level 11 */);
+         // withSightRange(6.0f) is not redundant with the 5.5 default: with
+         // attackRange 6.0, the default would let it attack what it cannot see.
+         // Pinned by test_sight_range.cpp.
+@@ -1635,8 +1635,8 @@ private:
+         // Tesla ("Electro Pulse"): 6-tile radius, low damage and a 0.5 s stun.
+         // There is no hiding to emerge from here, so it fires once on deploy.
+         addEvolution(154,
+-            building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir().withLifetime(250) /* audit 0003: wiki Tesla, level 11 */,
+-            building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir()
++            building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir().withLifetime(250).withHidesWhenIdle(8) /* audit 0003: wiki Tesla, level 11 */,
++            building(26, "Tesla", 4.0f, 1182, 'T', 5.5f, 220, 11).withTargetsAir().withHidesWhenIdle(8)
+                 .withSpawnEffect(6.0f, 100, std::make_shared<FreezeOnHit>(5, 0.0f)).withLifetime(250) /* audit 0003: wiki Tesla, level 11 */,
+             2, 1);
+ 
+diff --git a/include/core/CardStats.h b/include/core/CardStats.h
+index ef7a940..31df759 100644
+--- a/include/core/CardStats.h
++++ b/include/core/CardStats.h
+@@ -238,6 +238,10 @@ struct CardStats {
+     // damage and spells still land (Entity::takesAreaDamage, patch 0041).
+     bool startsInvisible = false;
+     int revealTicksAfterAttack = 0;
++    // Published hides_when_not_attacking / hide_time_ms (Tesla, patch 0086):
++    // see CombatEntity::hidesWhenIdle.
++    bool hidesWhenIdle = false;
++    int hideAfterIdleTicks = 0;
+ 
+     // Compound cards (Goblin Giant, Ram Rider, Goblin Machine, Goblin Gang,
+     // Rascals): a second, independently targeting unit spawned at the same
+@@ -539,6 +543,15 @@ struct CardStats {
+         revealTicksAfterAttack = revealTicks;
+         return *this;
+     }
++    // A building that goes underground `hideTicks` after its last enemy left
++    // its sight, and cannot be targeted while it is down (Tesla).
++    CardStats& withHidesWhenIdle(int hideTicks) {
++        startsInvisible = true;
++        hidesWhenIdle = true;
++        hideAfterIdleTicks = hideTicks;
++        revealTicksAfterAttack = hideTicks;
++        return *this;
++    }
+     CardStats& withPeriodicEffect(int intervalTicks, std::shared_ptr<IPeriodicEffect> effect) {
+         periodicIntervalTicks = intervalTicks;
+         periodicEffect = std::move(effect);
+diff --git a/include/core/ClashEnv.h b/include/core/ClashEnv.h
+index 01ae8c6..d5ab2ac 100644
+--- a/include/core/ClashEnv.h
++++ b/include/core/ClashEnv.h
+@@ -298,7 +298,7 @@ private:
+         for (const auto& entity : game.getBoard().getEntities()) {
+             if (!entity->isAlive()) continue;
+             // Projectiles and pending spells are not board presence.
+-            if (!entity->isTargetable()) continue;
++            if (!entity->isSeenOnBoard()) continue;
+ 
+             int x = static_cast<int>(entity->position.x);
+             // Mirrored for team 1, which physically sits near high y. Mirror
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index 492c310..9f10add 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -269,6 +269,13 @@ public:
+     int revealTicksAfterAttack = 0;
+     int visibleTicksRemaining = 0;
+ 
++    // Published hides_when_not_attacking (Tesla): underground, and not a
++    // target, unless it is deploying or has an enemy in sight; it goes back
++    // down hideAfterIdleTicks after the last one left. Uses the invisibility
++    // state above (CardStats::withHidesWhenIdle sets both).
++    bool hidesWhenIdle = false;
++    int hideAfterIdleTicks = 0;
++
+     // Periodic effects while alive (Witch, Night Witch, Furnace, huts,
+     // Tombstone, Goblin Drill): fires periodicEffect every
+     // periodicIntervalTicks. 0 disables it.
+@@ -595,6 +602,10 @@ public:
+     // whatever lands on its tile (Entity::takesAreaDamage). A rider is not: it
+     // has no body of its own while it is carried.
+     bool takesAreaDamage() const override { return !isRiding(); }
++    // An underground Tesla is drawn for both players (patch 0086).
++    bool isSeenOnBoard() const override {
++        return isTargetable() || (hidesWhenIdle && !isRiding());
++    }
+ 
+     // Soul collection: any death within radius, ally or enemy.
+     void onNearbyDeath(Board&, const Vector2D& deathPosition, int) override {
+@@ -862,6 +873,8 @@ public:
+ 
+         if (parryIntervalTicks > 0 && parryTicksUntilReady > 0) parryTicksUntilReady--;
+         if (startsInvisible && visibleTicksRemaining > 0) visibleTicksRemaining--;
++        // A hiding building is above ground for the whole of its deploy.
++        if (hidesWhenIdle && deploying) visibleTicksRemaining = hideAfterIdleTicks;
+         if (buffTicksRemaining > 0) buffTicksRemaining--;
+         if (curseTicksRemaining > 0) curseTicksRemaining--;
+         // The ability's own timer starts when the body has landed (patch
+@@ -957,6 +970,14 @@ public:
+             }
+         }
+ 
++        // A hiding building (Tesla) is up while an enemy it can shoot is in
++        // its sight, stunned or not. findTarget also returns the lane
++        // objective when nothing is in sight, hence the distance test.
++        if (hidesWhenIdle && target
++            && position.distanceTo(target->position) <= effectiveSightTo(target)) {
++            visibleTicksRemaining = hideAfterIdleTicks;
++        }
++
+         // No target at all cancels a wind-up. A stun does not: it PAUSES the
+         // attack (the wind-up is held below, like the cooldown) and the unit
+         // carries on where it stopped, on whatever it targets when it resumes.
+@@ -1047,7 +1068,9 @@ public:
+                         if (chargeIsSticky && chargeProgress >= chargeThreshold) chargeHasStuck = true;
+                         if (!chargeHasStuck) chargeProgress = 0.0f;
+                     }
+-                    if (startsInvisible) visibleTicksRemaining = revealTicksAfterAttack;
++                    if (startsInvisible) {
++                        visibleTicksRemaining = std::max(visibleTicksRemaining, revealTicksAfterAttack);
++                    }
+                     // Little Prince's hit-speed ramp; ticksOnTarget already
+                     // includes this hit.
+                     if (hitSpeedRampFullTick > 0) {
+@@ -1216,15 +1239,17 @@ protected:
+     }
+ 
+     // The published sight clip (SightClips.h), body to body like the sight
+-    // itself.
++    // itself. Only the SIDEWAYS cut is applied. Patch 0042 also cut the sight
++    // along the arena at sightRange - sightClip; 84 recorded pulls (patch
++    // 0086) do not support that: three Hog Riders leaving the bridge with a
++    // centre building 7.9-8.0 tiles away and the tower 7.6 away ran straight
++    // on (the along cut hides the tower from them), and an Ice Golem was
++    // pulled by a Tesla beyond the cut. What the published SightClip field
++    // means is therefore NOT known; `sightClip` is still loaded and reported.
+     bool withinSightClip(float myRadius, const Entity& target) const {
+-        if (sightClip <= 0.0f && sightClipSide <= 0.0f) return true;
++        if (sightClipSide <= 0.0f) return true;
+         const float r = myRadius + effectiveRadiusOf(target);
+-        if (sightClipSide > 0.0f
+-            && std::fabs(target.position.x - position.x) - r > sightRange - sightClipSide) return false;
+-        if (sightClip > 0.0f
+-            && std::fabs(target.position.y - position.y) - r > sightRange - sightClip) return false;
+-        return true;
++        return std::fabs(target.position.x - position.x) - r <= sightRange - sightClipSide;
+     }
+ 
+     // Re-validates the locked target by id rather than re-scanning for the
+diff --git a/include/entities/Entity.h b/include/entities/Entity.h
+index 061df03..8c62d0d 100644
+--- a/include/entities/Entity.h
++++ b/include/entities/Entity.h
+@@ -81,6 +81,11 @@ public:
+     // 0041). Things that are never bodies (projectiles, spells) stay out.
+     virtual bool takesAreaDamage() const { return isTargetable(); }
+ 
++    // Whether this is written into a player's observation. A cloaked Royal
++    // Ghost is not drawn for the opponent; a Tesla that has gone underground
++    // still is (patch 0086), although it cannot be targeted.
++    virtual bool isSeenOnBoard() const { return isTargetable(); }
++
+     // True only for Building and Tower. Lets code outside the Building chain
+     // (knockback, pulls) ask without a dynamic_cast, which would need
+     // Building.h and create an include cycle.
+@@ -103,8 +108,9 @@ public:
+     virtual float getPlacementRadius() const { return getCollisionRadius(); }
+ 
+     // Footprint for target-selection distance only, never collision or attack
+-    // range. Nothing overrides it since patch 0043: every building, Crown
+-    // Towers included, competes by its body.
++    // range. A building competes by its body; a Crown Tower by its PUBLISHED
++    // body, which is smaller than its collision radius here (Tower.h, patch
++    // 0086).
+     virtual float getTargetingRadius() const { return getCollisionRadius(); }
+ 
+     // Re-applies board bounds and river constraints. Only Troop overrides it;
+diff --git a/include/entities/Tower.h b/include/entities/Tower.h
+index 6e4f2b0..e410c1b 100644
+--- a/include/entities/Tower.h
++++ b/include/entities/Tower.h
+@@ -26,8 +26,20 @@ public:
+     static constexpr float DEFAULT_PROJECTILE_TILES_PER_TICK = 2.0f;
+     float projectileTilesPerTick = DEFAULT_PROJECTILE_TILES_PER_TICK;
+ 
+-    // Target selection uses the collision radius above, like every other
+-    // building (Entity::getTargetingRadius): the nearest footprint wins. Until
++    // Target selection ranks a Crown Tower by its PUBLISHED body (1.0
++    // Princess, 1.4 King), not by the engine's 1.5 / 2.0 collision radius
++    // above, which still sets reach, sight and where units stop (patch 0086).
++    // Measured on 84 recorded building pulls: with 1.5 a Hog Rider, a Golem
++    // and an Ice Golem stayed on the tower where the real ones turned to a
++    // Tesla, Cannon or Bomb Tower that was nearer by 0.3-0.5 tile centre to
++    // centre; every radius from 0.4 to 1.1 fits, 1.5 does not.
++    static constexpr float PUBLISHED_PRINCESS_RADIUS = 1.0f;
++    static constexpr float PUBLISHED_KING_RADIUS = 1.4f;
++    float getTargetingRadius() const override {
++        return (symbol == 'R') ? PUBLISHED_KING_RADIUS : PUBLISHED_PRINCESS_RADIUS;
++    }
++
++    // History: the nearest footprint wins (Entity::getTargetingRadius). Until
+     // patch 0043 a Crown Tower competed with an inflated footprint (3.3 / 4.4),
+     // fitted so that a Cannon 7-8 tiles off-lane would not pull a Hog Rider.
+     // That fact is the published sight clip (SightClips.h, patch 0042); the
+diff --git a/python_ai/tests/test_building_pull_0086.py b/python_ai/tests/test_building_pull_0086.py
+new file mode 100644
+index 0000000..4bf9bfa
+--- /dev/null
++++ b/python_ai/tests/test_building_pull_0086.py
+@@ -0,0 +1,182 @@
++"""Which building or tower a troop turns to (patch 0086).
++
++Three rules, fitted to 84 decided pull events read frame by frame from the 19
++live matches recorded on 2026-11-23 (before: 60 right, 6 wrong, 18 within
++measurement error; with all three: 70 right, 0 wrong, 14 within error):
++
++  * a Crown Tower is RANKED against other targets by its published body
++    (1.0 Princess, 1.4 King), not the engine's 1.5 / 2.0. A building therefore
++    pulls a building-targeter when its edge is nearer than the tower's
++    published edge: a Cannon whose centre is more than 0.4 nearer than the
++    tower's, where it used to need 0.9. The fit accepts 0.4 to 1.1 and
++    excludes 1.5; 1.0 is the published value inside that band.
++  * the published SightClip no longer cuts the sight box ALONG the arena. With
++    the cut a Hog Rider leaving the bridge could not see the Princess Tower it
++    was running at (9 tiles ahead) but could see a building in the middle of
++    the arena, and turned to it. Recorded Hogs in that position ran straight
++    to the tower (events m9-j, m12-n, m12-p; Ice Golem m9-i).
++  * a Tesla is underground, and cannot be picked as a target, unless an enemy
++    is inside its own sight (events m11-g, m11-l0). It is above ground for its
++    whole deploy and for 0.8 s (published hide time) after the last enemy left.
++
++The geometry below is in engine tiles; the enemy right Princess Tower is at
++(14, 27), the right bridge at x 14.5.
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++import numpy as np
++
++NOOP = 4
++KNIGHT, HOG, CANNON, TESLA, ROYAL_GHOST = 0, 15, 25, 26, 47
++OURS = [129, 168, 125, 15, 40, 72, 33, 7]
++
++
++def _env():
++    env = E.ClashRoyaleEnv(list(OURS), list(OURS), 3600)
++    env.seed(1)
++    env.reset()
++    return env
++
++
++def _step(env, n=1):
++    for _ in range(n):
++        env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++
++
++def _targets(troop_xy, building, building_xy, settle=0, building_deploy=0, ticks=160):
++    """Team 1 has `building` at `building_xy` for `settle` ticks; then a team-0
++    Hog Rider appears at `troop_xy`. -> the names of what the Hog targets, in
++    order, without repeats."""
++    env = _env()
++    env.inject(building, building_xy[0], building_xy[1], 1, -1.0, building_deploy)
++    _step(env, settle)
++    env.inject(HOG, troop_xy[0], troop_xy[1], 0, -1.0, 0)
++    seen = []
++    for _ in range(ticks):
++        _step(env)
++        units = env.get_units()
++        by_id = {u["id"]: u for u in units}
++        hog = [u for u in units if u["team"] == 0 and u["card_id"] == HOG]
++        if not hog:
++            break
++        target = by_id.get(hog[0]["target_id"])
++        name = target["name"] if target else None
++        if not seen or seen[-1] != name:
++            seen.append(name)
++    return seen
++
++
++def _tesla(env):
++    return [u for u in env.get_units() if u["name"] == "Tesla"][0]
++
++
++# ---- a Crown Tower is ranked by its published body -------------------------
++
++def test_a_cannon_0p6_nearer_than_the_tower_pulls_a_hog():
++    # Hog at (14.5, 19): tower centre 8.02 away, Cannon at (9, 24) 7.43 away.
++    # Edges: Cannon 6.83, tower 7.02 by its published body (6.52 by the
++    # engine's 1.5, which sent the Hog to the tower).
++    assert _targets((14.5, 19.0), CANNON, (9.0, 24.0)) == ["Cannon"]
++
++
++def test_a_cannon_only_0p2_nearer_than_the_tower_does_not():
++    # Cannon at (8.5, 24): 7.81 away, edge 7.21 against the tower's 7.02.
++    assert _targets((14.5, 19.0), CANNON, (8.5, 24.0)) == ["Princess Tower"]
++
++
++def test_a_cannon_further_than_the_tower_does_not():
++    assert _targets((14.5, 19.0), CANNON, (9.0, 25.0)) == ["Princess Tower"]
++
++
++# ---- no cut along the arena -------------------------------------------------
++
++def test_a_hog_leaving_the_bridge_runs_at_the_tower_it_can_see():
++    # Hog at the far end of the bridge (14.5, 18): tower 9.01 away, a Cannon
++    # in the middle at (8, 24) 8.85 away, its edge further than the tower's.
++    # With the along cut the tower was outside the sight box and the Hog went
++    # to the Cannon.
++    assert _targets((14.5, 18.0), CANNON, (8.0, 24.0)) == ["Princess Tower"]
++
++
++def test_the_sideways_cut_is_kept():
++    # Published SightClipSide: a Cannon 7 tiles to the side is inside the 9.5
++    # sight disc and still does not pull (patch 0042).
++    assert _targets((14.5, 19.0), CANNON, (7.0, 20.0)) == ["Princess Tower"]
++    stats = E.get_card_stats(HOG)["base"]
++    assert stats["sight_clip_side"] == 4.0
++
++
++# ---- the Tesla --------------------------------------------------------------
++
++def test_the_tesla_publishes_its_hide_time_and_nothing_else_hides():
++    assert E.get_card_stats(TESLA)["base"]["hide_after_idle_ticks"] == 8
++    assert E.get_card_stats(CANNON)["base"]["hide_after_idle_ticks"] == 0
++    assert E.get_card_stats(ROYAL_GHOST)["base"]["hide_after_idle_ticks"] == 0
++
++
++def test_a_tesla_is_up_while_it_deploys_and_goes_under_0p8_s_later():
++    env = _env()
++    env.inject(TESLA, 9.0, 22.0, 1)            # the card's own 1 s deploy
++    up = []
++    for _ in range(30):
++        _step(env)
++        up.append(_tesla(env)["targetable"])
++    # ticks 1-10 deploying, 8 more ticks counted from the last deploy tick
++    assert all(up[:17]) and not any(up[17:])
++
++
++def test_a_tesla_comes_up_for_an_enemy_in_its_sight_and_hides_after_it():
++    env = _env()
++    env.inject(TESLA, 9.0, 22.0, 1, -1.0, 0)
++    _step(env, 30)
++    assert not _tesla(env)["targetable"]
++    env.inject(KNIGHT, 9.0, 12.0, 0, 1.0, 0)   # 10 tiles off: out of its sight
++    _step(env, 5)
++    assert not _tesla(env)["targetable"]
++    env.inject(KNIGHT, 9.0, 17.6, 0, 1.0, 0)   # 4.4 tiles: in sight, 1 hit point
++    _step(env)
++    assert _tesla(env)["targetable"]
++    gone = None
++    for tick in range(1, 20):
++        _step(env)
++        near = [u for u in env.get_units()
++                if u["team"] == 0 and u["name"] == "Knight" and u["y"] > 16]
++        if gone is None and not near:
++            gone = tick                          # the Tesla shot it
++        if gone is not None and tick < gone + 8:
++            assert _tesla(env)["targetable"]
++        if gone is not None and tick >= gone + 8:
++            assert not _tesla(env)["targetable"]
++    assert gone is not None
++
++
++def test_an_underground_tesla_does_not_pull_a_hog_past_it():
++    # Event m11-g: the Hog runs the lane past a Tesla that is underground. At
++    # the bridge the Tesla at (9, 24) is nearer than the tower, but the Hog is
++    # 7.8 tiles from it, outside its sight (5.5 + bodies = 6.6); by the time
++    # the Tesla sees the Hog the tower is the nearer one.
++    assert _targets((14.5, 18.0), TESLA, (9.0, 24.0), settle=40) == ["Princess Tower"]
++
++
++def test_a_tesla_still_deploying_pulls_at_once():
++    assert _targets((14.5, 18.0), TESLA, (9.0, 24.0), building_deploy=10)[0] == "Tesla"
++
++
++def test_a_hog_turns_to_a_tesla_when_it_surfaces():
++    # Events m11-l, m16-b: the Hog starts for the tower and turns as the Tesla
++    # comes up for it.
++    assert _targets((14.5, 18.0), TESLA, (9.0, 22.0), settle=40) == ["Princess Tower", "Tesla"]
++
++
++def test_an_underground_tesla_is_still_in_the_observation():
++    # It is drawn on the real screen (lower in its pit); only a cloaked unit is
++    # left out of the opponent's observation.
++    spatial = E.ClashRoyaleEnv.BOARD_WIDTH * E.ClashRoyaleEnv.BOARD_HEIGHT * 21
++    with_tesla, empty = _env(), _env()
++    with_tesla.inject(TESLA, 9.0, 22.0, 1, -1.0, 0)
++    _step(with_tesla, 30)
++    _step(empty, 30)
++    assert not _tesla(with_tesla)["targetable"]
++    a = np.array(with_tesla.get_observation_for_team(0))[:spatial]
++    b = np.array(empty.get_observation_for_team(0))[:spatial]
++    assert (a != b).any()
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index db811c7..ad42c86 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -57,6 +57,8 @@ py::dict statsDict(const CardStats& s, int depth = 0) {
+     d["load_ticks"] = LoadTimes::forName(s.name);   // published load time
+     d["lands_unloaded"] = LoadTimes::landsUnloaded(s.name);   // published LoadFirstHit
+     d["ignores_pushback"] = Pushback::ignores(s.name);        // published IgnorePushback
++    // Published hide time of a building that goes underground (Tesla); 0 = never hides.
++    d["hide_after_idle_ticks"] = s.hidesWhenIdle ? s.hideAfterIdleTicks : 0;
+     // What a unit of this card winds up before its first hit on a target in
+     // range (CardFactories::applyCardMetadata): hit speed minus load time.
+     d["first_hit_windup_ticks"] = s.loadTicksOverride >= 0

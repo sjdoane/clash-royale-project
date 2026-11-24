@@ -1,0 +1,254 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index c392a18..c018289 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1850,6 +1850,42 @@ Existing expectations that moved, and what each had encoded:
+   already carried a horizon picked after patch 0034; the Ice Golem placed on
+   (2, 15) now walks straight up the bridge. Neither recorded nor published.
+ 
++## 2026-11-23: the first periodic spawn comes at the published SpawnStartTime (patch 0083)
++
++**GAMEPLAY-AFFECTING** for every opponent holding a Goblin Drill, a Witch or a
++Night Witch (none is in `DEFAULT_DECK`). `CardFactories` started every periodic
++spawner's countdown at one whole interval, so the first spawn came a whole
++interval after the deploy. New `CardStats::periodicFirstTicks`
++(`.withPeriodicFirst(ticks)`, -1 = the old rule): ticks from the end of the
++deploy to the first fire. The countdown does not run while the body deploys.
++
++| card | published start / pause | first spawn after the play, before | now |
++|---|---|---|---|
++| Goblin Drill (98, both forms of 153) | 1000 / 3000 ms | 4.0 s (first stab 5.4-5.9 s) | 1.1 s (first stab 2.5-3.0 s) |
++| Witch (and both Evolution forms) | 1000 / 7000 | 8.0 s | 2.0 s |
++| Night Witch | 1000 / 5000 | 6.0 s | 2.0 s |
++
++- Source: RoyaleAPI cr-api-data `cards_stats.json` (`spawn_start_time`,
++  `spawn_pause_time`).
++- **The Drill's value is the recording's, not the table's.** Three Goblin Drills
++  on our Princess Tower in `runs/live/20261123-104801`: the first Goblin's first
++  stab lands 2.1-2.4 s after the Drill's stopwatch appears, the next Goblin
++  about 3 s later. The spawned Goblin keeps its 1 s deploy here, so the Drill
++  uses `withPeriodicFirst(0)` (fires on the first tick after its own deploy):
++  first stab 2.5-3.0 s, still 0.3-0.6 s later than recorded. With the published
++  1000 on top of the Goblin's deploy it would be 3.5-4.0 s.
++- An unanswered Drill beside a Princess Tower now costs 10 to 16 stabs
++  (1250-2000) where it cost 5 to 8: the tower stays on the Drill, as before,
++  while the Goblins come out 3 s sooner. No recording of an unanswered Drill
++  exists to check the total; in the recorded match the first Drill took 7
++  stabs with our defence present, and the old engine gave 0 there.
++- NOT changed: spawners published with `spawn_start_time` 0 (Tombstone, Goblin
++  Hut, Barbarian Hut, Furnace) still fire first after one whole interval.
++  Whether 0 means "at once" was not checked against a recording.
++- Tests: `python_ai/tests/test_first_periodic_spawn.py`. Suites unchanged
++  otherwise: 837 cases, 836 passed, 1 failed as expected (C++); 1297 passed,
++  3 skipped (Python).
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index 9517a50..2d84c7d 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -65,7 +65,12 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     entity->revealTicksAfterAttack = stats.revealTicksAfterAttack;
+     entity->periodicEffect = stats.periodicEffect;
+     entity->periodicIntervalTicks = stats.periodicIntervalTicks;
+-    entity->periodicTicksUntilNext = stats.periodicIntervalTicks; // first fire after one full interval
++    // First fire one full interval after the deploy, or after the published
++    // SpawnStartTime where the card has one (the countdown fires on reaching 0,
++    // so 1 is the first tick after the deploy).
++    entity->periodicTicksUntilNext = stats.periodicFirstTicks >= 0
++        ? (stats.periodicFirstTicks > 1 ? stats.periodicFirstTicks : 1)
++        : stats.periodicIntervalTicks;
+     entity->periodicHotIntervalTicks = stats.periodicHotIntervalTicks;
+     entity->selfPeriodicEffect = stats.selfPeriodicEffect;
+     entity->selfPeriodicIntervalTicks = stats.selfPeriodicIntervalTicks;
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index 19218b8..26ffe38 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -850,7 +850,7 @@ private:
+         // Night Witch: releases 3 Bats on death and spawns Bats periodically.
+         add(troop(58, "Night Witch", 4.0f, Archetype::MeleeSquad, 906, SPEED_MEDIUM, 1.6f, 314, 13, '6')
+             .withDeathEffect(std::make_shared<SpawnOnDeath>(nightWitchBatStats()))
+-            .withPeriodicEffect(50, std::make_shared<PeriodicSpawnEffect>(nightWitchPeriodicBatStats())) /* audit 0003: wiki Night Witch, level 11 */);
++            .withPeriodicEffect(50, std::make_shared<PeriodicSpawnEffect>(nightWitchPeriodicBatStats())).withPeriodicFirst(10) /* audit 0003: wiki Night Witch, level 11 */);
+         // Phoenix: one-time revive (phoenixReviveStats).
+         add(troop(59, "Phoenix", 4.0f, Archetype::MeleeSquad, 1052, SPEED_MEDIUM, 1.6f, 217, 10, '7')
+             .withFlying().withTargetsAir()
+@@ -909,7 +909,7 @@ private:
+             .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(furnaceFireSpiritStats())));
+         add(troop(71, "Witch", 5.0f, Archetype::RangedSquad, 839, SPEED_MEDIUM, 5.5f, 135, 11, ':')
+             .withTargetsAir()
+-            .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(witchSkeletonStats())).withSplash(1.5f) /* audit 0003: wiki Witch, level 11 */);
++            .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(witchSkeletonStats())).withPeriodicFirst(10).withSplash(1.5f) /* audit 0003: wiki Witch, level 11 */);
+ 
+         // "Spirit" troops detonate on their first hit and vanish
+         // (CombatEntity::dieAfterFirstHit).
+@@ -1069,7 +1069,7 @@ private:
+         // effect; knockback not modelled), periodic Goblins, and 2 Goblins on
+         // death.
+         add(building(98, "Goblin Drill", 4.0f, 1313, '7', 0.0f, 0, 100)
+-            .withPeriodicEffect(30, std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats()))
++            .withPeriodicEffect(30, std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats())).withPeriodicFirst(0)
+             .withDeployAnywhere()
+             .withSpawnEffect(2.0f, 84)
+             .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinDrillDeathGoblinStats())).withLifetime(100) /* audit 0003: wiki Goblin Drill, level 11 */);
+@@ -1491,10 +1491,10 @@ private:
+         addEvolution(142,
+             troop(71, "Witch", 5.0f, Archetype::RangedSquad, 839, SPEED_MEDIUM, 5.5f, 135, 11, ':')
+                 .withTargetsAir()
+-                .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(witchSkeletonStats())).withSplash(1.5f) /* audit 0003: wiki Witch, level 11 */,
++                .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(witchSkeletonStats())).withPeriodicFirst(10).withSplash(1.5f) /* audit 0003: wiki Witch, level 11 */,
+             troop(71, "Witch", 5.0f, Archetype::RangedSquad, 839, SPEED_MEDIUM, 5.5f, 135, 11, ':')
+                 .withTargetsAir()
+-                .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(witchSkeletonStats()))
++                .withPeriodicEffect(70, std::make_shared<PeriodicSpawnEffect>(witchSkeletonStats())).withPeriodicFirst(10)
+                 .withHealOnHit(20, 1040).withSplash(1.5f) /* audit 0003: wiki Witch, level 11 */,
+             1 /* audit 0003: wiki Evolution, level 11: 1 cycle */, 1);
+ 
+@@ -1620,12 +1620,12 @@ private:
+         // each time) is approximated as more Goblins on death.
+         addEvolution(153,
+             building(98, "Goblin Drill", 4.0f, 1313, '7', 0.0f, 0, 100)
+-                .withPeriodicEffect(30, std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats()))
++                .withPeriodicEffect(30, std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats())).withPeriodicFirst(0)
+                 .withDeployAnywhere()
+                 .withSpawnEffect(2.0f, 84)
+                 .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinDrillDeathGoblinStats())).withLifetime(100) /* audit 0003: wiki Goblin Drill, level 11 */,
+             building(98, "Goblin Drill", 4.0f, 1313, '7', 0.0f, 0, 100)
+-                .withPeriodicEffect(30, std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats()))
++                .withPeriodicEffect(30, std::make_shared<PeriodicSpawnEffect>(goblinDrillGoblinStats())).withPeriodicFirst(0)
+                 .withDeployAnywhere()
+                 .withSpawnEffect(2.0f, 84)
+                 .withDeathEffect(std::make_shared<SpawnOnDeath>(goblinDrillDeathGoblinStats()
+diff --git a/include/core/CardStats.h b/include/core/CardStats.h
+index c276b5f..fad2e4b 100644
+--- a/include/core/CardStats.h
++++ b/include/core/CardStats.h
+@@ -253,9 +253,12 @@ struct CardStats {
+ 
+     // Periodic spawning while alive (Witch, Night Witch, Furnace, Barbarian
+     // Hut, Goblin Hut, Tombstone, Goblin Drill). First fires after one full
+-    // interval.
++    // interval unless periodicFirstTicks says otherwise.
+     std::shared_ptr<IPeriodicEffect> periodicEffect;
+     int periodicIntervalTicks = 0;
++    // Ticks from the end of the deploy to the first fire (the published
++    // SpawnStartTime); -1 = one full interval, the behaviour before patch 0083.
++    int periodicFirstTicks = -1;
+     // The self-periodic hook (SelfPeriodicEffect.h, patch 0015).
+     std::shared_ptr<ISelfPeriodicEffect> selfPeriodicEffect;
+     int selfPeriodicIntervalTicks = 0;
+@@ -531,6 +534,12 @@ struct CardStats {
+         periodicEffect = std::move(effect);
+         return *this;
+     }
++    // The published SpawnStartTime: the first fire comes `ticks` after the
++    // deploy ends instead of one full interval after it (patch 0083).
++    CardStats& withPeriodicFirst(int ticks) {
++        periodicFirstTicks = ticks;
++        return *this;
++    }
+     // First check `firstTicks` after the deploy ends, then every
+     // `intervalTicks` after each fire (a declined check retries next tick).
+     CardStats& withCrownTowerHitMultiplier(float m) {
+diff --git a/python_ai/tests/test_first_periodic_spawn.py b/python_ai/tests/test_first_periodic_spawn.py
+new file mode 100644
+index 0000000..ee524d0
+--- /dev/null
++++ b/python_ai/tests/test_first_periodic_spawn.py
+@@ -0,0 +1,93 @@
++"""The first periodic spawn comes at the published SpawnStartTime (patch 0083).
++
++Every periodic spawner fired first only after one whole interval: a Goblin
++Drill's first Goblin came out 4 s after the Drill was placed and stabbed at
++5.4 s, a Witch's first Skeletons 8 s after she was played. Published
++(RoyaleAPI cr-api-data cards_stats.json): GoblinDrill spawn_start_time 1000,
++spawn_pause_time 3000; Witch 1000 / 7000; DarkWitch (Night Witch) 1000 / 5000.
++
++Recorded (runs/live/20261123-104801, three Goblin Drills on our Princess
++Tower): the first Goblin's first stab lands 2.1-2.4 s after the Drill's deploy
++stopwatch appears and the next Goblin follows about 3 s later. The Drill's
++Goblin keeps its 1 s deploy here, so the Drill fires on the first tick after
++its own deploy and the first stab comes 2.5-3.0 s after the play, depending on
++how far the Goblin has to step. Before: 5.4-5.9 s.
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++
++ID = {E.get_card_info(c)["name"]: c for c in E.get_all_card_ids()}
++NOOP = 4
++REST = [4, 12, 112, 61, 20, 14, 2]
++PLAIN = [15, 6, 25, 40, 24, 72, 33, 7]
++MIRROR_Y = E.ClashRoyaleEnv.BOARD_HEIGHT - 1
++
++
++def _play(card, x, y, team=1):
++    deck = [ID[card]] + REST
++    decks = (PLAIN, deck) if team == 1 else (deck, PLAIN)
++    env = E.ClashRoyaleEnv(list(decks[0]), list(decks[1]), 3600)
++    env.seed(1)
++    env.set_tower_hit_log(True)
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 20)
++    env.set_elixir_for_team(team, 10.0)
++    assert env.set_hand_for_team(team, deck[:4])
++    spent = env.get_elixir_spent(team)
++    if team == 1:
++        env.step_self_play(NOOP, 0.0, 0.0, 0, x, y, 1)
++    else:
++        env.step_self_play(0, x, y, NOOP, 0.0, 0.0, 1)
++    assert env.get_elixir_spent(team) > spent, f"{card} was refused"
++    return env
++
++
++def _tick(env):
++    env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
++
++
++def _drill(dx, dy):
++    """(ticks from the play to each 125 stab on the defender's tower) for one
++    unanswered Goblin Drill placed (dx, dy) from our right Princess Tower."""
++    env = _play("Goblin Drill", 14.0 + dx, MIRROR_Y - (E.arena_princess_y(0) + dy))
++    n0 = len(env.get_tower_hits())
++    for _ in range(140):
++        _tick(env)
++    return [h[0] - 21 for h in env.get_tower_hits()[n0:] if h[4] == 0 and h[6] == 125]
++
++
++def test_the_drills_first_goblin_stabs_within_three_seconds():
++    for cell in ((0, 3), (2, 2), (-2, 2), (0, -3), (2.5, 0)):
++        stabs = _drill(*cell)
++        assert 22 <= stabs[0] <= 30, (cell, stabs[:4])      # recorded 2.1-2.4 s
++        # the same Goblin again one hit speed (1.1 s) later, before the second
++        # Goblin (out 3 s after the first) can join in
++        assert [b - a for a, b in zip(stabs, stabs[1:3])] == [11, 11], (cell, stabs[:5])
++
++
++def _first_spawn(card, child):
++    """Ticks from the play to the first `child` body on the board, and to the
++    second batch."""
++    env = _play(card, 9.0, 8.0, team=0)
++    seen, first, second = set(), None, None
++    for t in range(1, 140):
++        _tick(env)
++        ids = {u["id"] for u in env.get_units() if u["team"] == 0 and u["name"] == child}
++        new = ids - seen
++        if new and first is None:
++            first = t
++        elif new and second is None and t > first + 5:
++            second = t
++        seen |= ids
++    return first, second
++
++
++def test_the_witch_raises_her_first_skeletons_one_second_after_deploying():
++    first, second = _first_spawn("Witch", "Skeletons")
++    assert 19 <= first <= 22, first                         # 1 s deploy + 1 s
++    assert second - first == 70                             # then every 7 s
++
++
++def test_the_night_witch_releases_her_first_bats_one_second_after_deploying():
++    first, second = _first_spawn("Night Witch", "Bats")
++    assert 19 <= first <= 22, first
++    assert second - first == 50

@@ -1,0 +1,308 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index c018289..add75fc 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1886,6 +1886,41 @@ deploy to the first fire. The countdown does not run while the body deploys.
+   otherwise: 837 cases, 836 passed, 1 failed as expected (C++); 1297 passed,
+   3 skipped (Python).
+ 
++## 2026-11-23: the pocket opens when a Princess Tower falls (patch 0084)
++
++**GAMEPLAY-AFFECTING for every match in which a Princess Tower falls.** The
++engine never extended the deploy zone: with an enemy tower down, troops and
++buildings were still refused past the river. `GameManager::inPocket(team, x, y)`
++now opens, for the side that took the tower, that lane's half of the width
++(`ArenaLayout::isLeftLane`) on the enemy bank down to engine row 11 of the
++loser's half (rows 18-22 seen from team 0, 11-15 from team 1), plus that lane's
++bridge cells. River water stays closed. Both Princess Towers down opens the
++whole width. Used by `isValidPlacement` for troops, buildings, the own-side-only
++spells (Barbarian Barrel, Royal Delivery) and the rolling spells.
++
++- **EVIDENCE LEVEL: measured, not published.** In the 19 live matches recorded
++  on 2026-11-23 about 35 troop and building placements were made past the river
++  after a tower fell: every one on the fallen tower's half, none deeper than
++  engine row 11, the row most of them used; Hero Barbarian Barrels were cast
++  there too. The real pocket's exact shape (whether it is a full half-width
++  rectangle, whether the depth differs near the King Tower) is not known beyond
++  those placements.
++- Why it mattered: a replay of a recorded pocket play moved it to the river
++  bank (`training/ghost.py::nearest_legal`), 4-7 s further from the King Tower.
++  With the rule the 19 recorded matches, replayed with both sides scripted, cost
++  us 0.661 of our tower health against a real 0.668 (0.600 before; patch 0085 is
++  in that figure too).
++- NOT changed: `python_ai`'s cached placement mask
++  (`net._build_placement_legality`) tracks team 0's own towers only, so the old
++  trainer's mask does not offer pocket cells. That is conservative, never
++  illegal. `HeuristicOpponent` and the teacher do not use the pocket. Spells
++  that could always be cast anywhere are unchanged.
++- Tests: `python_ai/tests/test_pocket_placement.py`; the two tripwires that
++  pinned "an enemy tower dying changes nothing"
++  (`test_placement_legality_is_static.py`,
++  `test_placement_mask_after_tower_loss.py`) now pin exactly what opens and
++  that the mask stays a subset.
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/GameManager.h b/include/core/GameManager.h
+index 2099ebf..660ce06 100644
+--- a/include/core/GameManager.h
++++ b/include/core/GameManager.h
+@@ -512,6 +512,44 @@ public:
+     // `isRollingSpell` narrows the spell exemption for The Log and Barbarian
+     // Barrel, and `ownSideOnly` narrows it further, to a troop's own side, for
+     // Barbarian Barrel (see the end of this function).
++    // The placement rule's own-half test: a non-spell stays OWN_HALF_RIVER_BUFFER
++    // short of the river on its own side.
++    bool onOwnHalf(int team, float y) const {
++        return team == 0 ? y <= board.getRiverStart() - OWN_HALF_RIVER_BUFFER
++                         : y >= board.getRiverEnd() + OWN_HALF_RIVER_BUFFER;
++    }
++
++    // The pocket. Once an enemy Princess Tower has fallen, its half of the
++    // width opens to placement on the enemy side of the river: the bridge of
++    // that lane and the first POCKET_REAL_ROWS real rows of the enemy bank
++    // (engine rows 11-15 of team 0's half, 18-22 of team 1's: the engine's
++    // extra bank row is inside it). River water stays closed. With both
++    // Princess Towers down the whole width is open.
++    //
++    // MEASURED, not published: in 19 recorded live matches (2026-11-23) every
++    // one of about 35 troop and building placements made past the river after
++    // a tower fell sat on the fallen tower's half, and none was deeper than
++    // engine row 11, the row most of them used. Before this rule the engine
++    // refused all of them, and a replay moved each to the river bank, 4-7 s
++    // further from the King Tower.
++    static constexpr float POCKET_DEEPEST_ROW_TEAM0_HALF = 11.0f;
++    bool inPocket(int team, float x, float y) const {
++        const int enemy = 1 - team;
++        if (enemy == 0) {
++            if (y < POCKET_DEEPEST_ROW_TEAM0_HALF - Board::CELL_HALF_EXTENT) return false;
++        } else {
++            if (y > ArenaLayout::mirrorY(POCKET_DEEPEST_ROW_TEAM0_HALF) + Board::CELL_HALF_EXTENT) return false;
++        }
++        if (y > board.getRiverStart() && y < board.getRiverEnd() && !board.isOnBridge(x)) return false;
++        const bool left = ArenaLayout::isLeftLane(x);
++        for (const auto& entity : board.getEntities()) {
++            if (entity->team != enemy || !entity->isAlive() || !entity->isTower()) continue;
++            if (entity->cardId != TOWER_PRINCESS_ID) continue;
++            if (ArenaLayout::isLeftLane(entity->position.x) == left) return false;
++        }
++        return true;
++    }
++
+     bool isValidPlacement(int team, float x, float y, bool isSpell, float placedRadius,
+                           bool deployAnywhere = false, bool isRollingSpell = false,
+                           bool ownSideOnly = false) const {
+@@ -535,10 +573,7 @@ public:
+ 
+             // Deploy-anywhere cards (Miner, Goblin Drill) skip the own-half
+             // rule but not the building check below.
+-            if (!deployAnywhere) {
+-                if (team == 0 && y > board.getRiverStart() - OWN_HALF_RIVER_BUFFER) return false;
+-                if (team == 1 && y < board.getRiverEnd() + OWN_HALF_RIVER_BUFFER) return false;
+-            }
++            if (!deployAnywhere && !onOwnHalf(team, y) && !inPocket(team, x, y)) return false;
+ 
+             // Nothing may be placed on an existing building: the gap is its
+             // radius plus the new card's footprint.
+@@ -558,16 +593,15 @@ public:
+         // Princess Tower's near edge, 9.00 away; from the own-half limit it
+         // does not, which is why the bound is the river's end. A roller cast
+         // deep in enemy territory rolls off the board. Mirrored for team 1.
+-        if (isSpell && isRollingSpell) {
++        // The pocket (inPocket) is the caster's ground once the tower has
++        // fallen: recorded Hero Barbarian Barrels were cast there.
++        if (isSpell && isRollingSpell && !inPocket(team, x, y)) {
+             if (team == 0 && y > board.getRiverEnd()) return false;
+             if (team == 1 && y < board.getRiverStart()) return false;
+         }
+         // Barbarian Barrel is cast on its own side only, the troop rule above,
+         // with no river allowance (UPSTREAM_REQUESTS.md item 32n).
+-        if (isSpell && ownSideOnly) {
+-            if (team == 0 && y > board.getRiverStart() - OWN_HALF_RIVER_BUFFER) return false;
+-            if (team == 1 && y < board.getRiverEnd() + OWN_HALF_RIVER_BUFFER) return false;
+-        }
++        if (isSpell && ownSideOnly && !onOwnHalf(team, y) && !inPocket(team, x, y)) return false;
+         return true;
+     }
+ 
+diff --git a/python_ai/tests/test_placement_legality_is_static.py b/python_ai/tests/test_placement_legality_is_static.py
+index 6686cd9..467ef45 100644
+--- a/python_ai/tests/test_placement_legality_is_static.py
++++ b/python_ai/tests/test_placement_legality_is_static.py
+@@ -6,7 +6,8 @@ Princesses (a destroyed own Princess frees its footprint; see
+ test_placement_mask_after_tower_loss.py). The assumptions left, each a tripwire
+ for an engine change:
+ 
+-  * an enemy tower dying changes nothing (else the delta table needs a team-1 half);
++  * an enemy tower dying opens the pocket and nothing else (the cached table has
++    no team-1 half, so it is conservative there: see the first test);
+   * troops change nothing (else legality is per-step and no cached table works);
+   * the cached table agrees with the engine cell for cell.
+ """
+@@ -35,19 +36,27 @@ def game():
+ 
+ 
+ @pytest.mark.parametrize("slot", [1, 2])
+-def test_destroying_an_ENEMY_princess_does_not_change_legality(game, slot):
+-    """Tripwire: the delta table covers our own towers only. If the engine ever
+-    extends the deploy zone on taking a tower (the real game does), this fails
+-    and the table must grow a team-1 half.
++def test_destroying_an_ENEMY_princess_opens_the_pocket_and_nothing_else(game, slot):
++    """Since the pocket rule (2026-11-23, GameManager::inPocket) taking a
++    Princess Tower opens that lane's bridge and the first rows of the enemy
++    bank. The cached table (net._build_placement_legality) still tracks team 0
++    only, so after an enemy tower falls it is CONSERVATIVE: it offers no pocket
++    cell, and never an illegal one. This pins exactly what opened, so that a
++    wider rule cannot slip in unseen.
+     """
+     before = _legal(game, DECK[0])
+     assert game.destroy_tower(1, slot) is True
+     after = _legal(game, DECK[0])
+-    gained, lost = sorted(after - before), sorted(before - after)
+-    assert not gained and not lost, (
+-        f"destroying ENEMY tower slot {slot} changed legality "
+-        f"(+{len(gained)} / -{len(lost)}). net._build_placement_legality's "
+-        "delta table tracks team 0 only -- extend it to team 1.")
++    gained, lost = after - before, before - after
++    assert not lost
++    left = slot == 1
++    lane = range(0, 9) if left else range(9, 18)
++    bridge = (2, 3) if left else (14, 15)
++    expected = {(x, y) for x in lane for y in range(18, 23)}
++    expected |= {(x, y) for x in bridge for y in (16, 17)}
++    # a card keeps clear of what stands in the pocket (the King Tower's corner)
++    assert gained <= expected, sorted(gained - expected)
++    assert len(gained) >= len(expected) - 6, sorted(expected - gained)
+ 
+ 
+ def test_troops_on_the_board_do_not_change_legality(game):
+diff --git a/python_ai/tests/test_placement_mask_after_tower_loss.py b/python_ai/tests/test_placement_mask_after_tower_loss.py
+index e18285a..a8e4e06 100644
+--- a/python_ai/tests/test_placement_mask_after_tower_loss.py
++++ b/python_ai/tests/test_placement_mask_after_tower_loss.py
+@@ -97,12 +97,18 @@ def test_the_engine_frees_the_footprint_of_our_own_dead_princess(slot,
+                       for dx in (-1, 0, 1) for dy in (-1, 0, 1)}
+ 
+ 
+-def test_an_enemy_tower_dying_changes_nothing(net):
+-    """The asymmetry is why only our own towers are tracked."""
++def test_an_enemy_tower_dying_only_ADDS_cells_so_the_mask_stays_safe(net):
++    """Only our own towers are tracked. Since the pocket rule (2026-11-23,
++    GameManager::inPocket) a fallen ENEMY Princess Tower opens cells past the
++    river; the mask does not know them, which is conservative (it never offers
++    an illegal cell). test_pocket_placement.py pins what opens.
++    """
+     g = _game()
+     before = _engine_cells(g, DECK[0], net)
+     g.destroy_tower(1, 1)
+-    assert _engine_cells(g, DECK[0], net) == before
++    after = _engine_cells(g, DECK[0], net)
++    assert before <= after
++    assert after - before
+ 
+ 
+ @pytest.mark.parametrize("slot", [1, 2])
+diff --git a/python_ai/tests/test_pocket_placement.py b/python_ai/tests/test_pocket_placement.py
+new file mode 100644
+index 0000000..f554137
+--- /dev/null
++++ b/python_ai/tests/test_pocket_placement.py
+@@ -0,0 +1,97 @@
++"""The pocket: ground that opens on the enemy side when a Princess Tower falls.
++
++GameManager::inPocket (2026-11-23). MEASURED on 19 recorded live matches, not
++published: every placement made past the river after a tower fell was on the
++fallen tower's half of the width and none was deeper than engine row 11 of the
++loser's half (row 22 seen from team 0).
++"""
++import python_ai  # noqa: F401
++import clash_royale_env as E
++import pytest
++
++DECK = [15, 6, 25, 40, 24, 72, 33, 7]
++KNIGHT, CANNON, FIREBALL, LOG, BARB_BARREL = 6, 25, 7, 33, 101   # 6 is the Musketeer: any troop
++
++
++def _env():
++    g = E.ClashRoyaleEnv(list(DECK), list(DECK), 3600)
++    g.seed(1)
++    return g
++
++
++def _cells(g, card, team):
++    return {(x, y) for y in range(34) for x in range(18)
++            if g.is_valid_placement(card, float(x), float(y), team)}
++
++
++@pytest.mark.parametrize("card", [KNIGHT, CANNON])
++def test_nothing_past_the_river_while_both_towers_stand(card):
++    g = _env()
++    assert max(y for _, y in _cells(g, card, 0)) <= 15
++    assert min(y for _, y in _cells(g, card, 1)) >= 18
++
++
++@pytest.mark.parametrize("slot,lane,bridge", [(1, range(0, 9), (2, 3)),
++                                               (2, range(9, 18), (14, 15))])
++def test_a_fallen_tower_opens_its_own_half_of_the_width(slot, lane, bridge):
++    g = _env()
++    before = _cells(g, KNIGHT, 0)
++    assert g.destroy_tower(1, slot)
++    gained = _cells(g, KNIGHT, 0) - before
++    assert gained
++    assert all(x in lane for x, _ in gained)
++    assert all(16 <= y <= 22 for _, y in gained)          # never deeper than row 22
++    assert {(x, y) for x, y in gained if y in (16, 17)} == \
++        {(x, y) for x in bridge for y in (16, 17)}          # river: the bridge only
++    for y in range(18, 23):
++        assert (lane[4], y) in gained
++
++
++def test_team_1_gets_the_mirror():
++    g = _env()
++    before = _cells(g, KNIGHT, 1)
++    assert g.destroy_tower(0, 1)
++    gained = _cells(g, KNIGHT, 1) - before
++    assert gained and all(x <= 8 and 11 <= y <= 17 for x, y in gained)
++    assert (4, 11) in gained and (4, 10) not in gained
++
++
++def test_both_towers_down_opens_the_whole_width():
++    g = _env()
++    g.destroy_tower(1, 1), g.destroy_tower(1, 2)
++    cells = _cells(g, KNIGHT, 0)
++    assert all((x, 20) in cells for x in range(18))
++    assert not any(y > 22 for _, y in cells)
++
++
++def test_a_building_and_a_roller_may_use_it_and_spells_are_unchanged():
++    g = _env()
++    fire = _cells(g, FIREBALL, 0)
++    assert not g.is_valid_placement(BARB_BARREL, 4.0, 20.0, 0)
++    assert not g.is_valid_placement(LOG, 4.0, 20.0, 0)
++    g.destroy_tower(1, 1)
++    assert g.is_valid_placement(CANNON, 4.0, 20.0, 0)
++    assert g.is_valid_placement(BARB_BARREL, 4.0, 20.0, 0)
++    assert g.is_valid_placement(LOG, 4.0, 20.0, 0)
++    assert not g.is_valid_placement(BARB_BARREL, 13.0, 20.0, 0)   # the other lane
++    assert not g.is_valid_placement(LOG, 4.0, 24.0, 0)            # past the pocket
++    assert _cells(g, FIREBALL, 0) == fire
++
++
++def test_a_troop_played_in_the_pocket_lands_there():
++    g = _env()
++    g.destroy_tower(1, 1)
++    g.set_elixir_for_team(0, 10.0)
++    assert g.set_hand_for_team(0, [6, 15, 25, 40])
++    g.step_self_play(0, 4.0, 20.0, 4, 0.0, 0.0, 1)
++    mine = [u for u in g.get_units() if not u["tower"] and u["team"] == 0]
++    assert len(mine) == 1
++    assert abs(mine[0]["x"] - 4.0) < 0.6 and abs(mine[0]["y"] - 20.0) < 0.6
++
++
++def test_the_same_play_is_refused_while_the_tower_stands():
++    g = _env()
++    g.set_elixir_for_team(0, 10.0)
++    assert g.set_hand_for_team(0, [6, 15, 25, 40])
++    g.step_self_play(0, 4.0, 20.0, 4, 0.0, 0.0, 1)
++    assert not [u for u in g.get_units() if not u["tower"] and u["team"] == 0]

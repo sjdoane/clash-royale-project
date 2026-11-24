@@ -1,0 +1,385 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index add75fc..e35de60 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -1921,6 +1921,41 @@ spells (Barbarian Barrel, Royal Delivery) and the rolling spells.
+   `test_placement_mask_after_tower_loss.py`) now pin exactly what opens and
+   that the mask stays a subset.
+ 
++## 2026-11-23: the Hunter fires ten pellets in a fan (patch 0085)
++
++**GAMEPLAY-AFFECTING** for every opponent holding a Hunter (not in
++`DEFAULT_DECK`). The Hunter was one 84-damage shot with an invented range
++falloff (`withRangeFalloff(0.5)`): 42-84 a volley. The published record
++(RoyaleAPI cr-api-data `cards_stats.json`) is `multiple_projectiles` 10, 84 a
++pellet at level 11, pellet `area_damage_radius` 70, `scatter` "Line", projectile
++range 6.5, range 4.
++
++- `CardStats::withPellets(count, fanDegrees)` -> `CombatEntity::pelletCount` /
++  `pelletFanDegrees`. `CombatEntity::pelletsOnBody(count, fan, dist, bodyRadius)`
++  is the one rule: the pellets are spread evenly over the fan, and a body takes
++  those whose line passes within its radius plus the pellet's 0.07; all of them
++  inside that reach, never fewer than one. The damage of a shot is the per-pellet
++  damage times that number. Every other enemy body within the old splash radius
++  (1.5) of the target takes the pellets its own body intercepts, at most what
++  the target left over (`Projectile::applyPelletSpread`).
++- **`HUNTER_FAN_DEGREES = 45` IS NOT PUBLISHED.** It is chosen so that all ten
++  land on a Hog Rider in contact, which is measured: in the live recordings of
++  2026-11-23 a Hog lost 760-840 to one volley (9-10 pellets). The share at
++  range is NOT measured. Supercell's 24 Jan 2018 note ("range 5 -> 4, bullet
++  spread slightly smaller") is the only official text on the spread.
++- A Crown Tower is measured with its PUBLISHED body (1.0 / 1.4, two thirds of
++  the engine's 1.5 / 2.0) for this rule only (`pelletGeometry`), or the engine's
++  larger tower would catch pellets the real one does not.
++- Through the bindings: Hog Rider, Giant, Ice Golem in contact 840; Giant from
++  4.4 tiles 332; Knight from 3.5 tiles 270; a Princess Tower from his range 369
++  a volley (4.4 pellets). In the replays of the two recorded Hunter matches the
++  damage we deal went from 0.23 to 0.12 of their tower health (real 0.12) and
++  from 0.76 to 0.58 (real 0.30).
++- The generic `rangeFalloff` mechanism stays (its C++ tests use it directly);
++  no card uses it now.
++- Tests: `python_ai/tests/test_hunter_pellets.py`. Suites: 837 cases, 836
++  passed, 1 failed as expected (C++); 1314 passed, 3 skipped (Python).
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index 2d84c7d..0340b62 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -115,6 +115,8 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+     entity->lineSplashRange = stats.lineSplashRange;
+     entity->rangeFalloff = stats.rangeFalloff;
+     entity->rangeFalloffMinFraction = stats.rangeFalloffMinFraction;
++    entity->pelletCount = stats.pelletCount;
++    entity->pelletFanDegrees = stats.pelletFanDegrees;
+     entity->rangeBandMinDist = stats.rangeBandMinDist;
+     entity->rangeBandMaxDist = stats.rangeBandMaxDist;
+     entity->rangeBandDamageMultiplier = stats.rangeBandDamageMultiplier;
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index 26ffe38..6c5cab7 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -864,14 +864,14 @@ private:
+         add(troop(61, "Princess", 3.0f, Archetype::RangedSquad, 261, SPEED_MEDIUM, 9.0f, 168, 30, '9')
+             .withTargetsAir()
+             .withSplash(2.0f).withSightRange(9.5f).withDeployTime(12) /* audit 0003: wiki Princess, level 11 */);
+-        // Hunter: the real card fires 10 randomly spread pellets and no falloff
+-        // curve is published. withRangeFalloff is an invented deterministic
+-        // approximation: linear from full damage point-blank to half at max
+-        // range.
++        // Hunter: ten pellets of 84 in a fan (published multiple_projectiles
++        // 10; the fan angle is not published, see CombatEntity::pelletsOnBody).
++        // Until 2026-11-23 this was ONE pellet with an invented falloff: 84 at
++        // contact where the real volley takes about 800.
+         add(troop(62, "Hunter", 4.0f, Archetype::RangedSquad, 885, SPEED_MEDIUM, 4.0f, 84, 22, '!')
+             .withTargetsAir()
+             .withSplash(1.5f)
+-            .withRangeFalloff(0.5f));
++            .withPellets(10, HUNTER_FAN_DEGREES));
+         // A piercing line: 11.0 long, half-width 0.25.
+         add(troop(63, "Magic Archer", 4.0f, Archetype::RangedSquad, 529, SPEED_MEDIUM, 7.0f, 135, 11, '#')
+             .withTargetsAir()
+@@ -1539,9 +1539,9 @@ private:
+         // s net + 5 s recharge), via PeriodicFreezeNearestEffect.
+         addEvolution(146,
+             troop(62, "Hunter", 4.0f, Archetype::RangedSquad, 885, SPEED_MEDIUM, 4.0f, 84, 22, '!')
+-                .withTargetsAir().withSplash(1.5f).withRangeFalloff(0.5f),
++                .withTargetsAir().withSplash(1.5f).withPellets(10, HUNTER_FAN_DEGREES),
+             troop(62, "Hunter", 4.0f, Archetype::RangedSquad, 885, SPEED_MEDIUM, 4.0f, 84, 22, '!')
+-                .withTargetsAir().withSplash(1.5f).withRangeFalloff(0.5f)
++                .withTargetsAir().withSplash(1.5f).withPellets(10, HUNTER_FAN_DEGREES)
+                 .withPeriodicEffect(80, std::make_shared<PeriodicFreezeNearestEffect>(4.0f, 30)),
+             2, 1);
+ 
+diff --git a/include/core/CardStats.h b/include/core/CardStats.h
+index fad2e4b..ef7a940 100644
+--- a/include/core/CardStats.h
++++ b/include/core/CardStats.h
+@@ -54,6 +54,11 @@ inline constexpr float SPEED_VERY_FAST = 120.0f * REAL_TILES_PER_MIN_TO_ENGINE;
+ // towers and projectiles bypass.
+ inline constexpr int DEPLOY_TIME_TICKS = 10;
+ 
++// The Hunter's fan (CombatEntity::pelletsOnBody). NOT PUBLISHED. 45 degrees
++// puts all ten pellets on a Hog Rider at contact (measured 9-10 in the live
++// recordings of 2026-11-23) and about three on a troop at his full range.
++inline constexpr float HUNTER_FAN_DEGREES = 45.0f;
++
+ struct CardStats {
+     int id = 0;
+     std::string name;
+@@ -318,6 +323,11 @@ struct CardStats {
+     bool rangeFalloff = false;
+     float rangeFalloffMinFraction = 1.0f;
+ 
++    // A shot of several pellets in a fan (Hunter: published
++    // multiple_projectiles 10). `damage` is ONE pellet. 0 = an ordinary shot.
++    int pelletCount = 0;
++    float pelletFanDegrees = 0.0f;
++
+     // Bonus damage within a distance band (Archers' Power Shot, Executioner's
+     // Axe Smash). rangeBandMaxDist == 0 disables it.
+     float rangeBandMinDist = 0.0f;
+@@ -694,6 +704,12 @@ struct CardStats {
+         rangeFalloffMinFraction = minFraction;
+         return *this;
+     }
++    // The pellet count is published; the fan angle is not (see CombatEntity::pelletsOnBody).
++    CardStats& withPellets(int count, float fanDegrees) {
++        pelletCount = count;
++        pelletFanDegrees = fanDegrees;
++        return *this;
++    }
+     CardStats& withRangeBandBonus(float minDist, float maxDist, float multiplier) {
+         rangeBandMinDist = minDist;
+         rangeBandMaxDist = maxDist;
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index 7e99e6f..492c310 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -13,6 +13,7 @@
+ #include <limits>
+ #include <vector>
+ #include <algorithm>
++#include <cmath>
+ 
+ class CombatEntity;
+ 
+@@ -475,6 +476,48 @@ public:
+     // has no target of its own.
+     float lastAttackDistance = 0.0f;
+ 
++    // A fan of pellets (Hunter). `damage` is one pellet; the shot deals one
++    // pellet times the number its target's body intercepts (pelletsOnBody).
++    // pelletCount 0 = an ordinary shot.
++    int pelletCount = 0;
++    float pelletFanDegrees = 0.0f;
++    // The target's body at the last attack, as the fan sees it.
++    float lastAttackTargetRadius = 0.0f;
++    static constexpr float PELLET_RADIUS = 0.07f; // published area_damage_radius 70
++
++    // How many pellets of an evenly spread fan a body intercepts: the angle
++    // the body (plus a pellet's own radius) subtends from the shooter, over
++    // the angle between two pellets. Continuous and deterministic (the real
++    // fan is random); never less than one, never more than the fan holds.
++    //
++    // PUBLISHED: 10 pellets, each the card's damage. NOT PUBLISHED: the fan
++    // angle. MEASURED (live recordings 2026-11-23, matches 4 and 6): one
++    // volley at contact takes 45-50 % of a level-11 Hog Rider (1697 hp), nine
++    // to ten pellets, which a fan of up to about 55 degrees gives. The share
++    // at range is NOT measured.
++    static float pelletsOnBody(int count, float fanDegrees, float dist, float bodyRadius) {
++        if (count <= 1 || fanDegrees <= 0.0f) return static_cast<float>(std::max(count, 1));
++        const float reach = bodyRadius + PELLET_RADIUS;
++        if (dist <= reach) return static_cast<float>(count);
++        const float spacing = fanDegrees / static_cast<float>(count - 1) * 3.14159265f / 180.0f;
++        const float width = 2.0f * std::atan2(reach, dist);
++        return std::clamp(width / spacing, 1.0f, static_cast<float>(count));
++    }
++
++    // A Crown Tower's body here is 1.5 / 2.0 where the published one is
++    // 1.0 / 1.4 (patch 0043), and a shooter stops that much further out; the
++    // fan is given the published geometry so that a tower does not catch
++    // pellets for being drawn too large.
++    static void pelletGeometry(const Entity& target, float centreDist, float& dist, float& radius) {
++        radius = effectiveRadiusOf(target);
++        dist = centreDist;
++        if (target.isTower()) {
++            const float published = radius * (2.0f / 3.0f);
++            dist = centreDist - (radius - published);
++            radius = published;
++        }
++    }
++
+     // Champion marker. Gates no combat behaviour; lets GameManager find the
+     // deployed Champion.
+     bool isChampion = false;
+@@ -972,6 +1015,9 @@ public:
+                     // fire depends on when the damage lands (at once for a
+                     // direct hit, on arrival for a projectile).
+                     lastAttackDistance = dist;
++                    if (pelletCount > 0) {
++                        pelletGeometry(*target, dist, lastAttackDistance, lastAttackTargetRadius);
++                    }
+                     ticksSinceAttack = 0;
+                     attacksStarted++;
+                     if (magazineSize > 0 && magazineRounds > 0) magazineRounds--;
+@@ -1336,6 +1382,10 @@ protected:
+         if (buffTicksRemaining > 0) {
+             base = static_cast<int>(base * buffDamageMultiplier);
+         }
++        if (pelletCount > 0) {
++            base = static_cast<int>(std::lround(
++                base * pelletsOnBody(pelletCount, pelletFanDegrees, lastAttackDistance, lastAttackTargetRadius)));
++        }
+         if (rangeFalloff && attackRange > 0.0f) {
+             float distFraction = std::min(lastAttackDistance / attackRange, 1.0f);
+             float rangeFactor = 1.0f - (1.0f - rangeFalloffMinFraction) * distFraction;
+diff --git a/include/entities/Projectile.h b/include/entities/Projectile.h
+index 9e83c5f..f511631 100644
+--- a/include/entities/Projectile.h
++++ b/include/entities/Projectile.h
+@@ -50,6 +50,16 @@ public:
+     // Crown Tower. 1 = full damage. Set by RangedTroop when it fires.
+     float crownTowerFactor = 1.0f;
+ 
++    // A fan of pellets (Hunter; CombatEntity::pelletsOnBody). `damage` is
++    // then what the pellets on the target add up to. Every other body within
++    // splashRadius of the target takes the pellets its own body intercepts
++    // from the muzzle, but no more than the pellets the target left over
++    // (at least one). pelletCount 0 = an ordinary shot. Set by RangedTroop.
++    int pelletCount = 0;
++    float pelletFanDegrees = 0.0f;
++    float pelletDamage = 0.0f;   // one pellet
++    float pelletsOnTarget = 0.0f;
++
+     Projectile(int id, float x, float y, int team, std::weak_ptr<Entity> target, float speed, int damage,
+         std::vector<std::shared_ptr<IOnHitEffect>> onHitEffects = {},
+         bool returnsToSender = false, int returnDelayTicks = 0,
+@@ -122,6 +132,24 @@ public:
+     }
+ 
+ private:
++    void applyPelletSpread(Board& board, const std::shared_ptr<Entity>& t) {
++        const float spare = std::max(1.0f, static_cast<float>(pelletCount) - pelletsOnTarget);
++        for (const auto& entity : board.getEntities()) {
++            if (entity->id == t->id) continue;
++            if (entity->team == team || !entity->isAlive() || !entity->takesAreaDamage()) continue;
++            if (t->position.distanceTo(entity->position) > splashRadius) continue;
++            float dist = 0.0f, radius = 0.0f;
++            CombatEntity::pelletGeometry(*entity, origin.distanceTo(entity->position), dist, radius);
++            const float n = std::min(spare,
++                CombatEntity::pelletsOnBody(pelletCount, pelletFanDegrees, dist, radius));
++            const int dealt = static_cast<int>(std::lround(pelletDamage * n));
++            entity->takeDamage(dealt);
++            board.statsEvents.notifyDamageDealt(
++                { attackerId, team, attackerCardId, entity->id, entity->cardId, entity->team, dealt,
++                  board.currentTick, entity->isTower() });
++        }
++    }
++
+     void applyHit(Board& board, const std::shared_ptr<Entity>& t) {
+         const int dealt = (t->isTower() && crownTowerFactor != 1.0f)
+             ? static_cast<int>(damage * crownTowerFactor) : damage;
+@@ -137,7 +165,9 @@ private:
+                 }
+             }
+         }
+-        if (lineSplash) {
++        if (pelletCount > 0) {
++            applyPelletSpread(board, t);
++        } else if (lineSplash) {
+             applyLineSplashDamage(board, origin, t->position, lineSplashRange, splashRadius,
+                 t->id, attackerId, team, attackerCardId, damage);
+         } else {
+diff --git a/include/entities/RangedTroop.h b/include/entities/RangedTroop.h
+index da1f4b5..0998fe4 100644
+--- a/include/entities/RangedTroop.h
++++ b/include/entities/RangedTroop.h
+@@ -32,6 +32,13 @@ protected:
+             boomerang, boomerangReturnDelayTicks, id, cardId, splashRadius, lineSplash, lineSplashRange,
+             splashAppliesOnHit);
+         arrow->crownTowerFactor = crownTowerHitFactor(*target);
++        if (pelletCount > 0) {
++            arrow->pelletCount = pelletCount;
++            arrow->pelletFanDegrees = pelletFanDegrees;
++            arrow->pelletsOnTarget =
++                pelletsOnBody(pelletCount, pelletFanDegrees, lastAttackDistance, lastAttackTargetRadius);
++            arrow->pelletDamage = static_cast<float>(getCurrentDamage()) / arrow->pelletsOnTarget;
++        }
+         board.addEntity(arrow);
+     }
+ };
+\ No newline at end of file
+diff --git a/python_ai/tests/test_hunter_pellets.py b/python_ai/tests/test_hunter_pellets.py
+new file mode 100644
+index 0000000..f42b13d
+--- /dev/null
++++ b/python_ai/tests/test_hunter_pellets.py
+@@ -0,0 +1,85 @@
++"""The Hunter fires ten pellets in a fan (CombatEntity::pelletsOnBody).
++
++Published: ten projectiles a shot, 84 each at level 11, pellet radius 0.07,
++range 4. NOT published: the fan's angle. HUNTER_FAN_DEGREES 45 puts all ten on
++a Hog Rider in contact (9-10 measured in the live recordings of 2026-11-23:
++the Hog lost 760-840 a volley). The share at range is not measured.
++"""
++import math
++
++import python_ai  # noqa: F401
++import clash_royale_env as E
++import pytest
++
++ID = {E.get_card_info(c)["name"]: c for c in E.get_all_card_ids()}
++DECK = [15, 6, 25, 40, 24, 72, 33, 7]
++NOOP = 4
++
++
++def _first_volley(target, dist, also=None):
++    g = E.ClashRoyaleEnv(list(DECK), list(DECK), 3600)
++    g.seed(1)
++    g.step_self_play(NOOP, 0., 0., NOOP, 0., 0., 2)
++    g.inject(ID["Hunter"], 8.5, 13.0, 1, -1.0, 0)
++    g.inject(ID[target], 8.5, 13.0 - dist, 0, -1.0, 0)
++    if also:
++        g.inject(ID[also[0]], 8.5 + also[1], 13.0 - dist, 0, -1.0, 0)
++    prev = {u["id"]: u for u in g.get_units() if not u["tower"]}
++    for _ in range(60):
++        g.step_self_play(NOOP, 0., 0., NOOP, 0., 0., 1)
++        now = {u["id"]: u for u in g.get_units() if not u["tower"]}
++        hunter = next((u for u in prev.values() if u["name"] == "Hunter"), None)
++        lost = {}
++        for i, u in prev.items():
++            if hunter is None or u["name"] == "Hunter":   # injected bodies appear after a step
++                continue
++            d = u["hp"] - (now[i]["hp"] if i in now else 0)
++            if d > 0:
++                lost[u["name"]] = (d, math.hypot(u["x"] - hunter["x"], u["y"] - hunter["y"]))
++        if lost:
++            return lost
++        prev = now
++    return {}
++
++
++def test_published_per_pellet_damage_and_count():
++    base = E.get_card_stats(ID["Hunter"])["base"]
++    assert base["damage"] == 84
++
++
++@pytest.mark.parametrize("target", ["Hog Rider", "Giant", "Ice Golem"])
++def test_all_ten_pellets_land_in_contact(target):
++    lost = _first_volley(target, 1.3)
++    assert lost[target][0] == 840
++
++
++def test_fewer_pellets_land_from_further_away():
++    seen = []
++    for dist in (1.3, 4.0, 5.5):
++        dmg, d = _first_volley("Giant", dist)["Giant"]
++        seen.append((d, dmg))
++    assert seen[0][1] > seen[1][1] > seen[2][1]
++    far_d, far_dmg = seen[2]
++    assert far_d > 4.0
++    assert 3 * 84 <= far_dmg <= 5 * 84     # 3-5 pellets on a 0.75 body near full range
++
++
++def test_a_small_body_takes_at_least_one_pellet_and_no_more_than_it_has():
++    lost = _first_volley("Skeletons", 2.0)
++    assert lost and all(d <= 84 for d, _ in lost.values())
++
++
++def test_the_volley_is_shared_never_more_than_ten():
++    lost = _first_volley("Hog Rider", 1.5, also=("Ice Golem", 1.4))
++    assert sum(d for d, _ in lost.values()) <= 840 + 84
++
++
++def test_a_princess_tower_takes_about_four_pellets_at_his_range():
++    g = E.ClashRoyaleEnv(list(DECK), list(DECK), 3600)
++    g.seed(1)
++    g.set_tower_hit_log(True)
++    g.inject(ID["Hunter"], 3.0, 15.0, 1, -1.0, 0)
++    for _ in range(120):
++        g.step_self_play(NOOP, 0., 0., NOOP, 0., 0., 1)
++    hits = [h[6] for h in g.get_tower_hits() if h[1] == 1 and h[4] == 0]
++    assert hits and all(3 * 84 <= h <= 6 * 84 for h in hits)

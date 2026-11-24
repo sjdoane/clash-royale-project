@@ -1,0 +1,863 @@
+diff --git a/.claude/CLAUDE.md b/.claude/CLAUDE.md
+index 6bf0ad7..d533706 100644
+--- a/.claude/CLAUDE.md
++++ b/.claude/CLAUDE.md
+@@ -2027,6 +2027,83 @@ Tests: `python_ai/tests/test_building_pull_0086.py` (12; 10 of them fail on the
+ engine before this patch). No existing expectation moved. Suites: 837 cases,
+ 836 passed, 1 failed as expected (C++); 1326 passed, 3 skipped (Python).
+ 
++## 2026-11-24: units cross the river on the tower column; the Hog Rider jumps it on a diagonal (patch 0087)
++
++Lives in the copy `build/gen2_h` (training and the evals ran `build/gen2_g`
++up to this patch; switching a run to it is a dated change in
++`training/run_g2_ppo_s2r.sh`).
++
++**What was wrong.** A walker aimed for any point of the drawn two-tile deck
++(x 1.5-3.5 and 13.5-15.5, patch 0060) and a river jumper walked a straight
++line to its target. Neither is what the recordings of 2026-11-23/24 show
++(`evals/tools/hog_path.py`, `hog_path2.py`; 5,201 boxes of ground troops over
++the river, 145 own Hog Rider plays):
++
++- Ground troops cross on x 2.25-3.75 and 13.25-14.75, with a peak at 2.5 / 14.5
++  (arriving from outside) and one at 3.5 / 13.5 (arriving from the middle).
++  Nothing crosses on the outer tile of either deck.
++- The Hog Rider placed on (1, 15) lands on 2.52 (n 51), from (16, 15) on 14.54
++  (n 55); a straight line gives 1.5 and 15.5. It goes sideways and forward at
++  the same rate until it is within half a tile of its target's column, does
++  not lose forward speed doing so, and then goes straight up the column.
++- Placed a tile or less outside the column, beside the bridge, it does not
++  jump: it steps onto the column and walks (6 of 6 plays).
++
++**What changed** (`include/core/Board.h`, `include/entities/Troop.h`):
++
++- `Board::WALK_HALF_WIDTH` (0.5), `LEFT_WALK_X` / `RIGHT_WALK_X` (the lane
++  columns 3.0 / 14.0), `inWalkCorridor`, `walkXFor`. `crossingX` and
++  `getNextWaypoint` aim inside this one-tile corridor. It is an aim, not a
++  wall: `isOnBridge` (clampToBoard, the observation's bridge columns, the
++  pocket rule, the renderer) is still the drawn two-tile deck, so a pushed
++  body can stand on the outer tile, and from there it crosses where it stands
++  (`MOUTH_FUNNEL_SLOPE`) instead of walking along the bank to the mouth.
++- `Board::getJumperWaypoint` returns the next point and a speed scale for a
++  ground unit that ignores the river: 45 degrees to the target's column at
++  sqrt(2) x speed from the bank row on (`JUMP_ZONE`), straight once within half
++  a tile of it, and the walk-onto-the-column case from the outer side
++  (`BRIDGE_WALK_REACH`).
++- `Troop::moveTowards` gives a jumper up to three legs per tick. With one leg,
++  two jumpers abreast (Royal Hogs) pushed each other off the corridor edge
++  every tick and crept across the river.
++
++**Two dead ends, so nobody repeats them.** (1) The corridor as a wall: two wide
++bodies (Goblin Machine and its turret, 0.75 each) stood at the mouth pushing
++each other for ever. (2) One movement leg per tick for jumpers: the creep
++above.
++
++**What it does and does not fix.** The outer edge of the crossing moved one
++tile towards the middle, so a unit coming from the arena's edge is seen by a
++centre building a tile sooner. Measured with both sides replayed from the live
++store, our damage per match goes from 2,668 to 2,492 against about 1,200 in the
++real matches: a small part of that gap. The rest is not movement: where the
++opponent's plays are stored nearly completely, the simulated Hog already
++matches the real one (453 against 463 a play). The gap is opponent plays
++missing from the store (spells above all) and training opponents that answer a
++Hog worse than people do. See `memory/sim-vs-real-findings.md` in the outer
++repository's notes.
++
++**The recorded Golem-and-Hog pair is now reproduced on its own tiles.** Ice
++Golem on (15, 15), Hog Rider on (16, 15) 1.06 s later: the Golem is carried
++forward and to the left (14.5 to 13.3; recorded 14.5 to about 13), the Hog
++passes it on the right, and its first hit is 0.4 s later than a lone Hog's
++(recorded 0.45-0.67). Before this patch those tiles gave 0.1 s and the test
++used one column instead (see the mass-push section).
++
++**Not modelled:** a jumper's diagonal when its target is a building rather
++than a tower is the same rule (two recorded plays agree, 13.0 and 13.1); the
++recorded sidestep onto the column is spread over about a row and is done at
++the bank here; nothing is recorded for a Hog placed one tile INSIDE the column.
++
++Tests: `tests/core/test_board.cpp` (+361 lines: corridor, mirrored teams,
++jumpers from every start cross and do not stall, the recorded landing
++columns). Moved expectations, each with a comment at the assertion:
++`test_bridge_crossed_across_its_width.py` (a Giant on the outer tile steps in
++to 2.5; a pair abreast is 0.49 apart and 0.5 s apart, was > 0.5 and <= 0.4),
++`test_body_sizes.py` (contact test moved onto the tower column),
++`test_mass_push.py` (the recorded tiles). Suites: 845 cases, 844 passed, 1
++failed as expected (C++); 1326 passed, 3 skipped (Python).
++
+ ## Environment — the things that waste an hour
+ 
+ **`clash_royale_env.pyd` is built for Python 3.11 only.** The default `python`
+diff --git a/include/core/Board.h b/include/core/Board.h
+index 372936f..ded7c13 100644
+--- a/include/core/Board.h
++++ b/include/core/Board.h
+@@ -47,8 +47,44 @@ private:
+ 
+ public:
+     // Half a bridge's two-tile width; correct only with seam-centred bridges.
++    // The deck a unit can stand on (isOnBridge: clampToBoard, the observation's
++    // bridge columns, the pocket rule, the renderer). Where a unit AIMS to
++    // cross is the narrower walk corridor below (patch 0087).
+     static constexpr float BRIDGE_HALF_WIDTH = 1.0f;
+ 
++    // THE WALK CORRIDOR (patch 0087). The centre of a unit crossing the river
++    // stays within half a tile of its lane's centre column, the Princess
++    // Tower's: x in [2.5, 3.5] and [13.5, 14.5]. Measured on the live
++    // recordings of 2026-11-23/24 (5,201 boxes of ground troops over the
++    // river, evals/hog_path2.json and the engine notes): the mass lies on
++    // 2.25-3.75 and 13.25-14.75 with one peak at each corridor edge (units
++    // arriving from outside hug 2.5 / 14.5, from the middle 3.5 / 13.5), and
++    // nothing on 1.5-2.25 or 14.75-15.5, where the two-tile deck centred on
++    // 2.5 / 14.5 used to let them walk. The inner edge is unchanged; the outer
++    // edge moved one tile in, so a unit that comes from the arena's edge
++    // crosses a tile nearer the middle and is seen by a centre building a tile
++    // sooner.
++    //
++    // It is where a unit HEADS (getNextWaypoint, getJumperWaypoint), not a
++    // wall. The deck a unit can stand on is still the drawn one (isOnBridge,
++    // two tiles), so a body pushed sideways by another can be on the outer
++    // tile. A first version made the corridor the wall as well: two bodies
++    // wider than one tile together (a Goblin Machine and its turret, 0.75
++    // each) then stood at the mouth pushing each other for ever.
++    static constexpr float WALK_HALF_WIDTH = 0.5f;
++    static constexpr float LEFT_WALK_X = ArenaLayout::LEFT_LANE_X;
++    static constexpr float RIGHT_WALK_X = ArenaLayout::RIGHT_LANE_X;
++
++    // Is this x inside a walk corridor?
++    static constexpr bool inWalkCorridor(float x) {
++        return (x >= LEFT_WALK_X - WALK_HALF_WIDTH && x <= LEFT_WALK_X + WALK_HALF_WIDTH)
++            || (x >= RIGHT_WALK_X - WALK_HALF_WIDTH && x <= RIGHT_WALK_X + WALK_HALF_WIDTH);
++    }
++    // The corridor centre nearer to x (same split as ArenaLayout::isLeftLane).
++    static constexpr float walkXFor(float x) {
++        return ArenaLayout::isLeftLane(x) ? LEFT_WALK_X : RIGHT_WALK_X;
++    }
++
+     // Cell i covers [i - 0.5, i + 0.5], so the board's physical extent is x in
+     // [-0.5, width - 0.5] and y likewise. isValidPlacement's footprint check
+     // needs this physical edge: checking footprints against the index range
+@@ -442,7 +478,7 @@ public:
+             const float t = (bankY - from.y) / dy;
+             if (t >= 0.0f && t <= 1.0f) x = from.x + (to.x - from.x) * t;
+         }
+-        return std::max(bridgeX - BRIDGE_HALF_WIDTH, std::min(x, bridgeX + BRIDGE_HALF_WIDTH));
++        return std::max(bridgeX - WALK_HALF_WIDTH, std::min(x, bridgeX + WALK_HALF_WIDTH));
+     }
+ 
+     // The next point a ground walker at currentPos heads for on its way to
+@@ -479,9 +515,11 @@ public:
+             return targetPos;
+         }
+ 
+-        float distToLeft = currentPos.distanceTo(leftBridge);
+-        float distToRight = currentPos.distanceTo(rightBridge);
+-        float bridgeX = (distToLeft < distToRight) ? leftBridge.x : rightBridge.x;
++        // The nearer corridor, by its centre (patch 0087: the lane column,
++        // until then the deck's seam half a tile further out).
++        float distToLeft = currentPos.distanceTo(Vector2D{ LEFT_WALK_X, leftBridge.y });
++        float distToRight = currentPos.distanceTo(Vector2D{ RIGHT_WALK_X, rightBridge.y });
++        float bridgeX = (distToLeft < distToRight) ? LEFT_WALK_X : RIGHT_WALK_X;
+ 
+         if (isCurrentBelow || isCurrentAbove) {
+             // On dry land with the river ahead. The bank tests are inclusive,
+@@ -490,8 +528,21 @@ public:
+             const float nearY = isCurrentBelow ? riverY_start : riverY_end;
+             const float farY = isCurrentBelow ? riverY_end : riverY_start;
+             Vector2D nearBank{ crossingX(currentPos, targetPos, nearY, bridgeX), nearY };
++            const Vector2D farBank{ crossingX(currentPos, targetPos, farY, bridgeX), farY };
+             if (currentPos.distanceTo(nearBank) <= WAYPOINT_ARRIVAL_EPS) {
+-                return Vector2D{ crossingX(currentPos, targetPos, farY, bridgeX), farY };
++                return farBank;
++            }
++            // Pushed along the bank onto the deck's outer tile (patch 0087):
++            // it would have to walk nearly along the bank line to reach the
++            // corridor's mouth, and whatever pushed it out stands there. It
++            // goes across from where it is, towards the corridor. A unit
++            // walking in from its placement tile never meets this: the
++            // shallowest line to a mouth, from the arena's edge on the row
++            // beside the river, is 11 degrees.
++            const float toWater = std::abs(nearY - currentPos.y);
++            const float lateral = std::abs(nearBank.x - currentPos.x);
++            if (isOnBridge(currentPos.x) && toWater < MOUTH_FUNNEL_SLOPE * lateral) {
++                return farBank;
+             }
+             return nearBank;
+         }
+@@ -510,4 +561,99 @@ public:
+         }
+         return targetPos;
+     }
+-};
+\ No newline at end of file
++
++    // See getNextWaypoint: tan of the angle to the bank line below which a
++    // walker on the deck's outer tile stops heading for the corridor's mouth
++    // and crosses from where it is (10 degrees).
++    static constexpr float MOUTH_FUNNEL_SLOPE = 0.18f;
++
++    // RIVER JUMPERS (patch 0087). Where a ground unit that jumps the river
++    // (Hog Rider, Royal Hogs, Ram Rider, ...) heads next on its way to
++    // targetPos, and how fast.
++    //
++    // Until this patch a jumper walked a straight line to its target from
++    // wherever it stood. The recorded Hog Rider does not (145 own plays in
++    // the live runs of 2026-11-23/24, evals/tools/hog_path2.py):
++    //
++    //   placed on    lands at (engine row 18)   straight line
++    //   ( 1, 15)     2.52  [2.50, 2.58]  n 51   1.5
++    //   (16, 15)    14.54 [14.49, 14.58] n 55   15.5
++    //   ( 6, 15)     3.6                 n 1    5.2
++    //   ( 8, 15)     5.0                 n 1    6.8
++    //
++    // and then goes straight up that column to about row 21. With a building
++    // in sight from the start (a collector on (10, 23), an Inferno Tower on
++    // (10.5, 22.5), Hog on (16, 15)) it lands on 13.0 and 13.1, not on the
++    // straight line's 13.6 and 13.5. Every one of these is the same path:
++    // sideways and forward at the same rate (45 degrees over the real rows)
++    // until it is within half a tile of its target's column, then straight
++    // ahead. It does not slow down for the diagonal: it reaches the far bank
++    // when a Hog going straight across would (2.0-2.4 tiles/s sideways on top
++    // of its 2.3-2.7 forward), which is the game's faster jump.
++    //
++    // So, while the river is still ahead of it or under it:
++    //   - within half a tile of the target's column: straight across;
++    //   - else, far enough back to reach that column before the water at 45
++    //     degrees or steeper: the straight line to it on the near bank (what a
++    //     walker does; a Hog from behind the King tower reaches the river on
++    //     13.55, the corridor's corner);
++    //   - else 45 degrees towards the column, at sqrt(2) x speed from the bank
++    //     row on (JUMP_ZONE), so its forward speed is unchanged.
++    // Past the far bank it walks the straight line to its target as before
++    // (measured after landing: the straight line, 55 degrees where 45 would
++    // have been the other reading).
++    //
++    // One more recorded case: a Hog placed a tile or less off its target's
++    // column, on the tile beside the bridge, does not jump. It steps onto the
++    // column and walks up it: placed on (2, 15) it is on 3.0 over the river
++    // (4 of 4 plays with no building in sight), from (15, 15) on 14.0 (2 of
++    // 2), from (3, 15) on 3.05-3.2 (2), and it reaches the far bank 0.1-0.2 s
++    // after a jumping Hog would. So, short of the water, within
++    // BRIDGE_WALK_REACH of the column and on its outer side (further from the
++    // middle of the arena than the column), it heads for the column's point on
++    // the near bank at walking speed (0.24 s longer than straight from one
++    // tile off). The recorded sidestep is spread over about a row; here it is
++    // done by the bank. Outer side only, because the three Hogs recorded
++    // coming from the middle (placed behind the King Tower) reach the river on
++    // 13.55, the corridor's inner corner, not on 14.0. Nothing is recorded
++    // from one tile inside (4, 15) / (13, 15): it takes the half-tile rule.
++    //
++    // For a tower the column is the walk corridor, so jumpers and walkers
++    // cross in the same place. Flying units do not come here.
++    struct JumperStep { Vector2D waypoint; float speedScale; };
++    static constexpr float JUMP_ZONE = 1.0f;
++    static constexpr float JUMP_DIAGONAL_SPEED = 1.41421356f;
++    static constexpr float BRIDGE_WALK_REACH = 1.0f;
++    JumperStep getJumperWaypoint(const Vector2D& currentPos, const Vector2D& targetPos) const {
++        const bool up = targetPos.y > currentPos.y;
++        const float nearY = up ? riverY_start : riverY_end;
++        const float farY = up ? riverY_end : riverY_start;
++        const float dir = up ? 1.0f : -1.0f;
++        const bool targetBeyond = up ? (targetPos.y >= farY) : (targetPos.y <= farY);
++        const bool beforeFarBank = up ? (currentPos.y < farY) : (currentPos.y > farY);
++        if (!targetBeyond || !beforeFarBank) return { targetPos, 1.0f };
++
++        const float toWater = (nearY - currentPos.y) * dir;      // > 0 while short of the water
++        const float off = std::abs(targetPos.x - currentPos.x);
++        const bool outerSide = (currentPos.x - targetPos.x) * (targetPos.x - ArenaLayout::CENTER_X) > 0.0f;
++        if (outerSide && toWater > WAYPOINT_ARRIVAL_EPS && off > WAYPOINT_ARRIVAL_EPS
++            && off <= BRIDGE_WALK_REACH + 1e-3f) {
++            // Beside its crossing: onto the column at the bank, no jump.
++            return { Vector2D{ targetPos.x, nearY }, 1.0f };
++        }
++
++        const float gx = std::max(targetPos.x - WALK_HALF_WIDTH,
++                                  std::min(currentPos.x, targetPos.x + WALK_HALF_WIDTH));
++        const float lateral = std::abs(gx - currentPos.x);
++        if (lateral <= WAYPOINT_ARRIVAL_EPS) {
++            // In its column: straight across. Never a point it already stands
++            // on (Troop::moveTowards would not move).
++            const Vector2D across{ currentPos.x, farY };
++            if (currentPos.distanceTo(across) <= WAYPOINT_ARRIVAL_EPS) return { targetPos, 1.0f };
++            return { across, 1.0f };
++        }
++        if (toWater >= lateral) return { Vector2D{ gx, nearY }, 1.0f };
++        const bool jumping = toWater <= JUMP_ZONE;
++        return { Vector2D{ gx, currentPos.y + dir * lateral }, jumping ? JUMP_DIAGONAL_SPEED : 1.0f };
++    }
++};
+diff --git a/include/entities/Troop.h b/include/entities/Troop.h
+index 4e86b42..bd4458c 100644
+--- a/include/entities/Troop.h
++++ b/include/entities/Troop.h
+@@ -24,15 +24,43 @@ public:
+ protected:
+     void moveTowards(Board& board, const Vector2D& dest) override {
+         if (isRiding()) return; // carried (patch 0046): CombatEntity::update pins it to its carrier
+-        Vector2D waypoint = riverIgnores ? dest : board.getNextWaypoint(position, dest);
+-        float dx = waypoint.x - position.x;
+-        float dy = waypoint.y - position.y;
+-        float distToWaypoint = position.distanceTo(waypoint);
+-
+-        // Must be the same constant getNextWaypoint uses for arrival; two
+-        // different epsilons produce an absorbing state at the bridge mouths
+-        // (tests/core/test_board.cpp).
+-        if (distToWaypoint > Board::WAYPOINT_ARRIVAL_EPS) {
++        // A walker goes by the bridge (Board::getNextWaypoint). A flying unit
++        // goes straight. A ground unit that jumps the river goes diagonally
++        // to its target's column while the river is ahead, at the jump's
++        // speed (patch 0087, Board::getJumperWaypoint).
++        //
++        // A jumper that lands on a waypoint part-way through its step spends
++        // the rest of the step on the next leg (up to three legs a tick).
++        // Without that, two jumpers abreast in the one-tile corridor (Royal
++        // Hogs: bodies 0.6 + 0.6) push each other 0.02 outside it every tick,
++        // each is handed the 0.03-long diagonal back onto its edge, and both
++        // creep across the river at 0.02 a tick (tests/core/test_board.cpp,
++        // "river jumpers from every start cross the river"). A walker and a
++        // flying unit take one leg, exactly as before.
++        const bool jumper = riverIgnores && !isFlying;
++        const int maxLegs = jumper ? 3 : 1;
++        Vector2D at = position;
++        float budget = 1.0f;          // share of this tick's movement left
++        bool moved = false;
++        for (int leg = 0; leg < maxLegs && budget > 1e-3f; ++leg) {
++            Vector2D waypoint = dest;
++            float jumpScale = 1.0f;
++            if (!riverIgnores) {
++                waypoint = board.getNextWaypoint(at, dest);
++            } else if (!isFlying) {
++                const Board::JumperStep js = board.getJumperWaypoint(at, dest);
++                waypoint = js.waypoint;
++                jumpScale = js.speedScale;
++            }
++            const float dx = waypoint.x - at.x;
++            const float dy = waypoint.y - at.y;
++            const float distToWaypoint = at.distanceTo(waypoint);
++
++            // Must be the same constant getNextWaypoint uses for arrival; two
++            // different epsilons produce an absorbing state at the bridge mouths
++            // (tests/core/test_board.cpp).
++            if (distToWaypoint <= Board::WAYPOINT_ARRIVAL_EPS) break;
++            moved = true;
+             // The tick-start freeze (frozenThisTick / freezeSlowThisTick), not
+             // freezeTicks: update() has already counted the freezes down by
+             // now. A movement-only slow (Poison) competes with it; the
+@@ -43,18 +71,20 @@ protected:
+             if (isCharging()) currentSpeed *= chargeSpeedMultiplier;
+             // A Hero ability's dash or sprint (patch 0017).
+             if (inAbilityWindow()) currentSpeed *= windowMoveMultiplier;
++            // The diagonal leg of a river jump (patch 0087).
++            currentSpeed *= jumpScale;
+             // Land on the waypoint, never past it: an overshoot along a bank
+             // line keeps the unit "below" the river, so it is handed the same
+             // bridge mouth back and orbits it forever (UPSTREAM_REQUESTS.md
+             // item 31; tests/core/test_board.cpp, [orbit]).
+-            float step = std::min(currentSpeed, distToWaypoint);
+-            Vector2D newPos;
+-            newPos.x = position.x + (dx / distToWaypoint) * step;
+-            newPos.y = position.y + (dy / distToWaypoint) * step;
+-
+-            // Flying troops pass over building footprints.
+-            position = isFlying ? newPos : board.resolvePositionAgainstBuildings(newPos, id, bodyRadius);
++            const float step = std::min(currentSpeed * budget, distToWaypoint);
++            at.x += (dx / distToWaypoint) * step;
++            at.y += (dy / distToWaypoint) * step;
++            if (currentSpeed <= 0.0f) break;
++            budget -= step / currentSpeed;
+         }
++        // Flying troops pass over building footprints.
++        if (moved) position = isFlying ? at : board.resolvePositionAgainstBuildings(at, id, bodyRadius);
+     }
+ 
+     void clampPosition(Board& board) override {
+diff --git a/python_ai/tests/test_body_sizes.py b/python_ai/tests/test_body_sizes.py
+index 9b7f3f7..230ffbd 100644
+--- a/python_ai/tests/test_body_sizes.py
++++ b/python_ai/tests/test_body_sizes.py
+@@ -122,9 +122,11 @@ def test_two_bodies_rest_at_the_sum_of_their_radii():
+     # A Hog Rider (0.6) catching an Ice Golem (0.7) in the same lane: 1.3
+     # between centres, where the old 0.4 + 0.4 let them close to 0.8.
+     env = _match()
+-    env.inject(ICE_GOLEM, 15.0, 15.0, 0, -1.0, -1)
++    # (On the tower column since patch 0087: from the outer tile the Hog now
++    # leaves the Golem's line for its diagonal jump and the contact is short.)
++    env.inject(ICE_GOLEM, 14.0, 15.0, 0, -1.0, -1)
+     env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 11)
+-    env.inject(HOG, 15.0, 13.0, 0, -1.0, -1)
++    env.inject(HOG, 14.0, 13.0, 0, -1.0, -1)
+     gaps = []
+     for _ in range(60):
+         env.step_self_play(NOOP, 0.0, 0.0, NOOP, 0.0, 0.0, 1)
+diff --git a/python_ai/tests/test_bridge_crossed_across_its_width.py b/python_ai/tests/test_bridge_crossed_across_its_width.py
+index ca6857b..1273201 100644
+--- a/python_ai/tests/test_bridge_crossed_across_its_width.py
++++ b/python_ai/tests/test_bridge_crossed_across_its_width.py
+@@ -98,17 +98,21 @@ def test_a_unit_placed_in_the_lane_crosses_where_it_stands():
+     xs = [x for _, x, y in track if y <= 21.0]
+     assert max(xs) - min(xs) < 0.1            # recorded: flat on every row
+     assert xs[0] == pytest.approx(14.0, abs=0.05)
+-    # A Giant on the outer tile of the left bridge does not step to its centre.
++    # Patch 0087: the outer tile of a deck is not walked (recorded crossings
++    # all lie on the tower-side tile, x 2.5-3.5 and 13.5-14.5). A Giant on the
++    # outer tile of the left bridge steps in to the edge of that corridor, not
++    # to its centre.
+     (giant,) = _tracks(GIANT, 2.0, 15.0)
+-    assert _x_at(giant, RIVER_START) == pytest.approx(2.0, abs=0.1)
++    assert _x_at(giant, RIVER_START) == pytest.approx(2.5, abs=0.1)
+ 
+ 
+ def test_a_pair_placed_abreast_crosses_abreast():
+     # Elite Barbarians land a tile apart. Through one point the second reached
+     # the far bank 0.6 s after the first, on the same x.
+     first, second = sorted(_tracks(ELITE_BARBARIANS, 14.5, 12.0), key=lambda t: _tick_at(t, RIVER_END))
+-    assert abs(_x_at(first, RIVER_END) - _x_at(second, RIVER_END)) > 0.5
+-    assert _tick_at(second, RIVER_END) - _tick_at(first, RIVER_END) <= 4
++    # (0.49 apart since patch 0087 narrowed the walked part to one tile.)
++    assert abs(_x_at(first, RIVER_END) - _x_at(second, RIVER_END)) > 0.4
++    assert _tick_at(second, RIVER_END) - _tick_at(first, RIVER_END) <= 5      # 4 before patch 0087
+     for track in (first, second):
+         assert all(_on_a_deck(x) for _, x, y in track if RIVER_START < y < RIVER_END)
+ 
+diff --git a/python_ai/tests/test_mass_push.py b/python_ai/tests/test_mass_push.py
+index fb271c7..ab8ce64 100644
+--- a/python_ai/tests/test_mass_push.py
++++ b/python_ai/tests/test_mass_push.py
+@@ -165,8 +165,13 @@ def test_a_hog_rider_behind_an_ice_golem_in_the_lane_hits_later_and_longer():
+     # takes its arrows, the Hog's first hit comes 0.45-0.67 s later than a lone
+     # Hog's (0.4-1.0 s asked for here: one tile and one seed), and it lands
+     # more hits than a lone Hog because the tower is busy.
+-    lone_hits, lone_arrow = _hog_on_the_tower(None, (15.0, 14.0))
+-    hits, arrow = _hog_on_the_tower((15.0, 15.0), (15.0, 14.0))
++    # Since patch 0087 (walkers aim for the tower column, the Hog jumps the
++    # river on a diagonal) the recorded tiles themselves are used: Golem on
++    # (15, 15), Hog on (16, 15) 1.06 s later. The Golem is carried forward and
++    # to the left and the Hog passes it on the right, as recorded. (Before
++    # 0087 these tiles gave a 0.1 s delay and the test used one column.)
++    lone_hits, lone_arrow = _hog_on_the_tower(None, (16.0, 15.0))
++    hits, arrow = _hog_on_the_tower((15.0, 15.0), (16.0, 15.0))
+     assert 4 <= hits[0] - lone_hits[0] <= 10
+     assert arrow[ICE_GOLEM] < lone_arrow[HOG] + 6          # the tower opens on the Golem
+     assert arrow[HOG] - arrow[ICE_GOLEM] >= 50             # and stays on it
+diff --git a/tests/core/test_board.cpp b/tests/core/test_board.cpp
+index 6fef11e..89ea82b 100644
+--- a/tests/core/test_board.cpp
++++ b/tests/core/test_board.cpp
+@@ -318,24 +318,29 @@ TEST_CASE("getNextWaypoint routes below-to-above via the nearest bridge's start
+     // Closer to the right bridge than the left, and left of its deck: the
+     // deck's near corner.
+     Vector2D wp = board.getNextWaypoint(Vector2D{ 10.0f, 5.0f }, Vector2D{ 10.0f, 25.0f });
+-    REQUIRE(wp.x == Catch::Approx(board.getRightBridge().x - Board::BRIDGE_HALF_WIDTH));
++    REQUIRE(wp.x == Catch::Approx(Board::RIGHT_WALK_X - Board::WALK_HALF_WIDTH));
++    REQUIRE(wp.x == Catch::Approx(13.5f));
+     REQUIRE(wp.y == Catch::Approx(15.5f)); // riverY_start
+ }
+ 
+ TEST_CASE("getNextWaypoint routes above-to-below via the nearest bridge's end edge", "[board][waypoint]") {
+     Board board;
+     Vector2D wp = board.getNextWaypoint(Vector2D{ 10.0f, 25.0f }, Vector2D{ 10.0f, 5.0f });
+-    REQUIRE(wp.x == Catch::Approx(board.getRightBridge().x - Board::BRIDGE_HALF_WIDTH));
++    REQUIRE(wp.x == Catch::Approx(Board::RIGHT_WALK_X - Board::WALK_HALF_WIDTH));
+     REQUIRE(wp.y == Catch::Approx(17.5f)); // riverY_end
+ }
+ 
+ TEST_CASE("getNextWaypoint picks the left bridge when it is nearer", "[board][waypoint]") {
+     Board board;
+-    // x 2.0 is on the left deck (1.5 to 3.5): straight across.
++    // x 2.0 is outside the left walk corridor (2.5 to 3.5, patch 0087; it was
++    // on the old deck 1.5 to 3.5): the corridor's outer corner.
+     Vector2D wp = board.getNextWaypoint(Vector2D{ 2.0f, 5.0f }, Vector2D{ 2.0f, 25.0f });
+-    REQUIRE(wp.x == Catch::Approx(2.0f));
+-    REQUIRE(board.isOnBridge(wp.x));
+-    REQUIRE(std::abs(wp.x - board.getLeftBridge().x) <= Board::BRIDGE_HALF_WIDTH);
++    REQUIRE(wp.x == Catch::Approx(2.5f));
++    REQUIRE(Board::inWalkCorridor(wp.x));
++    REQUIRE(std::abs(wp.x - Board::LEFT_WALK_X) <= Board::WALK_HALF_WIDTH);
++    // In the corridor: straight across.
++    Vector2D own = board.getNextWaypoint(Vector2D{ 2.8f, 5.0f }, Vector2D{ 2.8f, 25.0f });
++    REQUIRE(own.x == Catch::Approx(2.8f));
+ }
+ 
+ // --- the bridge-mouth absorbing state ---
+@@ -533,7 +538,9 @@ TEST_CASE("a troop on a bank line walks onto the bridge instead of oscillating a
+ 
+ TEST_CASE("a walker whose line crosses the deck keeps its line", "[board][waypoint][patch0060]") {
+     Board board;
+-    for (float x : { 13.6f, 14.0f, 14.5f, 15.2f, 1.7f, 3.3f }) {
++    // Patch 0087: the corridor is 2.5-3.5 and 13.5-14.5 (it was 1.5-3.5 and
++    // 13.5-15.5; this list held 15.2 and 1.7, on the old deck's outer tile).
++    for (float x : { 13.6f, 14.0f, 14.5f, 2.5f, 2.7f, 3.3f }) {
+         INFO("x " << x);
+         Vector2D up = board.getNextWaypoint(Vector2D{ x, 12.0f }, Vector2D{ x, 27.0f });
+         REQUIRE(up.x == Catch::Approx(x));
+@@ -543,9 +550,12 @@ TEST_CASE("a walker whose line crosses the deck keeps its line", "[board][waypoi
+         REQUIRE(down.y == Catch::Approx(17.5f));
+     }
+     // A slanted line through the deck: the point where it meets the bank.
+-    Vector2D wp = board.getNextWaypoint(Vector2D{ 15.0f, 13.5f }, Vector2D{ 14.0f, 27.0f });
+-    REQUIRE(wp.x == Catch::Approx(15.0f - 2.0f / 13.5f).margin(1e-4));
++    Vector2D wp = board.getNextWaypoint(Vector2D{ 14.4f, 13.5f }, Vector2D{ 14.0f, 27.0f });
++    REQUIRE(wp.x == Catch::Approx(14.4f - 0.4f * 2.0f / 13.5f).margin(1e-4));
+     REQUIRE(wp.y == Catch::Approx(15.5f));
++    // The old outer tile is no longer deck: from x 15.2 or 1.7 the outer corner.
++    REQUIRE(board.getNextWaypoint(Vector2D{ 15.2f, 12.0f }, Vector2D{ 15.2f, 27.0f }).x == Catch::Approx(14.5f));
++    REQUIRE(board.getNextWaypoint(Vector2D{ 1.7f, 12.0f }, Vector2D{ 1.7f, 27.0f }).x == Catch::Approx(2.5f));
+ }
+ 
+ TEST_CASE("a walker coming from the side heads for the near corner of the deck", "[board][waypoint][patch0060]") {
+@@ -557,8 +567,10 @@ TEST_CASE("a walker coming from the side heads for the near corner of the deck",
+     Vector2D musketeer = board.getNextWaypoint(Vector2D{ 9.0f, 9.0f }, Vector2D{ 14.0f, 27.0f });
+     REQUIRE(musketeer.x == Catch::Approx(13.5f));
+     REQUIRE(musketeer.y == Catch::Approx(15.5f));
+-    // From outside the lane, the outer corner; team 1 mirrored.
+-    REQUIRE(board.getNextWaypoint(Vector2D{ 17.0f, 12.0f }, Vector2D{ 14.0f, 27.0f }).x == Catch::Approx(15.5f));
++    // From outside the lane, the outer corner (14.5 since patch 0087, it was
++    // 15.5); team 1 mirrored.
++    REQUIRE(board.getNextWaypoint(Vector2D{ 17.0f, 12.0f }, Vector2D{ 14.0f, 27.0f }).x == Catch::Approx(14.5f));
++    REQUIRE(board.getNextWaypoint(Vector2D{ 0.0f, 12.0f }, Vector2D{ 3.0f, 27.0f }).x == Catch::Approx(2.5f));
+     Vector2D down = board.getNextWaypoint(Vector2D{ 8.0f, 23.0f }, Vector2D{ 3.0f, 6.0f });
+     REQUIRE(down.x == Catch::Approx(3.5f));
+     REQUIRE(down.y == Catch::Approx(17.5f));
+@@ -629,7 +641,7 @@ TEST_CASE("getNextWaypoint never returns the caller's own position at a deck cor
+                                 REQUIRE(here.distanceTo(wp) > Board::WAYPOINT_ARRIVAL_EPS);
+                                 // Whatever it is handed across the river is on a deck.
+                                 if (wp.y == Catch::Approx(15.5f) || wp.y == Catch::Approx(17.5f)) {
+-                                    if (!(wp.x == target.x && wp.y == target.y)) REQUIRE(board.isOnBridge(wp.x));
++                                    if (!(wp.x == target.x && wp.y == target.y)) REQUIRE(Board::inWalkCorridor(wp.x));
+                                 }
+                             }
+                         }
+@@ -722,8 +734,12 @@ TEST_CASE("walkers from every start cross the bridge, and a squad crosses abreas
+                         REQUIRE(cx >= 0.0f);
+                         // Read one step after leaving the deck, so a step's
+                         // sideways drift is allowed.
+-                        const float offCentre = std::min(std::abs(cx - board.getLeftBridge().x),
+-                                                         std::abs(cx - board.getRightBridge().x));
++                        // The deck. Since patch 0087 a unit HEADS for the
++                        // walk corridor (the inner tile and a half), but a
++                        // squad's bodies push each other and the outer ones
++                        // cross on the deck's outer tile.
++                        const float offCentre = std::min(std::abs(cx - ArenaLayout::LEFT_BRIDGE_X),
++                                                         std::abs(cx - ArenaLayout::RIGHT_BRIDGE_X));
+                         REQUIRE(offCentre <= Board::BRIDGE_HALF_WIDTH + 0.3f);
+                         lo = std::min(lo, cx);
+                         hi = std::max(hi, cx);
+@@ -850,3 +866,320 @@ TEST_CASE("pushAwayFrom clears the full radius even from dead centre",
+         REQUIRE(out.y == Catch::Approx(4.95f));
+     }
+ }
++
++
++// --- patch 0087: the walk corridor, and the path of a river jumper ---
++// Evidence (engine notes, patch 0087; all from the live recordings of
++// 2026-11-23/24): ground troops cross with their centre on x 2.5-3.5 and
++// 13.5-14.5; a Hog Rider placed on (1, 15) lands on 2.52 (n 51), on (16, 15)
++// on 14.54 (n 55), on (6, 15) on 3.6, on the tile beside the bridge (2, 15) /
++// (15, 15) it walks up 3.0 / 14.0, and it reaches the far bank when a Hog
++// going straight across would.
++
++TEST_CASE("the walk corridor is half a tile each side of the Princess Tower's column",
++          "[board][clamp][patch0087]") {
++    Board board;
++    for (float x : { 2.5f, 3.0f, 3.5f, 13.5f, 14.0f, 14.5f }) REQUIRE(Board::inWalkCorridor(x));
++    for (float x : { 1.5f, 2.0f, 2.4f, 3.6f, 13.4f, 14.6f, 15.0f, 15.5f }) REQUIRE_FALSE(Board::inWalkCorridor(x));
++    REQUIRE(Board::LEFT_WALK_X == Catch::Approx(3.0f));
++    REQUIRE(Board::RIGHT_WALK_X == Catch::Approx(14.0f));
++    // It is where a unit heads, not a wall: the deck is still the drawn one,
++    // and a unit pushed onto its outer tile in mid-river stays there.
++    for (float x : { 1.5f, 2.0f, 3.5f, 13.5f, 15.0f, 15.5f }) REQUIRE(board.isOnBridge(x));
++    Vector2D a = board.clampToBoard(Vector2D{ 2.2f, 16.5f }, false);
++    REQUIRE(a.x == Catch::Approx(2.2f));
++    REQUIRE(a.y == Catch::Approx(16.5f));
++}
++
++TEST_CASE("a walker pushed along the bank onto the outer tile crosses from where it is",
++          "[board][waypoint][regression][patch0087]") {
++    Board board;
++    const Vector2D left{ 3.0f, 27.0f };
++    // Walking in from its placement tile: the corridor's mouth.
++    for (const Vector2D from : { Vector2D{ 2.0f, 15.0f }, Vector2D{ 1.0f, 15.0f }, Vector2D{ 0.0f, 15.0f },
++                                 Vector2D{ 2.0f, 12.0f } }) {
++        Vector2D wp = board.getNextWaypoint(from, left);
++        INFO("from (" << from.x << ", " << from.y << ")");
++        REQUIRE(wp.x == Catch::Approx(2.5f));
++        REQUIRE(wp.y == Catch::Approx(board.getRiverStart()));
++    }
++    // Shoved to (2.1, 15.45), 0.05 short of the water: across, towards the
++    // corridor, not sideways along the bank to the mouth.
++    Vector2D wp = board.getNextWaypoint(Vector2D{ 2.1f, 15.45f }, left);
++    REQUIRE(wp.x == Catch::Approx(2.5f));
++    REQUIRE(wp.y == Catch::Approx(board.getRiverEnd()));
++    // Team 1, right bridge.
++    Vector2D down = board.getNextWaypoint(Vector2D{ 15.2f, 17.53f }, Vector2D{ 14.0f, 6.0f });
++    REQUIRE(down.x == Catch::Approx(14.5f));
++    REQUIRE(down.y == Catch::Approx(board.getRiverStart()));
++    // Off the deck altogether there is water ahead: the mouth.
++    Vector2D off = board.getNextWaypoint(Vector2D{ 1.2f, 15.45f }, left);
++    REQUIRE(off.y == Catch::Approx(board.getRiverStart()));
++}
++
++// Two bodies that do not fit the corridor abreast. With the corridor as a wall
++// they pushed each other at the mouth for ever (Goblin Machine: no tower hit in
++// 40 s).
++TEST_CASE("pairs of wide bodies cross the river", "[board][waypoint][regression][patch0087]") {
++    const std::vector<int> deck = { 15, 6, 25, 40, 24, 72, 33, 7 };
++    constexpr int GOBLIN_MACHINE = 55, ELITE_BARBARIANS = 17, RASCALS = 113, ROYAL_RECRUITS = 77;
++    int stuck = 0, runs = 0;
++    std::ostringstream examples;
++    for (int card : { GOBLIN_MACHINE, ELITE_BARBARIANS, RASCALS, ROYAL_RECRUITS }) {
++        if (!CardRegistry::getInstance().getCard(card)) continue;
++        for (int team : { 0, 1 }) {
++            for (float rowsBack : { 0.5f, 1.5f, 4.0f }) {
++                for (int i = 0; i <= 34; ++i) {
++                    GameManager game(deck, deck);
++                    Board& board = game.getBoard();
++                    const float x = i * 0.5f;
++                    const float y = team == 0 ? board.getRiverStart() - rowsBack : board.getRiverEnd() + rowsBack;
++                    CardRegistry::getInstance().getCard(card)->spawnEntity(x, y, team, board);
++                    board.commitPendingEntities();
++                    std::vector<std::shared_ptr<Troop>> units;
++                    for (const auto& e : board.getEntities()) {
++                        if (e->team == team && !e->isTower()) {
++                            if (auto t = std::dynamic_pointer_cast<Troop>(e)) units.push_back(t);
++                        }
++                    }
++                    REQUIRE(units.size() >= 2);
++                    float slowest = units[0]->getSpeed();
++                    for (const auto& u : units) slowest = std::min(slowest, u->getSpeed());
++                    // Twice a straight walk: bodies queue at the mouth.
++                    const int budget = 2 * (DEPLOY_TIME_TICKS + 10
++                        + static_cast<int>(std::ceil((9.0f + rowsBack + 2.5f) / slowest)));
++                    auto over = [&](const std::shared_ptr<Troop>& u) {
++                        return !u->isAlive() || (team == 0 ? u->position.y > board.getRiverEnd()
++                                                           : u->position.y < board.getRiverStart());
++                    };
++                    bool all = false;
++                    for (int t = 0; t < budget && !all; ++t) {
++                        game.step();
++                        all = true;
++                        for (const auto& u : units) all = all && over(u);
++                    }
++                    ++runs;
++                    if (!all && ++stuck <= 8) {
++                        examples << "\n  card " << card << " team " << team << " from (" << x << ", " << y << "):";
++                        for (const auto& u : units) examples << " (" << u->position.x << ", " << u->position.y << ")";
++                    }
++                }
++            }
++        }
++    }
++    INFO(stuck << " of " << runs << " did not all cross; first few:" << examples.str());
++    REQUIRE(stuck == 0);
++    REQUIRE(runs >= 2 * 3 * 35 * 3);
++}
++
++TEST_CASE("a river jumper goes 45 degrees to within half a tile of its target's column, then straight",
++          "[board][waypoint][patch0087]") {
++    Board board;
++    const Vector2D left{ 3.0f, 27.0f }, right{ 14.0f, 27.0f };
++    const float fast = Board::JUMP_DIAGONAL_SPEED;
++
++    // The two bridge corners and the tile a Hog is played on from the middle.
++    Board::JumperStep a = board.getJumperWaypoint(Vector2D{ 1.0f, 15.0f }, left);
++    REQUIRE(a.waypoint.x == Catch::Approx(2.5f));
++    REQUIRE(a.waypoint.y == Catch::Approx(16.5f));
++    REQUIRE(a.speedScale == Catch::Approx(fast));
++    Board::JumperStep b = board.getJumperWaypoint(Vector2D{ 16.0f, 15.0f }, right);
++    REQUIRE(b.waypoint.x == Catch::Approx(14.5f));
++    REQUIRE(b.waypoint.y == Catch::Approx(16.5f));
++    REQUIRE(b.speedScale == Catch::Approx(fast));
++    Board::JumperStep c = board.getJumperWaypoint(Vector2D{ 6.0f, 15.0f }, left);
++    REQUIRE(c.waypoint.x == Catch::Approx(3.5f));
++    REQUIRE(c.waypoint.y == Catch::Approx(17.5f));
++    REQUIRE(c.speedScale == Catch::Approx(fast));
++
++    // In its column over the water: straight across; on the far bank: the target.
++    Board::JumperStep d = board.getJumperWaypoint(Vector2D{ 2.5f, 16.5f }, left);
++    REQUIRE(d.waypoint.x == Catch::Approx(2.5f));
++    REQUIRE(d.waypoint.y == Catch::Approx(17.5f));
++    REQUIRE(d.speedScale == Catch::Approx(1.0f));
++    Board::JumperStep e = board.getJumperWaypoint(Vector2D{ 2.5f, 17.5f }, left);
++    REQUIRE(e.waypoint.x == Catch::Approx(3.0f));
++    REQUIRE(e.waypoint.y == Catch::Approx(27.0f));
++    REQUIRE(e.speedScale == Catch::Approx(1.0f));
++
++    // Far enough back to reach the column before the water: the straight line
++    // to it on the near bank, at walking speed.
++    Board::JumperStep f = board.getJumperWaypoint(Vector2D{ 1.0f, 10.0f }, left);
++    REQUIRE(f.waypoint.x == Catch::Approx(2.5f));
++    REQUIRE(f.waypoint.y == Catch::Approx(15.5f));
++    REQUIRE(f.speedScale == Catch::Approx(1.0f));
++    Board::JumperStep fromKing = board.getJumperWaypoint(Vector2D{ 9.0f, 0.0f }, right);
++    REQUIRE(fromKing.waypoint.x == Catch::Approx(13.5f));   // recorded: 13.55 at the river
++    REQUIRE(fromKing.waypoint.y == Catch::Approx(15.5f));
++    // Not far enough back, and more than a tile from the water: 45 degrees at
++    // walking speed.
++    Board::JumperStep g = board.getJumperWaypoint(Vector2D{ 1.0f, 14.2f }, left);
++    REQUIRE(g.waypoint.x == Catch::Approx(2.5f));
++    REQUIRE(g.waypoint.y == Catch::Approx(15.7f));
++    REQUIRE(g.speedScale == Catch::Approx(1.0f));
++
++    // A building in the middle is its target: the same 45 degrees, towards
++    // the building's column.
++    Board::JumperStep h = board.getJumperWaypoint(Vector2D{ 16.0f, 15.0f }, Vector2D{ 10.0f, 23.0f });
++    REQUIRE(h.waypoint.x == Catch::Approx(10.5f));
++    REQUIRE(h.waypoint.y - 15.0f == Catch::Approx(16.0f - 10.5f));
++    REQUIRE(h.speedScale == Catch::Approx(fast));
++
++    // Team 1 is the mirror.
++    Board::JumperStep i = board.getJumperWaypoint(Vector2D{ 16.0f, 18.0f }, Vector2D{ 14.0f, 6.0f });
++    REQUIRE(i.waypoint.x == Catch::Approx(14.5f));
++    REQUIRE(i.waypoint.y == Catch::Approx(16.5f));
++    REQUIRE(i.speedScale == Catch::Approx(fast));
++
++    // A target on its own side of the river: the target.
++    Board::JumperStep k = board.getJumperWaypoint(Vector2D{ 1.0f, 10.0f }, Vector2D{ 9.0f, 14.0f });
++    REQUIRE(k.waypoint.x == Catch::Approx(9.0f));
++    REQUIRE(k.waypoint.y == Catch::Approx(14.0f));
++    REQUIRE(k.speedScale == Catch::Approx(1.0f));
++}
++
++TEST_CASE("a jumper beside its crossing, on the outer side, walks onto the column instead of jumping",
++          "[board][waypoint][patch0087]") {
++    Board board;
++    const Vector2D left{ 3.0f, 27.0f }, right{ 14.0f, 27.0f };
++    Board::JumperStep a = board.getJumperWaypoint(Vector2D{ 2.0f, 15.0f }, left);
++    REQUIRE(a.waypoint.x == Catch::Approx(3.0f));
++    REQUIRE(a.waypoint.y == Catch::Approx(15.5f));
++    REQUIRE(a.speedScale == Catch::Approx(1.0f));
++    Board::JumperStep b = board.getJumperWaypoint(Vector2D{ 15.0f, 15.0f }, right);
++    REQUIRE(b.waypoint.x == Catch::Approx(14.0f));
++    REQUIRE(b.waypoint.y == Catch::Approx(15.5f));
++    Board::JumperStep down = board.getJumperWaypoint(Vector2D{ 15.0f, 18.0f }, Vector2D{ 14.0f, 6.0f });
++    REQUIRE(down.waypoint.x == Catch::Approx(14.0f));
++    REQUIRE(down.waypoint.y == Catch::Approx(17.5f));
++    // On the column: straight across.
++    Board::JumperStep c = board.getJumperWaypoint(Vector2D{ 3.0f, 15.0f }, left);
++    REQUIRE(c.waypoint.x == Catch::Approx(3.0f));
++    REQUIRE(c.waypoint.y == Catch::Approx(17.5f));
++    // One tile on the INNER side: nothing recorded, the half-tile rule.
++    Board::JumperStep d = board.getJumperWaypoint(Vector2D{ 4.0f, 15.0f }, left);
++    REQUIRE(d.waypoint.x == Catch::Approx(3.5f));
++    REQUIRE(d.waypoint.y == Catch::Approx(15.5f));
++    // Two tiles out: the jump.
++    Board::JumperStep e = board.getJumperWaypoint(Vector2D{ 1.0f, 15.0f }, left);
++    REQUIRE(e.speedScale == Catch::Approx(Board::JUMP_DIAGONAL_SPEED));
++}
++
++TEST_CASE("getJumperWaypoint never returns the caller's own position",
++          "[board][waypoint][regression][patch0087]") {
++    Board board;
++    const Vector2D targets[] = { { 3.0f, 27.0f }, { 14.0f, 27.0f }, { 8.5f, 30.5f }, { 10.0f, 23.0f },
++                                 { 9.0f, 18.0f }, { 3.0f, 6.0f }, { 14.0f, 6.0f }, { 8.0f, 11.0f },
++                                 { 8.5f, 16.5f }, { 0.0f, 20.0f }, { 17.0f, 13.0f } };
++    int checked = 0;
++    for (const Vector2D& target : targets) {
++        for (int ix = 0; ix <= 68; ++ix) {
++            for (int iy = 0; iy <= 40; ++iy) {
++                for (int dx = -2; dx <= 2; ++dx) {
++                    for (int dy = -2; dy <= 2; ++dy) {
++                        const Vector2D here{ ix * 0.25f + dx * 0.004f, 11.5f + iy * 0.25f + dy * 0.004f };
++                        if (here.distanceTo(target) <= Board::WAYPOINT_ARRIVAL_EPS) continue;
++                        const Board::JumperStep js = board.getJumperWaypoint(here, target);
++                        ++checked;
++                        INFO("stuck at (" << here.x << ", " << here.y << ") target (" << target.x << ", " << target.y << ")");
++                        REQUIRE(here.distanceTo(js.waypoint) > Board::WAYPOINT_ARRIVAL_EPS);
++                        const bool plain = js.speedScale == Catch::Approx(1.0f);
++                        const bool fast = js.speedScale == Catch::Approx(Board::JUMP_DIAGONAL_SPEED);
++                        REQUIRE((plain || fast));
++                    }
++                }
++            }
++        }
++    }
++    REQUIRE(checked > 700000);
++}
++
++// Real cards through the GameManager tick loop.
++TEST_CASE("a Hog Rider lands where the recorded one does, when a straight one would",
++          "[board][waypoint][patch0087]") {
++    const std::vector<int> deck = { 15, 6, 25, 40, 24, 72, 33, 7 };
++    constexpr int HOG = 15;
++    struct Landing { float x; int tick; };
++    auto land = [&](float x, int team) {
++        GameManager game(deck, deck);
++        Board& board = game.getBoard();
++        const float y = team == 0 ? 15.0f : 18.0f;
++        CardRegistry::getInstance().getCard(HOG)->spawnEntity(x, y, team, board);
++        board.commitPendingEntities();
++        std::shared_ptr<Troop> hog;
++        for (const auto& e : board.getEntities()) {
++            if (e->cardId == HOG) hog = std::dynamic_pointer_cast<Troop>(e);
++        }
++        REQUIRE(hog);
++        for (int t = 1; t <= 80; ++t) {
++            game.step();
++            const bool over = team == 0 ? hog->position.y >= board.getRiverEnd()
++                                        : hog->position.y <= board.getRiverStart();
++            if (over) return Landing{ hog->position.x, t };
++        }
++        return Landing{ -1.0f, -1 };
++    };
++    struct Case { float from, lands; };
++    // placed on -> far-bank x. Recorded: 2.52, 14.54, 3.6, 3.0, 14.0, 3.05-3.2.
++    const Case cases[] = { { 1.0f, 2.5f }, { 16.0f, 14.5f }, { 6.0f, 3.5f }, { 11.0f, 13.5f },
++                           { 0.0f, 2.5f }, { 17.0f, 14.5f },
++                           { 2.0f, 3.0f }, { 15.0f, 14.0f }, { 3.0f, 3.0f }, { 14.0f, 14.0f } };
++    for (int team : { 0, 1 }) {
++        const Landing straight = land(3.0f, team);
++        REQUIRE(straight.tick > 0);
++        for (const Case& c : cases) {
++            const Landing got = land(c.from, team);
++            INFO("team " << team << " placed on x " << c.from << ": far bank at x " << got.x << " on tick " << got.tick
++                 << " (straight: tick " << straight.tick << ")");
++            REQUIRE(got.tick > 0);
++            REQUIRE(got.x == Catch::Approx(c.lands).margin(0.08));
++            // The jump costs no time; the step onto the column from the tile
++            // beside the bridge costs 0.24 s (recorded 0.1-0.2 s).
++            const bool besideBridge = c.from == 2.0f || c.from == 15.0f;
++            REQUIRE(got.tick - straight.tick >= 0);
++            REQUIRE(got.tick - straight.tick <= (besideBridge ? 3 : 1));
++        }
++    }
++}
++
++TEST_CASE("river jumpers from every start cross the river", "[board][waypoint][regression][patch0087]") {
++    const std::vector<int> deck = { 15, 6, 25, 40, 24, 72, 33, 7 };
++    constexpr int HOG = 15, PRINCE = 14, BANDIT = 50, BATTLE_RAM = 81, ROYAL_HOGS = 82;
++    int stuck = 0, runs = 0;
++    std::ostringstream examples;
++    for (int card : { HOG, PRINCE, BANDIT, BATTLE_RAM, ROYAL_HOGS }) {
++        for (int team : { 0, 1 }) {
++            for (float rowsBack : { 0.0f, 0.3f, 3.0f }) {
++                for (int i = 0; i <= 170; ++i) {
++                    GameManager game(deck, deck);
++                    Board& board = game.getBoard();
++                    const float x = i * 0.1f;
++                    const float y = team == 0 ? board.getRiverStart() - rowsBack : board.getRiverEnd() + rowsBack;
++                    CardRegistry::getInstance().getCard(card)->spawnEntity(x, y, team, board);
++                    board.commitPendingEntities();
++                    std::shared_ptr<Troop> unit;
++                    for (const auto& e : board.getEntities()) {
++                        if (e->cardId == card) unit = std::dynamic_pointer_cast<Troop>(e);
++                    }
++                    REQUIRE(unit);
++                    const int budget = DEPLOY_TIME_TICKS + 5
++                        + static_cast<int>(std::ceil((8.0f + rowsBack + 2.5f) / unit->getSpeed())) + 10;
++                    bool crossed = false;
++                    for (int t = 0; t < budget && !crossed; ++t) {
++                        game.step();
++                        crossed = team == 0 ? unit->position.y > board.getRiverEnd()
++                                            : unit->position.y < board.getRiverStart();
++                    }
++                    ++runs;
++                    if (!crossed && ++stuck <= 8) {
++                        examples << "\n  card " << card << " team " << team << " from (" << x << ", " << y
++                                 << "), now (" << unit->position.x << ", " << unit->position.y << ")";
++                    }
++                }
++            }
++        }
++    }
++    INFO(stuck << " of " << runs << " never crossed; first few:" << examples.str());
++    REQUIRE(stuck == 0);
++    REQUIRE(runs == 5 * 2 * 3 * 171);
++}
