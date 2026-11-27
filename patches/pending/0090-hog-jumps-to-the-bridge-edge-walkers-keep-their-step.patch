@@ -1,0 +1,729 @@
+Patch 0090 (gen2_j -> build/gen2_k), 2026-11-26. Three default-off switches in CR_P0088, matched exactly ("all" does NOT enable them):
+  jumpedge : a river jumper (Hog Rider, Royal Hogs, Ram Rider, Prince, ...) whose target is on its lane column, coming from the
+             outer side more than BRIDGE_WALK_REACH off the column, jumps on a straight line to (target.x -+ 0.8, near bank + 1.5)
+             = real (2.2 | 14.8, row 16.0). Inside JUMP_ZONE its speed scale is length / forward length (at most sqrt 2), so its
+             forward speed is unchanged; then it runs straight ahead to far bank + 2.5 (engine 20 = real row 18) before it turns
+             to its target. Beside the bridge (within BRIDGE_WALK_REACH of the column) or inside the walk corridor (arrival
+             tolerance WAYPOINT_ARRIVAL_EPS) it takes the walker's waypoint instead of the 0087 jumpcol step onto the column.
+  walklegs : a ground walker, like a jumper, spends the rest of its tick's step on the next leg after reaching a waypoint (up to
+             3 legs), but only on a leg within about 18 degrees of the previous one (cos >= WALK_LEG_MIN_COS 0.95). Without it
+             every waypoint cost the remainder of a step: about 4 % slow over the river. Without the angle rule two Goblin Machine
+             bodies (0.75 + 0.75) at a bridge mouth turned the corner into the water every tick and stalled for ever (the
+             "pairs of wide bodies cross the river" case in tests/core/test_board.cpp). Open-ground speed unchanged.
+  hogspeed : the Hog Rider walks on land at 2.34 tiles/s (HOG_LAND_SPEED_OF_S50 0.975 x S/50; absolute, also without "speed");
+             over the water (bank to bank, Troop::overWater) it keeps its own speed, so the jumpedge crossing is unchanged.
+             Set in CardFactories::applyCardMetadata (Troop::landSpeedScale); no other card changes.
+Measured on the live recordings (r5 detector, sprite bias removed), runs/bridge_1126:
+  landing x real 2.2 / 14.8; gen2_j 2.57 / 14.43; gen2_k 2.20 / 14.80; timing unchanged (rows 17-21 within +0.05..-0.10 s).
+  Walker river transit (real rows 14.5 -> 17.0, n 136): mean |sim - real| 0.14 s -> 0.08 s.
+  Hog open ground past the river (speed2.py, real rows 18.6 -> 21.6, clean tracks): real 2.340 tiles/s (n 174, both screen
+  halves, 95 % interval of the median 2.325-2.352) vs 2.40; same rows and mapping: Ice Golem 1.00, Skeletons 0.99-1.01 of S/50.
+  Corner Hog sim - real at real row 20 / 22: -0.10 / -0.21 s -> -0.06 / -0.15 (left), -0.06 / -0.14 -> -0.03 / -0.09 (right).
+Paths below start at engine/; apply from the build folder: cd build/gen2_X && patch -p1 < this. Also adds jumpedge/walklegs/
+hogspeed to p0088_active() (src/bindings.cpp), python_ai/tests/test_bridge_crossing_0090.py (22; 16 fail on gen2_j), and makes
+the 0087 cases of tests/core/test_board.cpp branch on P0088::jumpEdge() (plus one [patch0090] hogspeed case).
+All three off = bit-identical to gen2_j (150 of 150 replays, per-tick log sha; runs/bridge_1126/verify).
+
+diff --git a/engine/include/core/Board.h b/engine/include/core/Board.h
+index 1a30c74..a42a32b 100644
+--- a/engine/include/core/Board.h
++++ b/engine/include/core/Board.h
+@@ -628,6 +628,30 @@ public:
+     static constexpr float JUMP_ZONE = 1.0f;
+     static constexpr float JUMP_DIAGONAL_SPEED = 1.41421356f;
+     static constexpr float BRIDGE_WALK_REACH = 1.0f;
++    // Patch 0090 jumpedge: where the corner jump lands, outside the target
++    // column (real deck edges 2.0 / 15.0 by the bridge posts; the Hog lands
++    // 0.2 inside them), and how far past the near bank (real row 16.0).
++    static constexpr float JUMP_EDGE_INSET = 0.8f;
++    static constexpr float JUMP_EDGE_ROWS = 1.5f;
++    // ... and the straight run after it: to JUMP_EDGE_RUN engine rows past the
++    // far bank (engine 20.0 = real 18.0), only on the edge line (within
++    // JUMP_EDGE_RUN_TOL of its x) and only with the target at least
++    // JUMP_EDGE_RUN_CLEAR rows beyond the run's end.
++    static constexpr float JUMP_EDGE_RUN = 2.5f;
++    static constexpr float JUMP_EDGE_RUN_TOL = 0.05f;
++    static constexpr float JUMP_EDGE_RUN_CLEAR = 2.0f;
++    // The run's next point, or y = -1e9 when there is none.
++    Vector2D jumpEdgeRun(const Vector2D& at, const Vector2D& targetPos, float farY, float dir) const {
++        const Vector2D none{ at.x, -1.0e9f };
++        const float laneX = (std::abs(at.x - LEFT_WALK_X) <= std::abs(at.x - RIGHT_WALK_X)) ? LEFT_WALK_X : RIGHT_WALK_X;
++        if (std::abs(targetPos.x - laneX) > BRIDGE_HALF_WIDTH + 1e-3f) return none;
++        const float out = (targetPos.x < ArenaLayout::CENTER_X) ? -1.0f : 1.0f;
++        if (std::abs(at.x - (targetPos.x + out * JUMP_EDGE_INSET)) > JUMP_EDGE_RUN_TOL) return none;
++        const float runEnd = farY + dir * JUMP_EDGE_RUN;
++        if ((runEnd - at.y) * dir <= WAYPOINT_ARRIVAL_EPS) return none;
++        if ((targetPos.y - runEnd) * dir < JUMP_EDGE_RUN_CLEAR) return none;
++        return Vector2D{ at.x, runEnd };
++    }
+     // colLatch (jumpcol only): the unit's own record of the step-onto-the-column
+     // decision, -1 undecided, 0 no, 1 yes; null = decide on the spot.
+     JumperStep getJumperWaypoint(const Vector2D& currentPos, const Vector2D& targetPos,
+@@ -638,6 +662,14 @@ public:
+         const float dir = up ? 1.0f : -1.0f;
+         const bool targetBeyond = up ? (targetPos.y >= farY) : (targetPos.y <= farY);
+         const bool beforeFarBank = up ? (currentPos.y < farY) : (currentPos.y > farY);
++        // Patch 0090 jumpedge: past the far bank, a unit that landed on the
++        // edge line runs straight on to JUMP_EDGE_RUN rows past the bank before
++        // it turns to its target (recorded corner Hog: x 2.24 / 2.26 / 2.31 on
++        // real rows 17 / 18 / 19, then 2.48 / 2.54 on 20 / 21).
++        if (P0088::jumpEdge() && !beforeFarBank) {
++            const Vector2D run = jumpEdgeRun(currentPos, targetPos, farY, dir);
++            if (run.y > -1000.0f) return { run, 1.0f };
++        }
+         if (!targetBeyond || !beforeFarBank) return { targetPos, 1.0f };
+ 
+         const float toWater = (nearY - currentPos.y) * dir;      // > 0 while short of the water
+@@ -646,6 +678,43 @@ public:
+         const float gx = std::max(targetPos.x - WALK_HALF_WIDTH,
+                                   std::min(currentPos.x, targetPos.x + WALK_HALF_WIDTH));
+         const float lateral = std::abs(gx - currentPos.x);
++        // Patch 0090 (CR_P0088=jumpedge, P0088.h). Only for a target in the
++        // lane: its column within the deck of the bridge nearest the unit.
++        // Recorded (runs/bridge_1126, true positions = box centre less the
++        // hammer's 0.3): the corner Hog (1, 15) goes in a straight line to
++        // (2.2, real row 16.0) and lands there (n 140; (16, 15) on 14.8, n 130;
++        // the opponents' the same, n 13), forward at its walking speed (real
++        // rows 17 / 18 / 19 at 1.10 / 1.58 / 2.05 s); the Hog beside the bridge
++        // (2, 15) walks onto it (2.24 / 2.46 / 2.71 on real 14.5 / 15 / 16,
++        // n 12; (15, 15) the mirror, n 8).
++        if (P0088::jumpEdge()) {
++            const float laneX = (std::abs(currentPos.x - LEFT_WALK_X) <= std::abs(currentPos.x - RIGHT_WALK_X))
++                ? LEFT_WALK_X : RIGHT_WALK_X;
++            if (std::abs(targetPos.x - laneX) <= BRIDGE_HALF_WIDTH + 1e-3f) {
++                const bool inBand = toWater <= WAYPOINT_ARRIVAL_EPS;      // on the near bank or past it
++                // Arrival tolerance: a unit that stopped within WAYPOINT_ARRIVAL_EPS
++                // of the bridge mouth (the corridor's edge) has arrived there; a
++                // tighter test sent a beside-the-bridge Hog 0.004 short of it into
++                // the corner jump instead (a 2.5 % slower step was enough).
++                const bool inCorridor = std::abs(currentPos.x - laneX) <= WALK_HALF_WIDTH + WAYPOINT_ARRIVAL_EPS;
++                const float out = (targetPos.x < ArenaLayout::CENTER_X) ? -1.0f : 1.0f;
++                const Vector2D edge{ targetPos.x + out * JUMP_EDGE_INSET, nearY + dir * JUMP_EDGE_ROWS };
++                const float toEdge = (edge.y - currentPos.y) * dir;
++                const bool walk = inBand ? inCorridor : (off <= BRIDGE_WALK_REACH + 1e-3f);
++                if (walk) return { getNextWaypoint(currentPos, targetPos), 1.0f };
++                if (outerSide) {
++                    if (toEdge <= WAYPOINT_ARRIVAL_EPS || currentPos.engineDistanceTo(edge) <= WAYPOINT_ARRIVAL_EPS) {
++                        const Vector2D run = jumpEdgeRun(currentPos, targetPos, farY, dir);
++                        return { run.y > -1000.0f ? run : targetPos, 1.0f };
++                    }
++                    float scale = 1.0f;
++                    if (toWater <= JUMP_ZONE) {
++                        scale = std::min(JUMP_DIAGONAL_SPEED, currentPos.engineDistanceTo(edge) / toEdge);
++                    }
++                    return { edge, scale };
++                }
++            }
++        }
+         // Patch 0088 (CR_P0088=jumpcol): the step onto the column replaces the
+         // diagonal jump only, i.e. only where the jump would otherwise start
+         // (toWater <= lateral: it cannot walk into the corridor before the
+diff --git a/engine/include/core/CardFactories.h b/engine/include/core/CardFactories.h
+index 397b437..d1b57a4 100644
+--- a/engine/include/core/CardFactories.h
++++ b/engine/include/core/CardFactories.h
+@@ -41,6 +41,10 @@ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const
+             }
+         }
+     }
++    // Patch 0090 (CR_P0088=hogspeed): the Hog Rider walks at 2.34 tiles/s on land.
++    if (P0088::hogSpeed() && stats.name == "Hog Rider") {
++        if (auto* t = dynamic_cast<Troop*>(entity.get())) t->landSpeedScale = P0088::hogLandScale();
++    }
+     // Deploy time (CardStats.h: DEPLOY_TIME_TICKS unless the card publishes
+     // its own). Set here because every troop and building passes through;
+     // spells and deploy effects do not, since a spell has its own delay.
+diff --git a/engine/include/core/P0088.h b/engine/include/core/P0088.h
+index e6864a5..ac16cd3 100644
+--- a/engine/include/core/P0088.h
++++ b/engine/include/core/P0088.h
+@@ -104,6 +104,40 @@ inline bool onExact(const char* name) {
+ inline bool pocketCells() { static const bool b = onExact("pocketcells"); return b; }
+ inline bool kingPath() { static const bool b = onExact("kingpath"); return b; }
+ 
++// Patch 0090 switches (exact names only, like 0089; "all" does not enable them).
++// Measured on the recorded live runs (runs/bridge_1126: 2,018 real crossings,
++// round-5 detector; own Hog 270 corner plays, 20 beside the bridge):
++//   jumpedge  a river jumper whose target stands in its lane (target column
++//             within the bridge's deck) crosses like the game's Hog:
++//             - from the tile beside the bridge or on it (within a tile of the
++//               target column): the walker's route onto the bridge
++//               (Board::getNextWaypoint), no step onto the column
++//               (real x 2.24 / 2.46 / 2.71 on real rows 14.5 / 15 / 16 from (2,15));
++//             - from further out (the corner, x 1 / 16): a straight line to
++//               (column -/+ 0.8, 1.5 rows past the near bank) = real (2.2 | 14.8,
++//               row 16.0), forward at walking speed, then at its target
++//               (0087's 45-degree diagonal landed it on 2.57 | 14.43);
++//             a target off the lane keeps 0087's rule.
++//   walklegs  a walker keeps the rest of its step after reaching a waypoint
++//             (up to three legs a tick, as jumpers already do): no lost time
++//             at the bridge's mouths (real walkers cross at their own speed;
++//             the one-leg walker lost ~4 %).
++//   hogspeed  the Hog Rider walks on land at 2.34 tiles/s instead of S/50 =
++//             2.40 (the jump over the water keeps its speed, so jumpedge's
++//             crossing is unchanged). Real: 174 clean tracks on real rows
++//             18.6 -> 21.6 (both screen halves), median 2.340 tiles/s along
++//             the path, 95 % interval of the median 2.325-2.352; on the same
++//             rows and mapping Ice Golem, Skeletons and Knight match S/50
++//             within 1-2 %, so it is the card, not the screen mapping
++//             (runs/bridge_1126/speed2.py).
++inline bool jumpEdge() { static const bool b = onExact("jumpedge"); return b; }
++inline bool walkLegs() { static const bool b = onExact("walklegs"); return b; }
++inline bool hogSpeed() { static const bool b = onExact("hogspeed"); return b; }
++// hogspeed: land speed 2.34 tiles/s whether or not "speed" is on (S/50 = 2.40;
++// speedScale() 1 builds it at S x 0.02209 = 2.65).
++constexpr float HOG_LAND_SPEED_OF_S50 = 2.34f / 2.40f;
++inline float hogLandScale() { return HOG_LAND_SPEED_OF_S50 * (0.010f / 0.011045f) / speedScale(); }
++
+ // Tornado (royalesim area_effect_objects Tornado, status ATTRACT_LAW
+ // base_speed): life 1050 ms, every tick a victim in the radius takes an extra
+ // step of attract_percentage 360 % of its own base speed toward the centre.
+diff --git a/engine/include/entities/Troop.h b/engine/include/entities/Troop.h
+index 2a29fd1..1c9bcc6 100644
+--- a/engine/include/entities/Troop.h
++++ b/engine/include/entities/Troop.h
+@@ -17,6 +17,9 @@ public:
+     int jumpColLatch = -1;
+     float jumpColTargetX = -1000.0f;
+     float stompWalkScale = 1.0f;   // floor(S (stop+wait)/stop) / S
++    // Patch 0090 (hogspeed): speed factor on land (not over the water), set by
++    // applyCardMetadata for the Hog Rider.
++    float landSpeedScale = 1.0f;
+ 
+     // Base speed for the observation encoder. Not freeze-adjusted: the
+     // observation describes the unit, and a freeze shows up as it not moving.
+@@ -62,10 +65,19 @@ protected:
+             }
+             stompFactor = stompWalkScale * walked / 2.0f;
+         }
+-        const int maxLegs = jumper ? 3 : 1;
++        // Patch 0090 (walklegs): a walker too spends the rest of its step on
++        // the next leg after reaching a waypoint, but only on a leg that goes
++        // on in nearly the same direction (cos >= WALK_LEG_MIN_COS). Turning a
++        // corner with the rest of the step took two Goblin Machine bodies
++        // (0.75 + 0.75) at a bridge mouth into the water each tick, where the
++        // push and the clamp put both back for ever (tests/core/test_board.cpp,
++        // "pairs of wide bodies cross the river").
++        const bool walkLegs = !jumper && !isFlying && P0088::walkLegs();
++        const int maxLegs = (jumper || walkLegs) ? 3 : 1;
+         Vector2D at = position;
+         float budget = 1.0f;          // share of this tick's movement left
+         bool moved = false;
++        float lastUx = 0.0f, lastUy = 0.0f;
+         for (int leg = 0; leg < maxLegs && budget > 1e-3f; ++leg) {
+             Vector2D waypoint = dest;
+             float jumpScale = 1.0f;
+@@ -87,6 +99,11 @@ protected:
+             // different epsilons produce an absorbing state at the bridge mouths
+             // (tests/core/test_board.cpp).
+             if (distToWaypoint <= Board::WAYPOINT_ARRIVAL_EPS) break;
++            if (walkLegs) {
++                const float ux = dx / distToWaypoint, uy = dy / distToWaypoint;
++                if (leg > 0 && ux * lastUx + uy * lastUy < WALK_LEG_MIN_COS) break;
++                lastUx = ux; lastUy = uy;
++            }
+             moved = true;
+             // The tick-start freeze (frozenThisTick / freezeSlowThisTick), not
+             // freezeTicks: update() has already counted the freezes down by
+@@ -100,6 +117,9 @@ protected:
+             if (inAbilityWindow()) currentSpeed *= windowMoveMultiplier;
+             // The diagonal leg of a river jump (patch 0087).
+             currentSpeed *= jumpScale;
++            // Patch 0090 (CR_P0088=hogspeed): the Hog Rider's measured land speed;
++            // over the water a jumper keeps its own (the crossing jumpedge fits).
++            if (landSpeedScale != 1.0f && !(jumper && overWater(board, at, dest))) currentSpeed *= landSpeedScale;
+             // Patch 0088 (CR_P0088=jumpspeed): over the water a jumper moves
+             // at its JumpSpeed (Hog 160 / Speed 120), on top of the diagonal.
+             if (jumper && P0088::jumpSpeed() && overWater(board, at, dest)) {
+@@ -129,6 +149,10 @@ protected:
+         if (P0088::jump() && jumper && moved && overWater(board, position, dest)) jumpingNow = true;
+     }
+ 
++    // Patch 0090 walklegs: a further leg in the same tick only within about
++    // 18 degrees of the last one.
++    static constexpr float WALK_LEG_MIN_COS = 0.95f;
++
+     static float bankRowFactor(float y, float ux, float uy) {
+         const float k = ((y >= 13.0f && y < 15.0f) || (y >= 18.0f && y < 20.0f)) ? 0.5f : 1.0f;
+         if (k == 1.0f) return 1.0f;
+diff --git a/engine/src/bindings.cpp b/engine/src/bindings.cpp
+index e829242..e9be43b 100644
+--- a/engine/src/bindings.cpp
++++ b/engine/src/bindings.cpp
+@@ -671,6 +671,8 @@ PYBIND11_MODULE(clash_royale_env, m) {
+         d["bankrows"] = P0088::bankRows(); d["physdist"] = P0088::physDist(); d["jumpcol"] = P0088::jumpCol();
+         d["speed_scale"] = P0088::speedScale();
+         d["pocketcells"] = P0088::pocketCells(); d["kingpath"] = P0088::kingPath();   // patch 0089 (exact names only)
++        d["jumpedge"] = P0088::jumpEdge(); d["walklegs"] = P0088::walkLegs();   // patch 0090 (exact names only)
++        d["hogspeed"] = P0088::hogSpeed(); d["hog_land_scale"] = P0088::hogSpeed() ? P0088::hogLandScale() : 1.0f;
+         return d;
+     }, "Patch 0088: the switches this process's engine has latched (read once from CR_P0088).");
+ 
+diff --git a/engine/tests/core/test_board.cpp b/engine/tests/core/test_board.cpp
+index 89ea82b..453df05 100644
+--- a/engine/tests/core/test_board.cpp
++++ b/engine/tests/core/test_board.cpp
+@@ -980,13 +980,26 @@ TEST_CASE("a river jumper goes 45 degrees to within half a tile of its target's
+ 
+     // The two bridge corners and the tile a Hog is played on from the middle.
+     Board::JumperStep a = board.getJumperWaypoint(Vector2D{ 1.0f, 15.0f }, left);
++    Board::JumperStep b = board.getJumperWaypoint(Vector2D{ 16.0f, 15.0f }, right);
++    // Patch 0090 (CR_P0088=jumpedge): the corner jump lands on the bridge's
++    // outer edge line, 0.8 outside the column, 1.5 rows past the near bank,
++    // and keeps its forward speed: scale = length / forward length.
++    const float edgeScale = std::hypot(1.2f, 2.0f) / 2.0f;
++    if (P0088::jumpEdge()) {
++        REQUIRE(a.waypoint.x == Catch::Approx(2.2f));
++        REQUIRE(a.waypoint.y == Catch::Approx(17.0f));
++        REQUIRE(a.speedScale == Catch::Approx(edgeScale));
++        REQUIRE(b.waypoint.x == Catch::Approx(14.8f));
++        REQUIRE(b.waypoint.y == Catch::Approx(17.0f));
++        REQUIRE(b.speedScale == Catch::Approx(edgeScale));
++    } else {
+     REQUIRE(a.waypoint.x == Catch::Approx(2.5f));
+     REQUIRE(a.waypoint.y == Catch::Approx(16.5f));
+     REQUIRE(a.speedScale == Catch::Approx(fast));
+-    Board::JumperStep b = board.getJumperWaypoint(Vector2D{ 16.0f, 15.0f }, right);
+     REQUIRE(b.waypoint.x == Catch::Approx(14.5f));
+     REQUIRE(b.waypoint.y == Catch::Approx(16.5f));
+     REQUIRE(b.speedScale == Catch::Approx(fast));
++    }
+     Board::JumperStep c = board.getJumperWaypoint(Vector2D{ 6.0f, 15.0f }, left);
+     REQUIRE(c.waypoint.x == Catch::Approx(3.5f));
+     REQUIRE(c.waypoint.y == Catch::Approx(17.5f));
+@@ -994,7 +1007,15 @@ TEST_CASE("a river jumper goes 45 degrees to within half a tile of its target's
+ 
+     // In its column over the water: straight across; on the far bank: the target.
+     Board::JumperStep d = board.getJumperWaypoint(Vector2D{ 2.5f, 16.5f }, left);
++    if (P0088::jumpEdge()) {
++        // Patch 0090: inside the walk corridor a jumper takes the walker's
++        // waypoint, its own line to the target where that crosses the bank.
++        const Vector2D walk = board.getNextWaypoint(Vector2D{ 2.5f, 16.5f }, left);
++        REQUIRE(d.waypoint.x == Catch::Approx(walk.x));
++        REQUIRE(d.waypoint.x == Catch::Approx(2.5f + 0.5f / 10.5f));
++    } else {
+     REQUIRE(d.waypoint.x == Catch::Approx(2.5f));
++    }
+     REQUIRE(d.waypoint.y == Catch::Approx(17.5f));
+     REQUIRE(d.speedScale == Catch::Approx(1.0f));
+     Board::JumperStep e = board.getJumperWaypoint(Vector2D{ 2.5f, 17.5f }, left);
+@@ -1005,8 +1026,13 @@ TEST_CASE("a river jumper goes 45 degrees to within half a tile of its target's
+     // Far enough back to reach the column before the water: the straight line
+     // to it on the near bank, at walking speed.
+     Board::JumperStep f = board.getJumperWaypoint(Vector2D{ 1.0f, 10.0f }, left);
++    if (P0088::jumpEdge()) {   // patch 0090: the edge point from anywhere on the outer side
++        REQUIRE(f.waypoint.x == Catch::Approx(2.2f));
++        REQUIRE(f.waypoint.y == Catch::Approx(17.0f));
++    } else {
+     REQUIRE(f.waypoint.x == Catch::Approx(2.5f));
+     REQUIRE(f.waypoint.y == Catch::Approx(15.5f));
++    }
+     REQUIRE(f.speedScale == Catch::Approx(1.0f));
+     Board::JumperStep fromKing = board.getJumperWaypoint(Vector2D{ 9.0f, 0.0f }, right);
+     REQUIRE(fromKing.waypoint.x == Catch::Approx(13.5f));   // recorded: 13.55 at the river
+@@ -1014,8 +1040,13 @@ TEST_CASE("a river jumper goes 45 degrees to within half a tile of its target's
+     // Not far enough back, and more than a tile from the water: 45 degrees at
+     // walking speed.
+     Board::JumperStep g = board.getJumperWaypoint(Vector2D{ 1.0f, 14.2f }, left);
++    if (P0088::jumpEdge()) {   // patch 0090; more than JUMP_ZONE from the water: walking speed
++        REQUIRE(g.waypoint.x == Catch::Approx(2.2f));
++        REQUIRE(g.waypoint.y == Catch::Approx(17.0f));
++    } else {
+     REQUIRE(g.waypoint.x == Catch::Approx(2.5f));
+     REQUIRE(g.waypoint.y == Catch::Approx(15.7f));
++    }
+     REQUIRE(g.speedScale == Catch::Approx(1.0f));
+ 
+     // A building in the middle is its target: the same 45 degrees, towards
+@@ -1027,9 +1058,15 @@ TEST_CASE("a river jumper goes 45 degrees to within half a tile of its target's
+ 
+     // Team 1 is the mirror.
+     Board::JumperStep i = board.getJumperWaypoint(Vector2D{ 16.0f, 18.0f }, Vector2D{ 14.0f, 6.0f });
++    if (P0088::jumpEdge()) {   // patch 0090
++        REQUIRE(i.waypoint.x == Catch::Approx(14.8f));
++        REQUIRE(i.waypoint.y == Catch::Approx(16.0f));
++        REQUIRE(i.speedScale == Catch::Approx(edgeScale));
++    } else {
+     REQUIRE(i.waypoint.x == Catch::Approx(14.5f));
+     REQUIRE(i.waypoint.y == Catch::Approx(16.5f));
+     REQUIRE(i.speedScale == Catch::Approx(fast));
++    }
+ 
+     // A target on its own side of the river: the target.
+     Board::JumperStep k = board.getJumperWaypoint(Vector2D{ 1.0f, 10.0f }, Vector2D{ 9.0f, 14.0f });
+@@ -1042,6 +1079,24 @@ TEST_CASE("a jumper beside its crossing, on the outer side, walks onto the colum
+           "[board][waypoint][patch0087]") {
+     Board board;
+     const Vector2D left{ 3.0f, 27.0f }, right{ 14.0f, 27.0f };
++    if (P0088::jumpEdge()) {
++        // Patch 0090: beside the bridge (within BRIDGE_WALK_REACH of the
++        // column, outer side) a jumper takes the walker's route; recorded
++        // (2, 15): 2.24 / 2.46 / 2.71 on real rows 14.5 / 15 / 16, not the
++        // column at the bank.
++        for (const auto& [from, to] : { std::pair<Vector2D, Vector2D>{ { 2.0f, 15.0f }, left },
++                                        { { 15.0f, 15.0f }, right },
++                                        { { 15.0f, 18.0f }, { 14.0f, 6.0f } },
++                                        { { 2.0f, 18.0f }, { 3.0f, 6.0f } } }) {
++            const Board::JumperStep js = board.getJumperWaypoint(from, to);
++            const Vector2D walk = board.getNextWaypoint(from, to);
++            REQUIRE(js.waypoint.x == Catch::Approx(walk.x));
++            REQUIRE(js.waypoint.y == Catch::Approx(walk.y));
++            REQUIRE(js.speedScale == Catch::Approx(1.0f));
++            REQUIRE(std::abs(js.waypoint.x - (from.x < 8.5f ? 3.0f : 14.0f)) >= 0.5f - 1e-4f);
++        }
++        return;
++    }
+     Board::JumperStep a = board.getJumperWaypoint(Vector2D{ 2.0f, 15.0f }, left);
+     REQUIRE(a.waypoint.x == Catch::Approx(3.0f));
+     REQUIRE(a.waypoint.y == Catch::Approx(15.5f));
+@@ -1085,7 +1140,11 @@ TEST_CASE("getJumperWaypoint never returns the caller's own position",
+                         REQUIRE(here.distanceTo(js.waypoint) > Board::WAYPOINT_ARRIVAL_EPS);
+                         const bool plain = js.speedScale == Catch::Approx(1.0f);
+                         const bool fast = js.speedScale == Catch::Approx(Board::JUMP_DIAGONAL_SPEED);
+-                        REQUIRE((plain || fast));
++                        // Patch 0090 jumpedge: the jump to the edge point keeps the forward
++                        // speed, so its scale lies between the two.
++                        const bool edge = P0088::jumpEdge() && js.speedScale >= 1.0f - 1e-4f
++                            && js.speedScale <= Board::JUMP_DIAGONAL_SPEED + 1e-4f;
++                        REQUIRE((plain || fast || edge));
+                     }
+                 }
+             }
+@@ -1121,9 +1180,14 @@ TEST_CASE("a Hog Rider lands where the recorded one does, when a straight one wo
+     };
+     struct Case { float from, lands; };
+     // placed on -> far-bank x. Recorded: 2.52, 14.54, 3.6, 3.0, 14.0, 3.05-3.2.
+-    const Case cases[] = { { 1.0f, 2.5f }, { 16.0f, 14.5f }, { 6.0f, 3.5f }, { 11.0f, 13.5f },
+-                           { 0.0f, 2.5f }, { 17.0f, 14.5f },
+-                           { 2.0f, 3.0f }, { 15.0f, 14.0f }, { 3.0f, 3.0f }, { 14.0f, 14.0f } };
++    // Patch 0090 (jumpedge): 2.52 / 14.54 were box centres; the box carries
++    // the Hog's hammer, +0.3 outward while it faces up the left lane
++    // (runs/bridge_1126): the corner Hog lands on 2.2 / 14.8 (n 136 / 130),
++    // and the one beside the bridge walks, 2.6 / 14.4 at the far bank.
++    const bool edge = P0088::jumpEdge();
++    const Case cases[] = { { 1.0f, edge ? 2.2f : 2.5f }, { 16.0f, edge ? 14.8f : 14.5f }, { 6.0f, 3.5f }, { 11.0f, 13.5f },
++                           { 0.0f, edge ? 2.2f : 2.5f }, { 17.0f, edge ? 14.8f : 14.5f },
++                           { 2.0f, edge ? 2.59f : 3.0f }, { 15.0f, edge ? 14.41f : 14.0f }, { 3.0f, 3.0f }, { 14.0f, 14.0f } };
+     for (int team : { 0, 1 }) {
+         const Landing straight = land(3.0f, team);
+         REQUIRE(straight.tick > 0);
+@@ -1183,3 +1247,66 @@ TEST_CASE("river jumpers from every start cross the river", "[board][waypoint][r
+     REQUIRE(stuck == 0);
+     REQUIRE(runs == 5 * 2 * 3 * 171);
+ }
++
++// Patch 0090 (CR_P0088=hogspeed): on 174 clean real tracks past the river
++// (runs/bridge_1126/speed2.py, real rows 18.6-21.6, both screen halves) the Hog
++// runs 2.34 tiles/s, not S/50 = 2.40, while Ice Golem, Skeletons and Knight
++// match S/50 on the same rows. Over the water it keeps its speed, so the
++// crossing jumpedge fits is unchanged.
++TEST_CASE("hogspeed: the Hog Rider walks 2.5 % slower on land and keeps its speed over the water",
++          "[board][patch0090]") {
++    REQUIRE(P0088::HOG_LAND_SPEED_OF_S50 * 2.40f == Catch::Approx(2.34f));
++    REQUIRE(P0088::hogLandScale() * P0088::speedScale() == Catch::Approx(0.975f * 0.010f / 0.011045f));
++    const std::vector<int> deck = { 15, 6, 25, 40, 24, 72, 33, 7 };
++    constexpr int HOG = 15, LUMBERJACK = 21;   // same tier (120)
++    const float want = P0088::hogSpeed() ? 0.975f : 1.0f;
++    auto spawn = [](GameManager& game, float hx, float hy, float lx, float ly,
++                    std::shared_ptr<Troop>& hog, std::shared_ptr<Troop>& lj) {
++        Board& board = game.getBoard();
++        CardRegistry::getInstance().getCard(HOG)->spawnEntity(hx, hy, 0, board);
++        CardRegistry::getInstance().getCard(LUMBERJACK)->spawnEntity(lx, ly, 0, board);
++        board.commitPendingEntities();
++        for (const auto& e : board.getEntities()) {
++            if (e->cardId == HOG) hog = std::dynamic_pointer_cast<Troop>(e);
++            if (e->cardId == LUMBERJACK) lj = std::dynamic_pointer_cast<Troop>(e);
++        }
++    };
++    SECTION("open ground past the river: Hog step / Lumberjack step") {
++        GameManager game(deck, deck);
++        std::shared_ptr<Troop> hog, lj;
++        spawn(game, 3.0f, 20.5f, 14.0f, 20.5f, hog, lj);
++        REQUIRE(hog); REQUIRE(lj);
++        REQUIRE(hog->landSpeedScale == Catch::Approx(want));
++        REQUIRE(lj->landSpeedScale == 1.0f);
++        float hs = 0.0f, ls = 0.0f; int n = 0;
++        for (int t = 1; t <= 40; ++t) {
++            const Vector2D h0 = hog->position, l0 = lj->position;
++            game.step();
++            const float dh = h0.distanceTo(hog->position), dl = l0.distanceTo(lj->position);
++            if (h0.y >= 20.5f && hog->position.y <= 23.0f && l0.y >= 20.5f && lj->position.y <= 23.0f
++                && dh > 0.05f && dl > 0.05f) { hs += dh; ls += dl; ++n; }
++        }
++        INFO("ticks " << n << " hog " << hs << " lumberjack " << ls);
++        REQUIRE(n >= 5);
++        REQUIRE(hs / ls == Catch::Approx(want).epsilon(0.005));
++    }
++    SECTION("over the water: the Hog's step is the Lumberjack's on open ground") {
++        if (!P0088::jumpEdge()) return;   // the column route over the bridge (0090 jumpedge)
++        GameManager game(deck, deck);
++        Board& board = game.getBoard();
++        std::shared_ptr<Troop> hog, lj;
++        spawn(game, 3.0f, 12.0f, 14.0f, 6.0f, hog, lj);
++        REQUIRE(hog); REQUIRE(lj);
++        float hs = 0.0f, ls = 0.0f; int nh = 0, nl = 0;
++        for (int t = 1; t <= 60; ++t) {
++            const Vector2D h0 = hog->position, l0 = lj->position;
++            game.step();
++            const float dh = h0.distanceTo(hog->position), dl = l0.distanceTo(lj->position);
++            if (h0.y >= board.getRiverStart() && hog->position.y < board.getRiverEnd() && dh > 0.05f) { hs += dh; ++nh; }
++            if (l0.y >= 6.5f && lj->position.y <= 12.5f && dl > 0.05f) { ls += dl; ++nl; }
++        }
++        INFO("water ticks " << nh << " step " << hs / std::max(nh, 1) << ", land ticks " << nl << " step " << ls / std::max(nl, 1));
++        REQUIRE(nh >= 3); REQUIRE(nl >= 5);
++        REQUIRE((hs / nh) / (ls / nl) == Catch::Approx(1.0f).epsilon(0.005));
++    }
++}
+diff --git a/engine/python_ai/tests/test_bridge_crossing_0090.py b/engine/python_ai/tests/test_bridge_crossing_0090.py
+new file mode 100644
+index 0000000..77b2af0
+--- /dev/null
++++ b/engine/python_ai/tests/test_bridge_crossing_0090.py
+@@ -0,0 +1,247 @@
++"""River crossing against real frames: patch 0090 (switches `jumpedge`, `walklegs`, `hogspeed`).
++
++MEASURED 2026-11-26 on recorded live matches (r5 detector tracks, runs/bridge_1126,
++266 own Hog crossings from the corner tiles, sprite bias removed):
++
++* A Hog played on a back corner, engine (1,15) or (16,15), jumps on a straight line
++  to x 2.2 / 14.8 (0.8 tile outside the lane column 3.0 / 14.0, i.e. near the
++  bridge's outer edge), keeps that x straight ahead to real row 18 (engine 20), and
++  only then curves in.  gen2_j lands it at 2.57 / 14.43 (0.35-0.42 tile inward).
++* A Hog played beside the bridge, engine (2,15) / (15,15), does not step onto the
++  column before the bank as the 0087 `jumpcol` rule makes it do.
++* Its timing was already right (+0.05..-0.10 s on rows 17-21), so the fix must not
++  change it.
++* Walkers lost the rest of their step at every waypoint (about 4 % slow over the
++  river); `walklegs` lets them spend it on the next leg like jumpers do.
++* The Hog runs 2.34 tiles/s on open ground past the river (174 clean tracks, real
++  rows 18.6-21.6, median along the path 2.340, 95 % interval 2.325-2.352), not
++  S/50 = 2.40; Ice Golem, Skeletons and Knight match S/50 on the same rows, so it
++  is the card, not the screen mapping.  `hogspeed` sets its land speed to 2.34 and
++  leaves its speed over the water alone (the crossing above stays as it is).
++
++The switches are read once per process from CR_P0088, so every case runs in its
++own subprocess with the environment it needs.  Run from the build folder:
++
++    cd build/gen2_k/engine && nice -n 10 ../../../.venv/bin/python -m pytest \
++        python_ai/tests/test_bridge_crossing_0090.py -q
++
++On gen2_j the 0090 cases fail (the switches do not exist there); to see it, copy this file
++out of the build tree and run it with CR_ENGINE_UNDER_TEST=<abs path>/build/gen2_j/engine.
++"""
++import json
++import os
++import subprocess
++import sys
++
++import pytest
++
++# CR_ENGINE_UNDER_TEST points the subprocesses at another build (to show the cases fail on gen2_j).
++ENGINE = os.environ.get("CR_ENGINE_UNDER_TEST") or \
++    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++BASE = "tornado,jump,log,turret,king,speed,bankrows,stomp,jumpcol,pocketcells,kingpath"
++ON = BASE + ",jumpedge,walklegs"
++HOGSPEED = ON + ",hogspeed"
++HOG, ICE_GOLEM, KNIGHT, LUMBERJACK, ROYAL_HOGS = 15, 40, 0, 21, 82
++DECK = [25, 15, 0, 1, 2, 3, 4, 5]
++HZ = 10
++
++
++def _probe(specs):
++    """Child process: one unit alone on an empty board per spec, its path in the attacker frame."""
++    sys.path.insert(0, ENGINE)
++    import python_ai  # noqa: F401
++    import clash_royale_env as E
++    out = {"active": E.p0088_active() if hasattr(E, "p0088_active") else {}, "runs": []}
++    for card, x, y, team, secs in specs:
++        env = E.ClashRoyaleEnv(list(DECK), list(DECK), 3600)
++        env.seed(1)
++        env.step_self_play(4, 0.0, 0.0, 4, 0.0, 0.0, 30)
++        before = {u["id"] for u in env.get_units()}
++        env.inject(int(card), float(x), float(y), int(team), -1.0, -1)
++        uid, path = None, []
++        for k in range(int(secs * HZ)):
++            env.step_self_play(4, 0.0, 0.0, 4, 0.0, 0.0, 1)
++            U = {u["id"]: u for u in env.get_units()}
++            if uid is None:
++                new = [u for u in U.values() if u["id"] not in before and not u["building"]
++                       and u["team"] == team]
++                if not new:
++                    continue
++                uid = min(new, key=lambda u: (u["x"] - x) ** 2 + (u["y"] - y) ** 2)["id"]
++            u = U.get(uid)
++            if u is None:
++                break
++            ux, uy = (u["x"], u["y"]) if team == 0 else (17.0 - u["x"], 33.0 - u["y"])
++            path.append(((k + 1) / HZ, ux, uy))
++        out["runs"].append(path)
++    return out
++
++
++_CACHE = {}
++
++
++def run(switches, specs):
++    key = (switches, json.dumps(specs))
++    if key not in _CACHE:
++        env = dict(os.environ, CR_P0088=switches, CR_POCKET_TABLE="verified", PYTHONDONTWRITEBYTECODE="1")
++        r = subprocess.run([sys.executable, os.path.abspath(__file__), json.dumps(specs)], env=env,
++                           capture_output=True, text=True, check=True)
++        _CACHE[key] = json.loads(r.stdout.strip().splitlines()[-1])
++    return _CACHE[key]
++
++
++def x_at_y(path, y):
++    """x where the path first reaches engine row y (attacker frame), linear interpolation."""
++    for (ta, xa, ya), (tb, xb, yb) in zip(path, path[1:]):
++        if ya < y <= yb:
++            f = (y - ya) / (yb - ya)
++            return xa + f * (xb - xa)
++    raise AssertionError(f"path never reaches y {y}")
++
++
++def t_at_y(path, y):
++    for (ta, xa, ya), (tb, xb, yb) in zip(path, path[1:]):
++        if ya < y <= yb:
++            return ta + (y - ya) / (yb - ya) * (tb - ta)
++    raise AssertionError(f"path never reaches y {y}")
++
++
++def real_row(y):
++    return y - min(max((y - 13) / 2, 0), 1) - min(max((y - 18) / 2, 0), 1)
++
++
++def anchored_t(path, y):
++    """seconds from the first reach of deploy row + 0.3 (real rows) to engine row y: the
++    anchor used for the real tracks."""
++    y0 = path[0][2]
++    r0 = real_row(y0) + 0.3
++    pts = [(t, real_row(yy)) for t, _, yy in path]
++    for (ta, ra), (tb, rb) in zip(pts, pts[1:]):
++        if ra < r0 <= rb:
++            t0 = ta + (r0 - ra) / (rb - ra) * (tb - ta)
++            return t_at_y(path, y) - t0
++    raise AssertionError("never left the deploy row")
++
++
++# attacker-frame start -> (team, injected tile)
++CORNERS = {"left_team0": (0, 1, 15), "right_team0": (0, 16, 15),
++           "left_team1": (1, 16, 18), "right_team1": (1, 1, 18)}
++
++
++def corner_specs():
++    return [[HOG, x, y, team, 4.0] for team, x, y in CORNERS.values()]
++
++
++def test_switches_are_exact_names():
++    a = run(BASE + ",all", [])["active"]
++    assert a.get("jumpedge") is False and a.get("walklegs") is False
++    b = run(ON, [])["active"]
++    assert b.get("jumpedge") is True and b.get("walklegs") is True
++
++
++@pytest.mark.parametrize("i,name", list(enumerate(CORNERS)))
++def test_corner_hog_lands_on_the_bridge_edge_and_runs_straight(i, name):
++    path = run(ON, corner_specs())["runs"][i]
++    want = 2.2 if name.startswith("left") else 14.8
++    for y in (17.5, 18.0, 19.0, 20.0):     # real rows 16.5, 17.0, 17.5, 18.0
++        assert abs(x_at_y(path, y) - want) <= 0.1, (name, y, x_at_y(path, y))
++    # then it curves in toward the tower (real: 2.48 / 14.52 at engine row 22)
++    lane = 3.0 if want < 8.5 else 14.0
++    assert abs(x_at_y(path, 22.0) - lane) < abs(want - lane) - 0.1, x_at_y(path, 22.0)
++    assert abs(x_at_y(path, 22.0) - (2.48 if want < 8.5 else 14.52)) <= 0.15, x_at_y(path, 22.0)
++
++
++@pytest.mark.parametrize("i,name", list(enumerate(CORNERS)))
++def test_corner_hog_timing_is_unchanged(i, name):
++    on = run(ON, corner_specs())["runs"][i]
++    off = run(BASE, corner_specs())["runs"][i]
++    for y in (18.0, 20.0, 21.0):
++        assert abs(anchored_t(on, y) - anchored_t(off, y)) <= 0.06, (name, y)
++    # real (median of 266 tracks): 1.57 s from the anchor to real row 18 (engine 20)
++    assert abs(anchored_t(on, 20.0) - 1.57) <= 0.12, anchored_t(on, 20.0)
++
++
++@pytest.mark.parametrize("team,x,y,side", [(0, 2, 15, "left"), (0, 15, 15, "right"),
++                                           (1, 15, 18, "left"), (1, 2, 18, "right")])
++def test_hog_beside_the_bridge_does_not_step_onto_the_column(team, x, y, side):
++    path = run(ON, [[HOG, x, y, team, 4.0]])["runs"][0]
++    xb = x_at_y(path, 15.5)       # the near bank
++    if side == "left":
++        assert xb <= 2.6, xb
++    else:
++        assert xb >= 14.4, xb
++
++
++def test_walker_keeps_its_speed_over_the_river():
++    """Ice Golem on the column, bank to bank (engine 15.5 -> 18.0, 2.5 tiles)."""
++    specs = [[ICE_GOLEM, 3, 13, 0, 9.0], [ICE_GOLEM, 3, 9, 0, 9.0]]
++    on = run(ON, specs)["runs"]
++    off = run(BASE, specs)["runs"]
++    open_on = (t_at_y(on[1], 13.0) - t_at_y(on[1], 10.5)) / 2.5        # open ground, s per tile
++    river_on = (t_at_y(on[0], 18.0) - t_at_y(on[0], 15.5)) / 2.5
++    river_off = (t_at_y(off[0], 18.0) - t_at_y(off[0], 15.5)) / 2.5
++    assert river_on <= open_on * 1.02, (river_on, open_on)
++    assert river_on < river_off, (river_on, river_off)
++
++
++def test_switches_off_keep_the_gen2_j_line():
++    """Regression guard: without the switches the corner Hog lands where gen2_j put it."""
++    runs = run(BASE, corner_specs())["runs"]
++    for path, want in zip(runs, (2.526, 14.474, 2.526, 14.474)):
++        assert abs(x_at_y(path, 18.0) - want) <= 0.02, x_at_y(path, 18.0)
++
++
++def chord_speed(path, y0, y1):
++    """tiles/s on the straight line between the first reaches of engine rows y0 and y1."""
++    xa, xb = x_at_y(path, y0), x_at_y(path, y1)
++    return ((y1 - y0) ** 2 + (xb - xa) ** 2) ** 0.5 / (t_at_y(path, y1) - t_at_y(path, y0))
++
++
++def test_hogspeed_is_an_exact_name():
++    a = run(ON + ",all", [])["active"]
++    assert a.get("hogspeed") is False
++    b = run(HOGSPEED, [])["active"]
++    assert b.get("hogspeed") is True and abs(b.get("hog_land_scale") - 0.975) < 1e-4
++
++
++# attacker frame: past the river (engine 20.6 -> 23.4 = real 18.6 -> 21.4) and on its own half
++LAND = {"far_team0": (0, 3, 20.5, 20.6, 23.4), "far_team1": (1, 14, 12.5, 20.6, 23.4),
++        "own_team0": (0, 3, 8, 8.6, 12.4), "own_team1": (1, 14, 25, 8.6, 12.4)}
++
++
++@pytest.mark.parametrize("name", list(LAND))
++def test_hog_walks_at_the_measured_speed_on_land(name):
++    team, x, y, y0, y1 = LAND[name]
++    spec = [[HOG, x, y, team, 5.0]]
++    v_on = chord_speed(run(HOGSPEED, spec)["runs"][0], y0, y1)
++    v_off = chord_speed(run(ON, spec)["runs"][0], y0, y1)
++    assert abs(v_on - 2.34) <= 0.015, (name, v_on)
++    assert abs(v_off - 2.40) <= 0.015, (name, v_off)
++
++
++def test_hog_jump_and_crossing_are_unchanged():
++    """Over the water the Hog keeps its speed: the transit time (engine 15.5 -> 18.0, clear
++    of the boosted tick that leaves the bank rows) and the corner Hog's arrival on real
++    rows 17-18 stay within a fraction of a tick of the 0090 line (real: 1.57 s to real row 18)."""
++    specs = [[HOG, 3, 12, 0, 5.0]] + [[HOG, x, y, team, 6.0] for team, x, y in CORNERS.values()]
++    on, h = run(ON, specs)["runs"], run(HOGSPEED, specs)["runs"]
++    tr_on = t_at_y(on[0], 18.0) - t_at_y(on[0], 15.5)
++    tr_h = t_at_y(h[0], 18.0) - t_at_y(h[0], 15.5)
++    assert abs(tr_h - tr_on) <= 0.01, (tr_on, tr_h)   # the exit tick finishes its step on land
++    for a, b in zip(on[1:], h[1:]):
++        for y in (18.0, 19.0, 20.0):          # real rows 17, 17.5, 18
++            assert 0.0 <= anchored_t(b, y) - anchored_t(a, y) <= 0.03, (y, anchored_t(a, y), anchored_t(b, y))
++        assert abs(anchored_t(b, 20.0) - 1.57) <= 0.12, anchored_t(b, 20.0)
++        # the far half costs 2.5 % more: engine 20 -> 24 (4 tiles, 1.67 s at 2.40)
++        d = (anchored_t(b, 24.0) - anchored_t(b, 20.0)) - (anchored_t(a, 24.0) - anchored_t(a, 20.0))
++        assert 0.02 <= d <= 0.07, d
++
++
++def test_hogspeed_leaves_other_units_alone():
++    specs = [[KNIGHT, 3, 5, 0, 8.0], [LUMBERJACK, 14, 5, 0, 6.0], [ROYAL_HOGS, 3, 10, 0, 6.0],
++             [ICE_GOLEM, 3, 9, 0, 9.0]]
++    assert run(ON, specs)["runs"] == run(HOGSPEED, specs)["runs"]
++
++
++if __name__ == "__main__":
++    print(json.dumps(_probe(json.loads(sys.argv[1]))))

@@ -452,3 +452,288 @@ def test_an_opponent_network_presses_the_ability_of_the_deck_it_holds():
     pol.configure(ours, two)                          # back on a one-Hero deck: slot 1 only
     assert pol.net.ability_slots == [1]
     assert not pol.act(obs, pol.state(3), ready)[3].any()   # head 1 holds
+
+
+# ------------------------------------------------------- the lagged teacher ---
+def test_a_lagged_teacher_lands_its_cards_after_the_act_delay_and_replays():
+    plain = _env(seed=3)
+    s = _seed_for(plain, "teacher", False, rung=10)
+    assert "lag" not in plain._draw(random.Random(s + 104729))         # share 0: the old stream stands
+    env = _env(seed=3, pool={"weights": {"ghost": 0.0, "clone": 0.0, "teacher": 1.0, "self": 0.0},
+                             "teacher": {"lag_share": 1.0}})
+    s = _seed_for(env, "teacher", False, rung=10)
+    sp = env._draw(random.Random(s + 104729))
+    assert sp["lag"] is True and sp["name"].endswith("lag")
+    pushes = []
+    push = env._delay.push
+
+    def spy(team, tick, card_id, x, y):
+        ok = push(team, tick, card_id, x, y)
+        if team == 1 and ok:
+            pushes.append(int(tick))
+        return ok
+
+    env._delay.push = spy
+    d1, t1, info = _episode(env, s, steps=120)
+    assert isinstance(env.teacher, P._LaggedTeacher) and json.loads(info["opp_spec"])["lag"] is True
+    d = int(info["act_delay_ticks"])
+    spent, landed = 0.0, 0
+    for row in t1:                                         # (reward, tick, e0, e1, hand0, hand1, spent1)
+        if row[6] > spent + 1e-6:
+            landed += 1
+            assert any(p + d <= row[1] for p in pushes), (row[1], pushes)
+            assert sum(p + d <= row[1] for p in pushes) >= landed
+        spent = row[6]
+    assert landed > 0 and len(pushes) >= landed
+    env._delay.push = push
+    d2, t2, _ = _episode(env, s, steps=120)
+    assert (d1, t1) == (d2, t2)
+
+
+# ------------------------------------------------------- building answer ---
+def test_the_building_answer_off_leaves_the_draws_and_the_match_alone():
+    plain = _env(seed=3)
+    off = _env(seed=3, pool={"teacher": {"build_answer_p": 0.0}})
+    on = _env(seed=3, pool={"teacher": {"build_answer_p": 0.5}})
+    for s in range(1, 300):
+        a, b, c = (e._draw(random.Random(s + 104729)) for e in (plain, off, on))
+        assert a == b and "build_answer" not in a
+        if c["kind"] == "teacher":
+            assert c.pop("build_answer") == 0.5                # a spec entry, no random draw
+        assert a == c
+    s = _seed_for(plain, "teacher", False, rung=10)
+    assert _episode(plain, s, steps=120)[:2] == _episode(off, s, steps=120)[:2]
+    assert plain._util.build_answer_log == []
+
+
+def _ids(*names):
+    out = {}
+    for c in C.E.get_all_card_ids():
+        i = C.E.get_card_info(c)
+        if i["name"] in names and not (i["is_champion"] or i["is_hero"]) and i["name"] not in out:
+            out[i["name"]] = int(c)
+    return [out[n] for n in names]
+
+
+def _hog_case(p, hog_hp=-1.0, elixir=10.0, kind="teacher", hog_y=15.0, **extra):
+    """Our Hog Rider on the left bridge; the teacher (or the clone seat) holds a Cannon."""
+    deck = _ids("Cannon", "Knight", "Archers", "Fireball", "The Log", "Ice Spirit", "Skeletons", "Musketeer")
+    env = _env(seed=3, pool={"weights": {"ghost": 0.0, "clone": 0.0, "teacher": 1.0, "self": 0.0}})
+    spec = {"kind": kind, "deck": deck, "rung": 10, "build_answer": p}
+    if kind == "clone":
+        spec.update(ckpt=CLONE, name="clone", temp=1.0)
+    spec.update(extra)
+    env.reset(seed=11, options={"spec": spec})
+    g = env.game
+    assert g.set_hand_for_team(1, deck[:4])
+    g.set_elixir_for_team(1, float(elixir))
+    g.inject(15, 3.5, float(hog_y), 0, float(hog_hp))
+    g.step_self_play(C.NOOP, 0.0, 0.0, C.NOOP, 0.0, 0.0, 1, False, False, False, False)   # on the board
+    assert any(u["card_id"] == 15 for u in g.get_units())
+    return env, g, deck
+
+
+NOOP_ACTION = {"card_index": C.NOOP, "target_x": 0.0, "target_y": 0.0,
+               "activate_ability_slot1": 0, "activate_ability_slot2": 0}
+
+
+def test_a_committed_teacher_puts_the_building_on_the_pull_row_and_pulls_the_hog():
+    env, g, deck = _hog_case(1.0)
+    cannon, pulled, early = deck[0], False, []
+    for _ in range(40):
+        env.step(dict(NOOP_ACTION))
+        us = g.get_units()
+        b = [u for u in us if u["team"] == 1 and u["card_id"] == cannon]
+        hog = [u for u in us if u["team"] == 0 and u["card_id"] == 15]
+        if b and not any(e[0] == "fire" for e in env._util.build_answer_log):
+            early.append(b)
+        if b and hog and hog[0]["target_id"] == b[0]["id"]:
+            pulled = True
+            break
+    log = env._util.build_answer_log
+    kinds = [e[0] for e in log]
+    assert kinds[:2] == ["commit", "fire"], log
+    commit, fire = log[0], log[1]
+    assert 17.9 <= commit[4] <= 23.4                           # the drawn row
+    assert fire[2] == cannon and abs(fire[5] - commit[4]) <= 1.5, log   # sent at (about) that row
+    assert not early and pulled
+    x = b[0]["x"]
+    assert 6.0 <= x <= 9.0 and abs(b[0]["y"] - (33.0 - 11.0)) <= 1.0, b   # the pull row, the Hog's side
+
+
+def test_the_commitment_ends_when_the_hog_dies():
+    env, g, deck = _hog_case(1.0, hog_hp=1.0, elixir=4.0)
+    from python_ai.opponents.teacher import Candidate  # noqa: PLC0415
+    env.step(dict(NOOP_ACTION))
+    log = env._util.build_answer_log
+    assert [e[0] for e in log] == ["commit"], log
+    knight = Candidate.single(1, deck[1], 3.0, 12.0, "melee")
+    assert env._util.margin_for(knight, 4.0) == float("inf")    # 4 elixir: the Cannon's 3 are held
+    hog = next(u for u in g.get_units() if u["team"] == 0 and u["card_id"] == 15)
+    g.inject(deck[1], float(hog["x"]), float(hog["y"]) + 1.0, 1, -1.0, 0)    # a Knight on it
+    for _ in range(10):
+        env.step(dict(NOOP_ACTION))
+        if any(e[0] == "release" for e in log):
+            break
+    assert [e[0] for e in log] == ["commit", "release"] and log[1][2] == "gone", log
+    assert env._util.margin_for(knight, 4.0) < float("inf")
+
+
+def test_the_clone_answer_and_the_reserve_off_leave_the_draws_and_the_match_alone():
+    plain = _env(seed=3)
+    off = _env(seed=3, pool={"clone": {"build_answer_p": 0.0}, "teacher": {"build_reserve": False}})
+    on = _env(seed=3, pool={"clone": {"build_answer_p": 0.5}, "teacher": {"build_reserve": True}})
+    for s in range(1, 300):
+        a, b, c = (e._draw(random.Random(s + 104729)) for e in (plain, off, on))
+        assert a == b and "build_answer" not in a and "build_reserve" not in a
+        if c["kind"] == "clone":
+            assert c.pop("build_answer") == 0.5                # spec entries, no random draw
+        if c["kind"] == "teacher":
+            assert c.pop("build_reserve") is True
+        assert a == c
+    s = _seed_for(plain, "clone", False)
+    assert _episode(plain, s, steps=120)[:2] == _episode(off, s, steps=120)[:2]
+    assert plain._net.build_answer_log == []
+    s = _seed_for(plain, "self", False)
+    assert _episode(plain, s, steps=60)[:2] == _episode(on, s, steps=60)[:2]   # never on the self seat
+    with pytest.raises(ValueError):
+        _env(seed=3, pool={"clone": {"build_answer_p": 1.5}})
+
+
+def test_a_committed_clone_masks_the_building_then_puts_it_on_the_pull_row():
+    env, g, deck = _hog_case(1.0, kind="clone")
+    assert env._driver == "net"
+    cannon, pulled, early = deck[0], False, []
+    for _ in range(40):
+        env.step(dict(NOOP_ACTION))
+        us = g.get_units()
+        b = [u for u in us if u["team"] == 1 and u["card_id"] == cannon]
+        hog = [u for u in us if u["team"] == 0 and u["card_id"] == 15]
+        if b and not any(e[0] == "fire" for e in env._net.build_answer_log):
+            early.append(b)
+        if b and hog and hog[0]["target_id"] == b[0]["id"]:
+            pulled = True
+            break
+    log = env._net.build_answer_log
+    assert [e[0] for e in log][:2] == ["commit", "fire"], log
+    commit, fire = log[0], log[1]
+    assert fire[2] == cannon and fire[4] == 11.0 and 6.0 <= fire[3] <= 8.0, log   # a lane-side pull cell
+    assert abs(fire[5] - (commit[4] - 0.265 * (env._delay.d + env._delay.jitter / 2.0))) <= 1.5, log
+    assert not early and pulled
+    assert abs(b[0]["y"] - (33.0 - 11.0)) <= 1.0, b
+
+
+def test_the_reserve_holds_the_building_price_until_a_threat_is_on_its_side():
+    from python_ai.opponents.teacher import Candidate  # noqa: PLC0415
+    for reserve, hog_y, elixir, held in ((True, 13.0, 5.0, True), (True, 13.0, 7.0, False),
+                                         (False, 13.0, 5.0, False), (True, 20.0, 5.0, False)):
+        env, g, deck = _hog_case(0.0, elixir=elixir, hog_y=hog_y, build_reserve=reserve)
+        knight = Candidate.single(1, deck[1], 3.0, 12.0, "melee")
+        cannon = Candidate.single(0, deck[0], 8.0, 11.0, "building")
+        obs = np.asarray(g.get_observation_for_team(1), dtype=np.float32)
+        env._util.act(g, obs)
+        m = env._util.margin_for(knight, float(elixir))
+        assert (m == float("inf")) == held, (reserve, hog_y, elixir, m)
+        assert env._util.margin_for(cannon, float(elixir)) < float("inf")
+        assert env._util.build_answer_log == []
+
+
+def _hog_row(g):
+    hog = [u for u in g.get_units() if u["team"] == 0 and u["card_id"] == 15]
+    return float(hog[0]["y"]) if hog else None
+
+
+def test_a_lagged_committed_teacher_sends_the_building_ahead_by_the_act_delay():
+    env, g, deck = _hog_case(1.0, lag=True)
+    assert env.teacher is not env._util                        # the lagged wrapper is in place
+    cannon, pulled, early = deck[0], False, []
+    for _ in range(50):
+        env.step(dict(NOOP_ACTION))
+        us = g.get_units()
+        b = [u for u in us if u["team"] == 1 and u["card_id"] == cannon]
+        hog = [u for u in us if u["team"] == 0 and u["card_id"] == 15]
+        if b and not any(e[0] == "fire" for e in env._util.build_answer_log):
+            early.append(b)
+        if b and hog and hog[0]["target_id"] == b[0]["id"]:
+            pulled = True
+            break
+    log = env._util.build_answer_log
+    assert [e[0] for e in log][:2] == ["commit", "fire"], log
+    commit, fire = log[0], log[1]
+    lead = env._delay.d + env._delay.jitter / 2.0
+    assert fire[6] == pytest.approx(commit[4] - 0.265 * lead, abs=0.05), log   # the trigger: row less the lead
+    assert fire[5] <= commit[4] - 0.265 * lead + 1.5, log
+    assert not early and pulled
+
+
+def test_the_answer_runs_in_a_midmatch_start_and_replays_from_seed():
+    env = _env(seed=3, pool={"clone": {"build_answer_p": 1.0}})
+    s = _seed_for(env, "clone", True)
+    d1, t1, info = _episode(env, s, steps=200)
+    assert info["midmatch"] and env.spec["build_answer"] == 1.0
+    log1 = list(env._net.build_answer_log)
+    assert all(e[0] in ("commit", "fire", "release") for e in log1)
+    assert all(log1[i - 1][0] == "commit" for i, e in enumerate(log1) if e[0] in ("fire", "release"))
+    d2, t2, _ = _episode(env, s, steps=200)
+    assert (d1, t1, log1) == (d2, t2, list(env._net.build_answer_log))
+
+
+def test_a_due_but_unaffordable_commitment_waits_then_fires_when_the_elixir_comes():
+    env, g, deck = _hog_case(1.0, elixir=0.0)
+    log = env._util.build_answer_log
+    env.step(dict(NOOP_ACTION))
+    assert [e[0] for e in log] == ["commit"], log
+    row = log[0][4]
+    for _ in range(20):                                        # to the due decision, still broke
+        g.set_elixir_for_team(1, 0.0)
+        if _hog_row(g) >= row - 0.265 * 2.5:
+            break
+        env.step(dict(NOOP_ACTION))
+    g.set_elixir_for_team(1, 0.0)
+    env.step(dict(NOOP_ACTION))                                # due, unaffordable: waits
+    assert [e[0] for e in log] == ["commit"], log
+    assert _hog_row(g) <= P.BUILD_LAST_ROW
+    g.set_elixir_for_team(1, 10.0)
+    env.step(dict(NOOP_ACTION))
+    assert [e[0] for e in log] == ["commit", "fire"], log
+    assert log[1][2] == deck[0] and log[1][5] > row - 0.265 * 2.5, log   # fired late, not released
+
+
+def test_the_attack_bank_off_leaves_the_draws_and_the_match_alone():
+    plain = _env(seed=3)
+    off = _env(seed=3, pool={"teacher": {"attack_bank": 0.0}})
+    on = _env(seed=3, pool={"teacher": {"attack_bank": 2.5}})
+    for s in range(1, 300):
+        a, b, c = (e._draw(random.Random(s + 104729)) for e in (plain, off, on))
+        assert a == b and "attack_bank" not in a
+        if c["kind"] == "teacher":
+            assert c.pop("attack_bank") == 2.5                 # a spec entry, no random draw
+        assert a == c
+    s = _seed_for(plain, "teacher", False)
+    assert _episode(plain, s, steps=120)[:2] == _episode(off, s, steps=120)[:2]
+    with pytest.raises(ValueError):
+        _env(seed=3, pool={"teacher": {"attack_bank": -1.0}})
+
+
+def test_the_attack_bank_holds_an_attack_until_the_bank_is_there_or_a_threat_comes():
+    from python_ai.opponents.teacher import Candidate  # noqa: PLC0415
+    # (bank, our Hog's world y, elixir, the knight's own-frame row, kind, held)
+    for bank, hog_y, elixir, row, kind, held in ((3.0, 13.0, 5.0, 15.0, "single", True),    # 5 - 3 < 3
+                                                 (3.0, 13.0, 7.0, 15.0, "single", False),   # 7 - 3 >= 3
+                                                 (3.0, 13.0, 5.0, 11.0, "single", False),   # its own half
+                                                 (3.0, 13.0, 5.0, 15.0, "followup", False), # a plan's second half
+                                                 (3.0, 20.0, 5.0, 15.0, "single", False),   # a threat on its side
+                                                 (0.0, 13.0, 5.0, 15.0, "single", False)):  # off
+        env, g, deck = _hog_case(0.0, elixir=elixir, hog_y=hog_y, attack_bank=bank)
+        knight = Candidate.single(1, deck[1], 3.0, row, "melee", kind=kind)
+        hog = Candidate.single(2, deck[1], 3.0, 9.0, "wincon")              # a win condition, any row
+        ball = Candidate.single(3, deck[3], 3.0, 26.0, "spell")
+        cannon = Candidate.single(0, deck[0], 8.0, 11.0, "building")
+        obs = np.asarray(g.get_observation_for_team(1), dtype=np.float32)
+        env._util.act(g, obs)
+        m = env._util.margin_for(knight, float(elixir))
+        assert (m == float("inf")) == held, (bank, hog_y, elixir, row, kind, m)
+        if kind == "single" and row == 15.0:
+            assert (env._util.margin_for(hog, float(elixir)) == float("inf")) == held
+        assert env._util.margin_for(ball, float(elixir)) < float("inf")
+        assert env._util.margin_for(cannon, float(elixir)) < float("inf")

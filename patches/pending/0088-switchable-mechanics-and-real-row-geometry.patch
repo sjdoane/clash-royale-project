@@ -1,0 +1,781 @@
+diff --git a/include/core/Board.h b/include/core/Board.h
+index ded7c13..1a30c74 100644
+--- a/include/core/Board.h
++++ b/include/core/Board.h
+@@ -5,6 +5,7 @@
+ #include <cmath>
+ #include <unordered_map>
+ #include "ArenaLayout.h"
++#include "P0088.h"
+ #include "CardLevels.h"
+ #include "Entity.h"
+ #include "StatsEventBus.h"
+@@ -365,6 +366,9 @@ public:
+ 
+                 // Only entities in the same plane collide; fliers pass through
+                 // everything.
++                // A river jumper mid-jump touches nothing (patch 0088,
++                // crforge ContactRule; never set with the switch off).
++                if (e1->jumpingNow || e2->jumpingNow) continue;
+                 if (isTroop1 && isTroop2 && b1.flying == b2.flying) {
+                     float dx = e1->position.x - e2->position.x;
+                     float dy = e1->position.y - e2->position.y;
+@@ -517,8 +521,8 @@ public:
+ 
+         // The nearer corridor, by its centre (patch 0087: the lane column,
+         // until then the deck's seam half a tile further out).
+-        float distToLeft = currentPos.distanceTo(Vector2D{ LEFT_WALK_X, leftBridge.y });
+-        float distToRight = currentPos.distanceTo(Vector2D{ RIGHT_WALK_X, rightBridge.y });
++        float distToLeft = currentPos.engineDistanceTo(Vector2D{ LEFT_WALK_X, leftBridge.y });
++        float distToRight = currentPos.engineDistanceTo(Vector2D{ RIGHT_WALK_X, rightBridge.y });
+         float bridgeX = (distToLeft < distToRight) ? LEFT_WALK_X : RIGHT_WALK_X;
+ 
+         if (isCurrentBelow || isCurrentAbove) {
+@@ -529,7 +533,7 @@ public:
+             const float farY = isCurrentBelow ? riverY_end : riverY_start;
+             Vector2D nearBank{ crossingX(currentPos, targetPos, nearY, bridgeX), nearY };
+             const Vector2D farBank{ crossingX(currentPos, targetPos, farY, bridgeX), farY };
+-            if (currentPos.distanceTo(nearBank) <= WAYPOINT_ARRIVAL_EPS) {
++            if (currentPos.engineDistanceTo(nearBank) <= WAYPOINT_ARRIVAL_EPS) {
+                 return farBank;
+             }
+             // Pushed along the bank onto the deck's outer tile (patch 0087):
+@@ -554,7 +558,7 @@ public:
+         if (isTargetAbove || isTargetBelow) {
+             const float exitY = isTargetAbove ? riverY_end : riverY_start;
+             Vector2D exitBank{ crossingX(currentPos, targetPos, exitY, bridgeX), exitY };
+-            if (currentPos.distanceTo(exitBank) <= WAYPOINT_ARRIVAL_EPS) {
++            if (currentPos.engineDistanceTo(exitBank) <= WAYPOINT_ARRIVAL_EPS) {
+                 return targetPos;
+             }
+             return exitBank;
+@@ -624,7 +628,10 @@ public:
+     static constexpr float JUMP_ZONE = 1.0f;
+     static constexpr float JUMP_DIAGONAL_SPEED = 1.41421356f;
+     static constexpr float BRIDGE_WALK_REACH = 1.0f;
+-    JumperStep getJumperWaypoint(const Vector2D& currentPos, const Vector2D& targetPos) const {
++    // colLatch (jumpcol only): the unit's own record of the step-onto-the-column
++    // decision, -1 undecided, 0 no, 1 yes; null = decide on the spot.
++    JumperStep getJumperWaypoint(const Vector2D& currentPos, const Vector2D& targetPos,
++                                 int* colLatch = nullptr) const {
+         const bool up = targetPos.y > currentPos.y;
+         const float nearY = up ? riverY_start : riverY_end;
+         const float farY = up ? riverY_end : riverY_start;
+@@ -636,20 +643,42 @@ public:
+         const float toWater = (nearY - currentPos.y) * dir;      // > 0 while short of the water
+         const float off = std::abs(targetPos.x - currentPos.x);
+         const bool outerSide = (currentPos.x - targetPos.x) * (targetPos.x - ArenaLayout::CENTER_X) > 0.0f;
+-        if (outerSide && toWater > WAYPOINT_ARRIVAL_EPS && off > WAYPOINT_ARRIVAL_EPS
+-            && off <= BRIDGE_WALK_REACH + 1e-3f) {
++        const float gx = std::max(targetPos.x - WALK_HALF_WIDTH,
++                                  std::min(currentPos.x, targetPos.x + WALK_HALF_WIDTH));
++        const float lateral = std::abs(gx - currentPos.x);
++        // Patch 0088 (CR_P0088=jumpcol): the step onto the column replaces the
++        // diagonal jump only, i.e. only where the jump would otherwise start
++        // (toWater <= lateral: it cannot walk into the corridor before the
++        // water). The recorded basis is Hogs placed ON the bank tile beside
++        // the bridge (2,15) / (15,15) / (3,15). A Hog that walks from further
++        // back walks into the corridor and crosses on its edge; recorded
++        // enemy Hogs from behind the bridge never cross on the column
++        // (runs/hoggap_1125/colB). Off: any Hog within a tile outside the
++        // column short of the water heads for the column (patch 0087).
++        // Decided once, the first time the unit is beside its crossing: the step
++        // itself changes the geometry (it heads for the column, not the
++        // corridor edge), so the test is not re-run along the way.
++        const bool beside = outerSide && toWater > WAYPOINT_ARRIVAL_EPS && off > WAYPOINT_ARRIVAL_EPS
++            && off <= BRIDGE_WALK_REACH + 1e-3f;
++        bool jumpWouldStart = true;
++        if (P0088::jumpCol() && beside) {
++            if (colLatch == nullptr) {
++                jumpWouldStart = toWater <= lateral * 1.001f;
++            } else {
++                if (*colLatch < 0) *colLatch = (toWater <= lateral * 1.001f) ? 1 : 0;
++                jumpWouldStart = *colLatch == 1;
++            }
++        }
++        if (beside && jumpWouldStart) {
+             // Beside its crossing: onto the column at the bank, no jump.
+             return { Vector2D{ targetPos.x, nearY }, 1.0f };
+         }
+ 
+-        const float gx = std::max(targetPos.x - WALK_HALF_WIDTH,
+-                                  std::min(currentPos.x, targetPos.x + WALK_HALF_WIDTH));
+-        const float lateral = std::abs(gx - currentPos.x);
+         if (lateral <= WAYPOINT_ARRIVAL_EPS) {
+             // In its column: straight across. Never a point it already stands
+             // on (Troop::moveTowards would not move).
+             const Vector2D across{ currentPos.x, farY };
+-            if (currentPos.distanceTo(across) <= WAYPOINT_ARRIVAL_EPS) return { targetPos, 1.0f };
++            if (currentPos.engineDistanceTo(across) <= WAYPOINT_ARRIVAL_EPS) return { targetPos, 1.0f };
+             return { across, 1.0f };
+         }
+         if (toWater >= lateral) return { Vector2D{ gx, nearY }, 1.0f };
+diff --git a/include/core/CardFactories.h b/include/core/CardFactories.h
+index 747a736..397b437 100644
+--- a/include/core/CardFactories.h
++++ b/include/core/CardFactories.h
+@@ -1,5 +1,6 @@
+ #pragma once
+ #include "CardStats.h"
++#include "P0088.h"
+ #include "LoadTimes.h"
+ #include "SightClips.h"
+ #include "ProjectileSpeeds.h"
+@@ -31,6 +32,15 @@ inline void applyOnHit(const std::shared_ptr<CombatEntity>& entity, const CardSt
+ inline void applyCardMetadata(const std::shared_ptr<CombatEntity>& entity, const CardStats& stats) {
+     entity->name = stats.name;
+     entity->cardId = stats.id;
++    if (P0088::stomp()) {
++        if (auto* t = dynamic_cast<Troop*>(entity.get())) {
++            const P0088::Stomp st = P0088::stompFor(stats.name);
++            if (st.stopMs > 0) {
++                t->stompStopMs = st.stopMs; t->stompWaitMs = st.waitMs; t->stompClockMs = 0;
++                t->stompWalkScale = float((st.speed * (st.stopMs + st.waitMs)) / st.stopMs) / float(st.speed);
++            }
++        }
++    }
+     // Deploy time (CardStats.h: DEPLOY_TIME_TICKS unless the card publishes
+     // its own). Set here because every troop and building passes through;
+     // spells and deploy effects do not, since a spell has its own delay.
+@@ -221,7 +231,7 @@ inline void spawnMeleeSquad(const CardStats& stats, float x, float y, int team,
+         const Vector2D slot = formationSlot(x, y, offset, team);
+         auto troop = std::make_shared<MeleeTroop>(
+             board.allocateId(), slot.x, slot.y, stats.hp, team,
+-            stats.speed, stats.attackRange, stats.damage, stats.attackCooldown, stats.symbol);
++            stats.speed * P0088::speedScale(), stats.attackRange, stats.damage, stats.attackCooldown, stats.symbol);
+         if (shouldIgnoreRiver(stats)) troop->setIgnoresRiver(true);
+         applyCardMetadata(troop, stats);
+         board.addEntity(troop);
+@@ -234,7 +244,7 @@ inline void spawnRangedSquad(const CardStats& stats, float x, float y, int team,
+         const Vector2D slot = formationSlot(x, y, offset, team);
+         auto troop = std::make_shared<RangedTroop>(
+             board.allocateId(), slot.x, slot.y, stats.hp, team,
+-            stats.speed, stats.attackRange, stats.damage, stats.attackCooldown, stats.symbol);
++            stats.speed * P0088::speedScale(), stats.attackRange, stats.damage, stats.attackCooldown, stats.symbol);
+         if (shouldIgnoreRiver(stats)) troop->setIgnoresRiver(true);
+         troop->boomerang = stats.boomerang;
+         troop->boomerangReturnDelayTicks = stats.boomerangReturnDelayTicks;
+@@ -250,7 +260,7 @@ inline void spawnMeleeBuildingTargeter(const CardStats& stats, float x, float y,
+         const Vector2D slot = formationSlot(x, y, offset, team);
+         auto troop = std::make_shared<BuildingTargeter>(
+             board.allocateId(), slot.x, slot.y, stats.hp, team,
+-            stats.speed, stats.attackRange, stats.damage, stats.attackCooldown, stats.symbol);
++            stats.speed * P0088::speedScale(), stats.attackRange, stats.damage, stats.attackCooldown, stats.symbol);
+         if (shouldIgnoreRiver(stats)) troop->setIgnoresRiver(true);
+         applyCardMetadata(troop, stats);
+         board.addEntity(troop);
+@@ -263,7 +273,7 @@ inline void spawnRangedBuildingTargeter(const CardStats& stats, float x, float y
+         const Vector2D slot = formationSlot(x, y, offset, team);
+         auto troop = std::make_shared<RangedBuildingTargeter>(
+             board.allocateId(), slot.x, slot.y, stats.hp, team,
+-            stats.speed, stats.attackRange, stats.damage, stats.attackCooldown, stats.symbol);
++            stats.speed * P0088::speedScale(), stats.attackRange, stats.damage, stats.attackCooldown, stats.symbol);
+         if (shouldIgnoreRiver(stats)) troop->setIgnoresRiver(true);
+         applyCardMetadata(troop, stats);
+         board.addEntity(troop);
+@@ -331,6 +341,11 @@ inline void spawnSpell(const CardStats& stats, float x, float y, int team, Board
+     spell->crownTowerDamage = stats.spellCrownTowerDamage;
+     spell->spawnRingRadius = stats.spellSpawnRingRadius;
+     spell->thrown = stats.spellProjectileSpeed > 0;
++    // Patch 0088 (CR_P0088=tornado): the Tornado drags for its life.
++    if (P0088::tornado() && stats.name == "Tornado") {
++        spell->attractFactor = P0088::TORNADO_ATTRACT;
++        spell->attractTicksLeft = P0088::TORNADO_LIFE_TICKS;
++    }
+     // Rolling spells (The Log, Barbarian Barrel) are configured after
+     // construction: configureRoll latches the roll origin from the spawn
+     // position, so it must run before the first update.
+diff --git a/include/core/CardRegistry.h b/include/core/CardRegistry.h
+index 276c57c..71cad74 100644
+--- a/include/core/CardRegistry.h
++++ b/include/core/CardRegistry.h
+@@ -1,4 +1,5 @@
+ #pragma once
++#include "P0088.h"
+ #include <string>
+ #include <functional>
+ #include <unordered_map>
+@@ -406,7 +407,9 @@ private:
+         // every 0.5 s (280 DPS), range 4.0, air and ground, 10 s lifetime
+         // (Building decay, replacing the hp-transform timer), 2 s deploy
+         // (History 12/1/2026). The lifetime clock runs through the deploy.
+-        return building(-45, "Trusty Turret", 0.0f, 1536, 't', 4.0f, 140, 5)
++        // Patch 0088 (CR_P0088=turret): 148 a hit, the tower-health step
++        // read 15 times in the live recordings (140 never).
++        return building(-45, "Trusty Turret", 0.0f, 1536, 't', 4.0f, P0088::turret() ? 148 : 140, 5)
+             .withTargetsAir()
+             .withDeployTime(20)
+             .withLifetime(100);
+@@ -764,7 +767,7 @@ private:
+         // The body is 1.2 tiles long (published projectile_radius_y 600, each
+         // way): what lands in the corridor after it has rolled by is not hit,
+         // so a Log cast as a Goblin Barrel is thrown rolls past under it.
+-        add(spell(33, "The Log", 2.0f, 3.9f, 269, 8, 'o')
++        add(spell(33, "The Log", 2.0f, 3.9f, 269, P0088::log() ? 5 : 8 /* patch 0088: royalesim first contact 0.2-0.3 s sooner */, 'o')
+             .withGroundOnly()
+             .withRollingSweep(10.1f, 3.9f, 0.34f, 0.7f)
+             .withRollBodyDepth(1.2f)); // audit 0003: wiki The Log, level 11; Crown Tower damage: CrownTowerDamage.h
+@@ -1345,7 +1348,7 @@ private:
+                 .withSpawnEffect(2.0f, 261)
+                 .withSpawnBarrage({ {-7.0f, 3.0f}, {-3.5f, 3.0f}, {0.0f, 3.0f}, {3.5f, 3.0f}, {7.0f, 3.0f},
+                                     {-5.25f, 6.0f}, {-1.75f, 6.0f}, {1.75f, 6.0f}, {5.25f, 6.0f} },
+-                                  1.0f, 76),
++                                  1.0f, P0088::evoCannon() ? 53 : 76 /* patch 0088: external candidate, unverified */),
+             2, 1);
+ 
+         // Firecracker: the real center and shrapnel sparks (low damage every
+diff --git a/include/core/LanePath.h b/include/core/LanePath.h
+index 1166afd..ace09da 100644
+--- a/include/core/LanePath.h
++++ b/include/core/LanePath.h
+@@ -60,7 +60,7 @@ inline Vector2D approachPoint(const Board& board, int myTeam, const Vector2D& fr
+     const bool advancingUp = (enemyTeam == 1);
+     const bool reachedRow = advancingUp ? (from.y >= w1.y) : (from.y <= w1.y);
+     if (reachedRow) return target->position;
+-    if (from.distanceTo(w1) <= Board::WAYPOINT_ARRIVAL_EPS) return target->position;
++    if (from.engineDistanceTo(w1) <= Board::WAYPOINT_ARRIVAL_EPS) return target->position;
+     return w1;
+ }
+ 
+diff --git a/include/entities/AreaSpell.h b/include/entities/AreaSpell.h
+index 948ce71..cb4c15a 100644
+--- a/include/entities/AreaSpell.h
++++ b/include/entities/AreaSpell.h
+@@ -1,6 +1,7 @@
+ #pragma once
+ #include "CardEntity.h"
+ #include "CombatEntity.h"
++#include "Troop.h"
+ #include "OnHitEffect.h"
+ #include "PeriodicEffect.h"
+ #include "Board.h"
+@@ -120,6 +121,15 @@ public:
+         tierFewDamage(tierFewDamage), tierManyDamage(tierManyDamage),
+         spellTowerDamageMultiplier(spellTowerDamageMultiplier), totalHits(remainingHits) {}
+ 
++    // Patch 0088 (CR_P0088=tornado): a pulling spell that drags for its life
++    // instead of one pull on landing (royalesim Tornado: life 1050 ms, every
++    // tick each enemy troop in the radius takes an extra step of
++    // attractFactor x its own base speed toward the centre, buildings
++    // excepted). attractTicksLeft counts the ticks of drag left, the landing
++    // tick included; 0 = the old single pull. Set by CardFactories::spawnSpell.
++    float attractFactor = 0.0f;
++    int attractTicksLeft = 0;
++
+     bool isTargetable() const override { return false; }
+ 
+     // For Board::deepCopy: a spell mid-fuse or mid-volley resumes where the
+@@ -166,6 +176,11 @@ public:
+             delayTicks--;
+             return;
+         }
++        if (landed && attractTicksLeft > 0 && remainingHits <= 0) {
++            // Patch 0088: the drag after the (last) damage application.
++            attract(board);
++            return;
++        }
+         landed = true;
+         if (isRolling()) {
+             updateRoll(board);
+@@ -188,7 +203,7 @@ public:
+         for (const auto& entity : board.getEntities()) {
+             bool teamMatches = alliesOnly ? (entity->team == this->team) : (entity->team != this->team);
+             if (entity->isAlive() && entity->takesAreaDamage() && teamMatches && entity->id != this->id
+-                && (!groundOnly || !entity->isFlying)
++                && (!groundOnly || !(entity->isFlying || entity->jumpingNow))
+                 && position.distanceTo(entity->position) <= radius + CombatEntity::effectiveRadiusOf(*entity)) {
+                 candidates.push_back(entity);
+             }
+@@ -223,7 +238,7 @@ public:
+             // else scaled by spellTowerDamageMultiplier.
+             int dealt = entity->isTower() ? towerDamage(effectiveDamage) : effectiveDamage;
+             entity->takeDamage(dealt);
+-            if (knockback != 0.0f) {
++            if (knockback != 0.0f && attractTicksLeft <= 0) {
+                 if (knockback > 0.0f) {
+                     pushAway(*entity, position, knockback);
+                 } else {
+@@ -256,12 +271,32 @@ public:
+             // tickInterval ran every multi-hit spell a tick slow (Poison 1.1 s,
+             // Graveyard 0.6 s; UPSTREAM_REQUESTS.md item 32i).
+             delayTicks = (tickInterval > 0) ? tickInterval - 1 : 0;
++            if (attractTicksLeft > 0) attract(board);
++        } else if (attractTicksLeft > 0) {
++            attract(board);
+         } else {
+             hp = 0;
+         }
+     }
+ 
+ private:
++    // One tick of a Tornado's drag (patch 0088). A building and a Crown Tower
++    // are not moved (exemptFromForcedMovement), nor a unit mid-jump; a unit
++    // published IgnorePushback is (royalesim moves it). pullToward never
++    // carries a unit past the centre. The spell ends with its last tick.
++    void attract(Board& board) {
++        for (const auto& entity : board.getEntities()) {
++            if (!entity->isAlive() || !entity->takesAreaDamage()) continue;
++            if (entity->team == this->team || entity->id == this->id) continue;
++            if (groundOnly && (entity->isFlying || entity->jumpingNow)) continue;
++            if (position.distanceTo(entity->position) > radius + CombatEntity::effectiveRadiusOf(*entity)) continue;
++            auto troop = std::dynamic_pointer_cast<Troop>(entity);
++            if (!troop) continue;
++            pullToward(*entity, position, attractFactor * troop->getSpeed());
++        }
++        if (--attractTicksLeft <= 0) hp = 0;
++    }
++
+     int towerDamage(int troopDamage) const {
+         return (crownTowerDamage >= 0) ? crownTowerDamage
+                                        : static_cast<int>(troopDamage * spellTowerDamageMultiplier);
+@@ -304,7 +339,7 @@ private:
+         for (const auto& entity : board.getEntities()) {
+             if (!entity->isAlive() || !entity->takesAreaDamage()) continue;
+             if (entity->team == this->team || entity->id == this->id) continue;
+-            if (groundOnly && entity->isFlying) continue;
++            if (groundOnly && (entity->isFlying || entity->jumpingNow)) continue;
+             if (alreadySwept(entity->id)) continue;
+ 
+             const float r = CombatEntity::effectiveRadiusOf(*entity);
+diff --git a/include/entities/CombatEntity.h b/include/entities/CombatEntity.h
+index 9f10add..bee6374 100644
+--- a/include/entities/CombatEntity.h
++++ b/include/entities/CombatEntity.h
+@@ -813,6 +813,13 @@ public:
+         // hook, even with the cooldown already at 0. A slow is also "frozen"
+         // here and keeps attacking, only slower.
+         const bool stunned = wasFrozen && slowThisTick <= 0.0f;
++        // Patch 0088 (CR_P0088=jump): a river jumper that was in the air last
++        // tick keeps its target, does not attack and goes on moving; Troop::
++        // moveTowards sets the flag again if it is still over the water after
++        // this tick's move (crforge: no target selection, no attack while
++        // JUMPING). Never set with the switch off.
++        const bool jumpLock = jumpingNow && !stunned;
++        jumpingNow = false;
+         // Published for Troop::moveTowards, which runs after the decrement.
+         frozenThisTick = wasFrozen;
+         freezeSlowThisTick = slowThisTick;
+@@ -960,6 +967,7 @@ public:
+                 if (e->id == forcedTargetEntityId && e->isAlive() && e->isTargetable()) { target = e; break; }
+             }
+         }
++        if (!target && jumpLock) target = resolveCurrentTarget(board);
+         if (!target) {
+             target = stunned ? nullptr : resolveCurrentTarget(board);
+             if (target && position.distanceTo(target->position) > effectiveRangeTo(target)) {
+@@ -1007,7 +1015,7 @@ public:
+             float dist = position.distanceTo(target->position);
+             float effectiveAttackRange = effectiveRangeTo(target);
+ 
+-            if (dist <= effectiveAttackRange) {
++            if (dist <= effectiveAttackRange && !jumpLock) {
+                 // First hit: a new engagement winds up for loadTicks first,
+                 // so the first hit lands loadTicks after coming into range
+                 // and later hits follow every attackCooldown. A slow slows
+@@ -1130,7 +1138,7 @@ public:
+                     }
+                     if (dieAfterFirstHit) hp = 0;
+                 }
+-            } else if (!stunned && jumpMaxRange > 0.0f && dist >= jumpMinRange && dist <= jumpMaxRange && currentCooldown == 0.0f) {
++            } else if (!stunned && !jumpLock && jumpMaxRange > 0.0f && dist >= jumpMinRange && dist <= jumpMaxRange && currentCooldown == 0.0f) {
+                 // Jump (Mega Knight): close to just inside attack range and
+                 // land a boosted, splashing hit at once.
+                 ticksSinceAttack = 0;
+@@ -1141,7 +1149,7 @@ public:
+                     { id, team, cardId, target->id, target->cardId, target->team, jumpDamage, board.currentTick, target->isTower() });
+                 applySplashDamage(board, target->position, jumpSplashRadius, target->id, id, team, cardId, jumpDamage);
+                 currentCooldown = static_cast<float>(attackCooldown);
+-            } else if (!stunned && hookRange > 0.0f && dist <= hookRange && currentCooldown == 0.0f) {
++            } else if (!stunned && !jumpLock && hookRange > 0.0f && dist <= hookRange && currentCooldown == 0.0f) {
+                 // Hook: pull the target to just inside melee range; the damage
+                 // lands on a later hit. A no-op on a building.
+                 pullToward(*target, position, dist - effectiveAttackRange + 0.1f);
+@@ -1456,7 +1464,7 @@ inline void applySplashDamage(Board& board, const Vector2D& origin, float radius
+     for (const auto& entity : board.getEntities()) {
+         if (entity->id == excludeId) continue; // already hit as the primary target
+         if (entity->team == attackerTeam || !entity->isAlive() || !entity->takesAreaDamage()) continue;
+-        if (!hitsAir && entity->isFlying) continue;
++        if (!hitsAir && (entity->isFlying || entity->jumpingNow)) continue; // jumpingNow: patch 0088
+         if (origin.distanceTo(entity->position) > radius) continue;
+         entity->takeDamage(dealt);
+         board.statsEvents.notifyDamageDealt(
+diff --git a/include/entities/Entity.h b/include/entities/Entity.h
+index 8c62d0d..c89e7c5 100644
+--- a/include/entities/Entity.h
++++ b/include/entities/Entity.h
+@@ -5,11 +5,27 @@
+ #include <string>
+ #include <typeinfo>
+ #include <unordered_map>
++#include "P0088.h"
++#include "ArenaLayout.h"
+ 
+ struct Vector2D {
+     float x, y;
+ 
++    // The distance the game's rules use. Patch 0088 (CR_P0088=physdist): in
++    // real 32-row tiles (ArenaLayout::realRow), so the engine's two extra bank
++    // rows do not stretch ranges, sight or the nearest-target comparison.
+     float distanceTo(const Vector2D& other) const {
++        if (P0088::physDist()) {
++            const float dx = other.x - x;
++            const float dy = ArenaLayout::realRow(other.y) - ArenaLayout::realRow(y);
++            return std::sqrt(dx * dx + dy * dy);
++        }
++        return engineDistanceTo(other);
++    }
++
++    // Straight-line distance in engine tiles: for movement legs, waypoint
++    // arrival and pushes, which step through engine coordinates.
++    float engineDistanceTo(const Vector2D& other) const {
+         return std::sqrt((other.x - x) * (other.x - x) + (other.y - y) * (other.y - y));
+     }
+ };
+@@ -55,6 +71,10 @@ public:
+     // A plain field, not a virtual: findTarget and resolveCollisions read it in
+     // tight loops.
+     bool isFlying = false;
++    // Patch 0088 (CR_P0088=jump): a river jumper in the air over the water,
++    // set by Troop::moveTowards each tick it moves. Always false with the
++    // switch off.
++    bool jumpingNow = false;
+ 
+     // Set by Board::commitPendingEntities once this entity carries its team's
+     // level (CardLevels.h). Copied with the entity, so a snapshot or a Clone
+@@ -181,7 +201,10 @@ public:
+ // The two pushes (pushAway, pushAlong) also tell the entity it was knocked back
+ // (Entity::onKnockedBack); the pulls and the lane mirror do not.
+ inline bool exemptFromForcedMovement(const Entity& entity) {
+-    return entity.isBuilding();
++    // A unit mid-jump is not pushed or pulled (patch 0088, crforge BuffPush /
++    // royalesim jump_ignores_pushback); jumpingNow is only ever set with the
++    // switch on.
++    return entity.isBuilding() || entity.jumpingNow;
+ }
+ 
+ // Moves `entity` up to `distance` tiles toward `point`, never past it. A
+@@ -191,7 +214,7 @@ inline bool exemptFromForcedMovement(const Entity& entity) {
+ inline void pullToward(Entity& entity, const Vector2D& point, float distance) {
+     if (exemptFromForcedMovement(entity)) return;
+     if (distance <= 0.0f) return; // nothing to close
+-    float dist = entity.position.distanceTo(point);
++    float dist = entity.position.engineDistanceTo(point);
+     if (dist <= 0.01f) return; // coincident: no direction
+     float moveBy = (distance < dist) ? distance : dist;
+     entity.position.x += (point.x - entity.position.x) / dist * moveBy;
+@@ -213,7 +236,7 @@ inline void pushAway(Entity& entity, const Vector2D& point, float distance) {
+     if (exemptFromForcedMovement(entity)) return;
+     if (entity.ignoresPushback()) return;
+     if (distance <= 0.0f) return; // see pullToward
+-    float dist = entity.position.distanceTo(point);
++    float dist = entity.position.engineDistanceTo(point);
+     if (dist <= 0.01f) return; // coincident: no direction
+     entity.position.x += (entity.position.x - point.x) / dist * distance;
+     entity.position.y += (entity.position.y - point.y) / dist * distance;
+diff --git a/include/entities/Projectile.h b/include/entities/Projectile.h
+index f511631..6dc56e7 100644
+--- a/include/entities/Projectile.h
++++ b/include/entities/Projectile.h
+@@ -120,6 +120,8 @@ public:
+             } else {
+                 float dx = t->position.x - position.x;
+                 float dy = t->position.y - position.y;
++                // dist is in real tiles under CR_P0088=physdist: the engine
++                // step is scaled so the shot covers `speed` real tiles.
+                 position.x += (dx / dist) * speed;
+                 position.y += (dy / dist) * speed;
+             }
+diff --git a/include/entities/Tower.h b/include/entities/Tower.h
+index e410c1b..f332f7b 100644
+--- a/include/entities/Tower.h
++++ b/include/entities/Tower.h
+@@ -1,4 +1,5 @@
+ #pragma once
++#include "P0088.h"
+ #include "Building.h"
+ #include "Projectile.h"
+ 
+@@ -69,7 +70,7 @@ public:
+             // Trigger 1: any damage. Latched on hp < maxHp rather than hooked
+             // into one of the several damage entry points; the latch only sets,
+             // so a heal cannot re-sleep it.
+-            if (hp < maxHp) awake = true;
++            bool trigger = hp < maxHp;
+ 
+             // Trigger 2: a friendly Princess Tower destroyed. The count is
+             // recorded on the first update rather than compared with 2, since a
+@@ -79,7 +80,12 @@ public:
+                 if (e->isAlive() && e->isTower() && e->team == team && e->symbol != 'R') ++living;
+             }
+             if (initialFriendlyPrincesses < 0) initialFriendlyPrincesses = living;
+-            else if (living < initialFriendlyPrincesses) awake = true;
++            else if (living < initialFriendlyPrincesses) trigger = true;
++            // Patch 0088 (CR_P0088=king): the King wakes KING_WAKE_DELAY_TICKS
++            // after its trigger (royalesim KING_ACTIVATE_TIME_MS 3550).
++            if (trigger && !P0088::king()) awake = true;
++            else if (trigger && wakeDelayLeft < 0) wakeDelayLeft = P0088::KING_WAKE_DELAY_TICKS;
++            if (wakeDelayLeft >= 0 && wakeDelayLeft-- == 0) awake = true;
+         }
+         Building::update(board);
+     }
+@@ -105,4 +111,6 @@ private:
+     bool awake = true;
+     // -1 until the first update() records the starting count.
+     int initialFriendlyPrincesses = -1;
++    // Patch 0088: ticks until a triggered King wakes, -1 = not triggered.
++    int wakeDelayLeft = -1;
+ };
+\ No newline at end of file
+diff --git a/include/entities/Troop.h b/include/entities/Troop.h
+index bd4458c..2a29fd1 100644
+--- a/include/entities/Troop.h
++++ b/include/entities/Troop.h
+@@ -1,5 +1,8 @@
+ #pragma once
+ #include "CombatEntity.h"
++#include "P0088.h"
++#include "ArenaLayout.h"
++#include <cmath>
+ 
+ class Troop : public CombatEntity {
+ protected:
+@@ -7,6 +10,13 @@ protected:
+ 
+ public:
+     bool riverIgnores = false;
++    // Patch 0088 (CR_P0088=stomp): the walk-pause clock, set by applyCardMetadata.
++    int stompStopMs = 0, stompWaitMs = 0, stompClockMs = 0;
++    // Patch 0088 (jumpcol): Board::getJumperWaypoint's step-onto-the-column
++    // decision for the current target column (-1 undecided).
++    int jumpColLatch = -1;
++    float jumpColTargetX = -1000.0f;
++    float stompWalkScale = 1.0f;   // floor(S (stop+wait)/stop) / S
+ 
+     // Base speed for the observation encoder. Not freeze-adjusted: the
+     // observation describes the unit, and a freeze shows up as it not moving.
+@@ -38,6 +48,20 @@ protected:
+         // "river jumpers from every start cross the river"). A walker and a
+         // flying unit take one leg, exactly as before.
+         const bool jumper = riverIgnores && !isFlying;
++        // Patch 0088 (CR_P0088=stomp): share of this tick spent walking, two
++        // royalesim 50 ms ticks of its stomp clock. The clock does not run
++        // while the unit is held by a full stop.
++        float stompFactor = 1.0f;
++        if (P0088::stomp() && stompStopMs > 0 && !(frozenThisTick && freezeSlowThisTick <= 0.0f)) {
++            int walked = 0;
++            for (int sub = 0; sub < 2; ++sub) {
++                stompClockMs += 50;
++                if (stompClockMs <= stompStopMs) { ++walked; continue; }
++                const int rem = stompClockMs - (stompStopMs + stompWaitMs);
++                if (rem >= 0) { stompClockMs = rem; ++walked; }
++            }
++            stompFactor = stompWalkScale * walked / 2.0f;
++        }
+         const int maxLegs = jumper ? 3 : 1;
+         Vector2D at = position;
+         float budget = 1.0f;          // share of this tick's movement left
+@@ -48,13 +72,16 @@ protected:
+             if (!riverIgnores) {
+                 waypoint = board.getNextWaypoint(at, dest);
+             } else if (!isFlying) {
+-                const Board::JumperStep js = board.getJumperWaypoint(at, dest);
++                if (P0088::jumpCol() && std::abs(dest.x - jumpColTargetX) > 1e-3f) {
++                    jumpColTargetX = dest.x; jumpColLatch = -1;   // new target column: decide again
++                }
++                const Board::JumperStep js = board.getJumperWaypoint(at, dest, P0088::jumpCol() ? &jumpColLatch : nullptr);
+                 waypoint = js.waypoint;
+                 jumpScale = js.speedScale;
+             }
+             const float dx = waypoint.x - at.x;
+             const float dy = waypoint.y - at.y;
+-            const float distToWaypoint = at.distanceTo(waypoint);
++            const float distToWaypoint = at.engineDistanceTo(waypoint);
+ 
+             // Must be the same constant getNextWaypoint uses for arrival; two
+             // different epsilons produce an absorbing state at the bridge mouths
+@@ -73,6 +100,16 @@ protected:
+             if (inAbilityWindow()) currentSpeed *= windowMoveMultiplier;
+             // The diagonal leg of a river jump (patch 0087).
+             currentSpeed *= jumpScale;
++            // Patch 0088 (CR_P0088=jumpspeed): over the water a jumper moves
++            // at its JumpSpeed (Hog 160 / Speed 120), on top of the diagonal.
++            if (jumper && P0088::jumpSpeed() && overWater(board, at, dest)) {
++                currentSpeed *= P0088::JUMP_SPEED_RATIO;
++            }
++            currentSpeed *= stompFactor;
++            // Patch 0088 (CR_P0088=bankrows): speed is in REAL tiles on the
++            // squeezed rows: an engine step (ux, uy) costs sqrt(ux^2 + (k uy)^2)
++            // real tiles, k = d realRow / dy (0.5 on y 13-15 and 18-20).
++            if (P0088::bankRows() && distToWaypoint > 0.0f) currentSpeed *= bankRowFactor(at.y, dx / distToWaypoint, dy / distToWaypoint);
+             // Land on the waypoint, never past it: an overshoot along a bank
+             // line keeps the unit "below" the river, so it is handed the same
+             // bridge mouth back and orbits it forever (UPSTREAM_REQUESTS.md
+@@ -85,6 +122,26 @@ protected:
+         }
+         // Flying troops pass over building footprints.
+         if (moved) position = isFlying ? at : board.resolvePositionAgainstBuildings(at, id, bodyRadius);
++        // Patch 0088 (CR_P0088=jump): in the air while over the water on its
++        // way across (crforge RouteFollower JUMPING: from the last land node
++        // to the first one beyond). CombatEntity::update clears it each tick
++        // before it moves, so a unit that stops is no longer jumping.
++        if (P0088::jump() && jumper && moved && overWater(board, position, dest)) jumpingNow = true;
++    }
++
++    static float bankRowFactor(float y, float ux, float uy) {
++        const float k = ((y >= 13.0f && y < 15.0f) || (y >= 18.0f && y < 20.0f)) ? 0.5f : 1.0f;
++        if (k == 1.0f) return 1.0f;
++        const float c = std::sqrt(ux * ux + k * k * uy * uy);
++        return c > 1e-6f ? 1.0f / c : 1.0f;
++    }
++
++    // Over the river (bank to bank) and heading across it to dest.
++    static bool overWater(const Board& board, const Vector2D& p, const Vector2D& dest) {
++        constexpr float e = 1e-3f;
++        if (dest.y > p.y) return p.y >= board.getRiverStart() - e && p.y < board.getRiverEnd() - e && dest.y >= board.getRiverEnd();
++        if (dest.y < p.y) return p.y <= board.getRiverEnd() + e && p.y > board.getRiverStart() + e && dest.y <= board.getRiverStart();
++        return false;
+     }
+ 
+     void clampPosition(Board& board) override {
+diff --git a/src/bindings.cpp b/src/bindings.cpp
+index ad42c86..52248b6 100644
+--- a/src/bindings.cpp
++++ b/src/bindings.cpp
+@@ -2,6 +2,7 @@
+ #include <pybind11/stl.h>
+ #include <optional>
+ #include "ArenaLayout.h"
++#include "P0088.h"
+ #include "ClashEnv.h"
+ #include "SpawnOnAbility.h"
+ #include "CappedSpawnOnHitEffect.h"
+@@ -661,6 +662,17 @@ PYBIND11_MODULE(clash_royale_env, m) {
+         "so the answer grows with the distance; every other spell returns its "
+         "fixed spell_delay_ticks.");
+ 
++    m.def("p0088_active", []() {
++        pybind11::dict d;
++        d["raw"] = P0088::raw();
++        d["tornado"] = P0088::tornado(); d["jump"] = P0088::jump(); d["jumpspeed"] = P0088::jumpSpeed();
++        d["log"] = P0088::log(); d["turret"] = P0088::turret(); d["king"] = P0088::king();
++        d["evocannon"] = P0088::evoCannon(); d["speed"] = P0088::speed(); d["stomp"] = P0088::stomp();
++        d["bankrows"] = P0088::bankRows(); d["physdist"] = P0088::physDist(); d["jumpcol"] = P0088::jumpCol();
++        d["speed_scale"] = P0088::speedScale();
++        return d;
++    }, "Patch 0088: the switches this process's engine has latched (read once from CR_P0088).");
++
+     m.def("get_card_stats", [](int cardId) {
+         const CardDefinition* def = CardRegistry::getInstance().getCard(cardId);
+         if (!def || !def->stats) {
+diff --git a/include/core/P0088.h b/include/core/P0088.h
+new file mode 100644
+index 0000000..e5f2f7d
+--- /dev/null
++++ b/include/core/P0088.h
+@@ -0,0 +1,106 @@
++#pragma once
++#include <cstdlib>
++#include <string>
++
++// Patch 0088: each change is a separate switch, read once from the environment
++// variable CR_P0088 (a comma list), so each can be measured on its own. Unset
++// or empty = the engine of patch 0087, bit for bit.
++//
++//   tornado    Tornado drags (attract) for its 1.05 s life instead of a 1.5-tile
++//              pull on landing
++//   jump       a river jumper (Hog Rider, ...) is mid-jump while it crosses the
++//              water: no retarget, no attack, no collision, no push or pull,
++//              not hit by ground-only area damage
++//   jumpspeed  the jump runs at the published JumpSpeed (Hog 160 / Speed 120)
++//   log        The Log starts rolling 3 ticks sooner
++//   turret     Hero Musketeer's Trusty Turret hits for 148
++//   king       the King Tower wakes 3.1 s after its trigger (first shot 3.6 s)
++//   evocannon  Evolved Cannon barrage on a Crown Tower 53
++//   speed      every troop walks at S/50 tiles/s (royalesim) instead of
++//              S x 0.02209 tiles/s: 9.5 % slower (runs/speed_check_1125/VERDICT.txt);
++//              applied where a troop is built, get_card_stats still reports
++//              the old figure; the board keeps its 34 rows
++//   stomp      Giant, Royal Giant, Goblin Giant, Golem, Ice Golem walk in
++//              royalesim's stop/wait pulses (StopMovementAfterMS / WaitMS)
++//   bankrows   a troop on the two extra engine rows each side of the river
++//              (ArenaLayout::realRow squeezes y 13-15 and 18-20 into one real
++//              row each) moves at its speed in REAL tiles, so the extra rows
++//              cost no extra travel time
++//   physdist   every distance the game rules measure (targeting, attack range,
++//              sight, spell and splash radii, projectile flight) is taken in
++//              REAL 32-row tiles: y goes through ArenaLayout::realRow first, so
++//              the two extra bank rows add no length (y 13-15 and 18-20 count
++//              as one row each). Coordinates, observations and
++//              placement stay in the 34-row engine frame. Movement legs and
++//              collisions stay in engine tiles (bankrows makes the walk real).
++//   jumpcol    a river jumper steps onto its target's column at the bank only
++//              where its diagonal jump would start (placed beside the bridge);
++//              one walking in from further back crosses on the corridor edge
++//   all        every switch above
++//
++// The registry reads the switches when it is built, so set the variable before
++// the module is imported.
++namespace P0088 {
++inline const std::string& raw() {
++    static const std::string v = [] {
++        const char* e = std::getenv("CR_P0088");
++        return std::string(e ? e : "");
++    }();
++    return v;
++}
++inline bool on(const char* name) {
++    const std::string& s = raw();
++    if (s.empty()) return false;
++    const std::string n(name);
++    size_t i = 0;
++    while (i <= s.size()) {
++        size_t j = s.find(',', i);
++        if (j == std::string::npos) j = s.size();
++        const std::string tok = s.substr(i, j - i);
++        if (tok == n || tok == "all") return true;
++        i = j + 1;
++    }
++    return false;
++}
++inline bool tornado() { static const bool b = on("tornado"); return b; }
++inline bool jump() { static const bool b = on("jump"); return b; }
++inline bool jumpSpeed() { static const bool b = on("jumpspeed"); return b; }
++inline bool log() { static const bool b = on("log"); return b; }
++inline bool turret() { static const bool b = on("turret"); return b; }
++inline bool king() { static const bool b = on("king"); return b; }
++inline bool evoCannon() { static const bool b = on("evocannon"); return b; }
++inline bool speed() { static const bool b = on("speed"); return b; }
++// REAL_TILES_PER_MIN_TO_ENGINE 0.011045 -> 0.010 (royalesim S/50 tiles/s, which
++// the speed check measured on 300+ live tracks within 1 %).
++inline bool stomp() { static const bool b = on("stomp"); return b; }
++inline bool bankRows() { static const bool b = on("bankrows"); return b; }
++inline bool physDist() { static const bool b = on("physdist"); return b; }
++inline bool jumpCol() { static const bool b = on("jumpcol"); return b; }
++inline float speedScale() { return speed() ? 0.010f / 0.011045f : 1.0f; }
++
++// Tornado (royalesim area_effect_objects Tornado, status ATTRACT_LAW
++// base_speed): life 1050 ms, every tick a victim in the radius takes an extra
++// step of attract_percentage 360 % of its own base speed toward the centre.
++constexpr float TORNADO_ATTRACT = 3.6f;
++constexpr int TORNADO_LIFE_TICKS = 11;     // 1.05 s, the landing tick included
++// HogRider JumpSpeed 160 / Speed 120.
++constexpr float JUMP_SPEED_RATIO = 160.0f / 120.0f;
++// royalesim calibration KING_ACTIVATE_TIME_MS 3550 (first target and swing on
++// the wake tick); our King then winds up KING_FIRST_HIT_TICKS (5), so the wake
++// is held 31 ticks for a first shot 3.6 s after the trigger.
++constexpr int KING_WAKE_DELAY_TICKS = 31;
++
++// royalesim data/derived/cards-160635007-20261103.json StopMovementAfterMS /
++// WaitMS; path2026::stomp_clock_step on its 50 ms tick, run twice per engine
++// tick. While walking the unit moves at floor(S x (stop + wait) / stop)
++// (card.rs move_speed). Names: an Evolution shares the name; "Hero X" is X.
++struct Stomp { int stopMs; int waitMs; int speed; };
++inline Stomp stompFor(const std::string& name) {
++    std::string n = name.rfind("Hero ", 0) == 0 ? name.substr(5) : name;
++    if (n == "Giant" || n == "Royal Giant") return {640, 100, 45};
++    if (n == "Goblin Giant") return {640, 100, 60};
++    if (n == "Golem") return {1000, 200, 45};
++    if (n == "Ice Golem") return {470, 80, 45};
++    return {0, 0, 0};
++}
++}

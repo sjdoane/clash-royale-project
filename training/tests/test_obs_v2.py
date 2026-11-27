@@ -228,9 +228,6 @@ def test_env_appends_the_tail_and_the_flag_gives_the_old_observation():
     assert steps > 60 and a[base + V.OPP_PLAYS.start] == 1.0 and a[base + V.OWN_PLAYS.start] == 1.0
 
 
-@pytest.mark.xfail(reason="known, open (2026-11-23): on the gen2 engine a Musketeer played at (15, 7) at "
-                          "tick 164 is not in the board channels on the next decision; fails the same way in "
-                          "the original working repo", strict=False)
 def test_env_tail_holds_every_play_the_engine_recorded():
     """Independent of the tracker: the engine's get_last_played_tick says which
     card and when, the action we sent says where (ours), the unit planes of the
@@ -693,7 +690,7 @@ def test_gen1_engine_fills_the_tail_without_spell_flight():
     code = (
         "import sys, numpy as np\n"
         "from training import common as C\n"
-        "assert not hasattr(C.E, 'spell_flight_ticks'), 'has spell_flight_ticks: ' + C.ENGINE\n"
+        "assert not hasattr(C.E, 'spell_flight_ticks'), C.ENGINE\n"
         "from training import reward as R, obs_v2 as V\n"
         "sys.path.insert(0, C.REPO + '/live_ppo')\n"
         "from live_ppo import obs_tail as LT\n"

@@ -3,7 +3,7 @@
 # Two updates of g2_ppo_s2r took 859 s and 585 s on 2026-11-23 (normal: 5 s) with nothing to show why.
 # When the trainer's log has not moved for 120 s, take one 5 s stack sample of the trainer process
 # (macOS `sample`) into runs/logs/stall_<time>.txt, then wait for the log to move again.
-cd "$(dirname "$0")/../.." || exit 1
+cd $HOME/cr-robot || exit 1
 log=runs/logs/g2_ppo_s2r.log
 while true; do
   pid=$(pgrep -f "training.[p]po_pool --run g2_ppo_s2r" | head -1)

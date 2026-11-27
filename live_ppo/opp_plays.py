@@ -118,6 +118,45 @@ def card_cost(cid: int) -> float:
     return float(E.get_card_info(cid)["cost"])
 
 
+# Bodies a card puts on the board when it is deployed, where they are not its own
+# class (several cards share a body). Used when the deck is known (offline re-read).
+MULTI_BODIES = {"Goblin Gang": {"goblin", "spear-goblin"}, "Skeleton Army": {"skeleton"},
+                "Minion Horde": {"minion"}, "Three Musketeers": {"musketeer"}}
+
+
+def card_bodies(cid: int) -> set:
+    """Base YOLO classes that are card `cid` itself when it is deployed."""
+    name = E.get_card_info(cid)["name"]
+    if name in MULTI_BODIES:
+        return set(MULTI_BODIES[name])
+    return {c for c in _all_base_classes() if card_for_class(c) == cid}
+
+
+_BASES: list = []
+
+
+def _all_base_classes():
+    if not _BASES:
+        det = str(REPO / "video_dataset" / "detector")
+        if det not in sys.path:
+            sys.path.append(det)
+        import classes as _C  # noqa: PLC0415
+        _BASES.extend(sorted({base_class(c) for c in _C.all_classes()}))
+    return _BASES
+
+
+def deck_card(card, bodies, deck):
+    """The card of a known deck that a reading (card id, body classes) is: the
+    card itself when it is in the deck, else the one deck card those bodies
+    belong to (a `skeleton` birth is Skeleton Army when the deck has no
+    Skeletons), else the reading unchanged."""
+    if card is None or card in deck:
+        return card
+    cl = {base_class(b) for b in bodies or ()}
+    hit = [c for c in deck if card_bodies(c) & cl]
+    return hit[0] if len(hit) == 1 else card
+
+
 # ----------------------------------------------------------------- tracking
 @dataclass
 class Track:
@@ -184,6 +223,11 @@ class OppPlayDetector:
     # came from another class's boxes; of the 9 forms this rule adds, 5 show the
     # purple / gold spawn flash, 4 are on a misread card; none seen wrong).
     FORM_OWN_CLASS = True
+    # Rule (e) `gang_bodies` of 2026-11-27 (OppModel, default off): a GROUP_CARDS card
+    # (Goblin Gang: 3 Goblins + 3 Spear Goblins) is named only when the group holds at
+    # least this many of its bodies; else the top class names the card (Spear Goblins,
+    # Goblins). 0 = off. Set by OppModel(gang_bodies=True) to OppModel.GANG_MIN.
+    gang_min = 0
 
     def __init__(self, evidence: bool = True):
         self.evidence = evidence             # False: forms voted as before 2026-11-19
@@ -335,7 +379,7 @@ class OppPlayDetector:
             votes.update(tr.votes)
         classes = {c for c, v in votes.items() if v >= 0.5}
         for need, name in GROUP_CARDS:
-            if need <= classes:
+            if need <= classes and sum(tr.cls in need for tr in trs) >= self.gang_min:
                 return _BY_NAME[_norm(name)], name
         # a body its group's own spawner makes is not the card (Witch + her
         # Skeletons: the Skeletons outvote her once two spawn)
@@ -355,7 +399,7 @@ class OppPlayDetector:
     def _refine(self, p: Play):
         classes = set(p.bodies)
         for need, name in GROUP_CARDS:
-            if need <= classes:
+            if need <= classes and sum(b in need for b in p.bodies) >= self.gang_min:
                 p.card, p.cls = _BY_NAME[_norm(name)], name
 
     def _emit(self, t):
@@ -501,12 +545,70 @@ class OppModel:
     # `known` holds 9-12 "cards" of an 8-card deck, the extra ones misreads
     # (7 of the 13 false ones were of a card named once, 0 of the 2 real).
     YOLO_ONLY_CONFIRMED = True
+    # Play-reader rules of 2026-11-27 (live session 20261127-010105, runs/live_1127/
+    # FACTS_minipekka_3m.md), each default off; live_ppo/eval/opp_rules_replay.py replays them.
+    # (a) `own_units`: a class of OUR deck (OWN_DECK_BODIES) whose boxes within VOTE_R of a
+    # watch, from PRE_S before it to the end of its vote, are ours (side 0) on at least as
+    # many frames as theirs (side 1) does not name that watch: our Hog / Musketeer / Ice
+    # Golem near the bridge read side 1 on a few frames and outvote the opponent's card
+    # (m6 Evo P.E.K.K.A. read as Musketeer: musketeer side 0 on 26 frames, side 1 on 2).
+    # The opponent's own Skeleton Army / Skeletons / Musketeer (mostly side 1) still count.
+    # (b) `badge_marks`: a watch first seen on our half (y < OPP_HALF_Y) whose spot an
+    # opponent unit on our half stood BADGE_DY0-BADGE_DY1 tiles below (box bottom; within
+    # BADGE_DX across) on a frame of the BADGE_S before it, and where no opponent body
+    # shows up on the spot (BADGE_NEW_DX across, BADGE_NEW_DY below to BADGE_NEW_DY1
+    # above) in the VOTE_S after it, is that unit's gold-framed level badge riding over its
+    # head (Hero Mini P.E.K.K.A., m2 87.4 / 89.4 s: nothing within 2.5 tiles below the mark),
+    # not a deploy (m5 167.4 s: real Bats over the opponent's Ram Rider, bats at +0.3 s).
+    BADGE_S = 1.5
+    BADGE_DX = 0.75
+    BADGE_DY0 = 1.5
+    BADGE_DY1 = 4.0
+    BADGE_NEW_DX = 1.5
+    BADGE_NEW_DY0 = 1.0
+    BADGE_NEW_DY1 = 2.5
+    # (c) `three_musk`: a Musketeer play on their half (y >= OPP_HALF_Y) with two or more
+    # `musketeer` bodies (one YOLO birth group, the tracks at a watch, one frame of the
+    # watch's vote), or a YOLO Musketeer birth there followed within THREE_MUSK_S by
+    # THREE_MUSK_N more simultaneous musketeer boxes within THREE_MUSK_R than stood there
+    # before it, is Three Musketeers. Such a YOLO birth needs no earlier sighting of the
+    # card (yolo_known / YOLO_ONLY_CONFIRMED); one that would be dropped for that waits up
+    # to THREE_MUSK_S for the other bodies. m4 46.55 s / 116.48 s: the 3M births read as
+    # one musketeer + bomber / princess / goblin, the 2nd and 3rd musketeer boxes came
+    # 2.2 s later; both were dropped as "card not seen at a watch".
+    THREE_MUSK_N = 2
+    THREE_MUSK_S = 4.0
+    THREE_MUSK_R = 6.0
+    # (d) `rage`: a stopwatch with a YOLO `rage` box (any side: Rage is not in our deck)
+    # within RAGE_R tiles of it and RAGE_S seconds either side of it is the opponent's Rage
+    # cast, not a troop: every YOLO `rage` run of 20261127-010105 (9) sits on a stopwatch
+    # play, and by eye m2 63.11 "Dark Prince", m5 170.18 "Witch" and m6 101.73 "Elite
+    # Barbarians" are Rage circles over their troops. Without the stopwatch the class stays
+    # skipped (opp_spells.SKIP_CLASSES: our placement circle, the pink deploy zone). Named
+    # only when Rage may be in their deck (allowed(): a known deck, from the battle log or
+    # 8 confirmed cards, must hold it; m10 90.01 is a Rage-like circle with no Rage in the
+    # deck): else the watch is read as before. The watch waits RAGE_S for the circle.
+    # It needs RAGE_N `rage` boxes there (real Rage casts: 22-30 boxes within 3 tiles,
+    # median conf 0.90-0.93; m10's four `??` watches: 1-2 boxes), and no opponent
+    # Lumberjack within RAGE_R in the RAGE_LJ_S before the watch: that is his death Rage, not
+    # a card (m10 17.83/90.01/143.25/173.69, Lumberjack in their deck, last seen 0.3 s before
+    # each watch; their deck has no Rage card).
+    RAGE_R = 3.0
+    RAGE_S = 1.5
+    RAGE_N = 5
+    RAGE_LJ_S = 1.5
+    # (e) `gang_bodies`: Goblin Gang needs GANG_MIN of its bodies (one group, or one frame
+    # of a watch's vote): m6 13.24 "Goblin Gang" was three Spear Goblins, one box read
+    # `goblin` (eye/w_m6gg13.jpg). Goblin Gang drops 6, Spear Goblins 3, Goblins 4.
+    GANG_MIN = 4
 
     def __init__(self, deck, spells: bool = False, state: bool = False, watch: bool = False,
                  yolo_only: bool = True, late_id: bool = True, crest: bool = True,
                  deck_rule: bool = False, bomb: bool = True, yolo_known: bool = True,
                  deck_prior: bool = False, local_vote: bool = True, evidence: bool = True,
-                 spell_evidence: bool | None = None):
+                 spell_evidence: bool | None = None, known_deck=None, own_casts=None,
+                 spell_skip=None, own_units: bool = False, badge_marks: bool = False,
+                 three_musk: bool = False, rage: bool = False, gang_bodies: bool = False):
         from contracts import Phase  # noqa: PLC0415
         from track.opp_elixir import OpponentElixirTracker  # noqa: PLC0415
         from timebase import seconds_to_ticks  # noqa: PLC0415
@@ -517,7 +619,8 @@ class OppModel:
         if spells:
             from opp_spells import OppSpellDetector  # noqa: PLC0415
             self.spells = OppSpellDetector(
-                deck, evidence=evidence if spell_evidence is None else spell_evidence)
+                deck, skip=spell_skip, evidence=evidence if spell_evidence is None else spell_evidence,
+                own_casts=own_casts)
         self.elixir = OpponentElixirTracker()
         # Opponent-state section (engine item 46): the engine's estimator, fed
         # the same plays. Only with --opp-state, and only on an engine with 0012.
@@ -549,6 +652,14 @@ class OppModel:
         # and remove none of its three false ones.
         # Measured by live_ppo/eval/opp_plays_ab.py.
         self.evidence = evidence
+        self.own_units, self.badge_marks, self.three_musk = own_units, badge_marks, three_musk
+        self._hist0: list[tuple] = []    # (t, [(cls, x, y)]) our OWN_DECK_BODIES boxes (own_units)
+        self._musk_pend: list = []       # YOLO Musketeer births waiting for 3M bodies (three_musk)
+        self.rage, self.gang_bodies = rage, gang_bodies
+        self._rages: list[tuple] = []    # (t, x, y) of YOLO `rage` boxes, last 10 s (rage)
+        self._ljs: list[tuple] = []      # (t, x, y) of opponent `lumberjack` boxes, last 10 s (rage)
+        if gang_bodies:
+            self.det.gang_min = self.GANG_MIN
         self.confirmed: list[int] = []   # base cards confirmed at high confidence, in order
         self._hist: list[tuple] = []     # (t, [(cls, form, conf, x, y)]) side-1 bodies, last 20 s
         self.known: dict[int, int] = {}  # opponent cards seen played -> count
@@ -560,6 +671,20 @@ class OppModel:
         self._wdone: list[Play] = []    # watch plays emitted (YOLO duplicates are dropped)
         self._recent: list[Play] = []   # every play out in the last YOLO_ONLY_RECENT_S
         self.log: list[dict] = []
+        # Offline re-read (live_ppo/reread.py): the opponent's eight cards are known
+        # from the battle log, as base card ids. The deck prior then holds from the
+        # first second and every card of it counts as confirmed (a YOLO-only play of
+        # one needs no earlier sighting). A spell cast still needs its own evidence:
+        # a one-frame sprite of a spell that is in their deck is a glitch as often as
+        # anywhere (S1 match 1: single static "Fireball" and "Log" sightings, while
+        # every real Log there was seen 11-15 times); the re-read weighs those casts
+        # against the card cycle instead. None (live): nothing here changes.
+        self.known_deck = None
+        if known_deck is not None:
+            self.known_deck = [int(c) for c in known_deck]
+            self.deck_prior = True
+            self.confirmed = list(self.known_deck)
+            self.known = {c: self.CONF_PLAYS for c in self.known_deck}
 
     # -- watch fusion
     def _near(self, w, t, xy):
@@ -597,10 +722,81 @@ class OppModel:
         return any(bt >= t0 - self.BOMB_S and np.hypot(bx - xy[0], by - xy[1]) <= self.BOMB_R
                    for bt, bx, by in self._bombs)
 
+    # -- rules of 2026-11-27 (default off)
+    def _ours_near(self, w, t1) -> set:
+        """(a) Classes of our deck seen within VOTE_R of watch w, from PRE_S (+0.25)
+        before it to t1, on our side on at least as many frames as on theirs."""
+        if not self.own_units:
+            return set()
+        t0 = w.t - self.PRE_S - 0.25
+
+        def frames(hist, cls_xy):
+            n = Counter()
+            for t, boxes in hist:
+                if t0 <= t <= t1:
+                    n.update({c for c, x, y in map(cls_xy, boxes)
+                              if np.hypot(x - w.xy[0], y - w.xy[1]) <= self.VOTE_R})
+            return n
+        n0 = frames(self._hist0, lambda b: b)
+        n1 = frames(self._hist, lambda b: (b[0], b[3], b[4]))
+        return {c for c, k in n0.items() if k >= n1[c]}
+
+    def _badge(self, t0, tx, ty) -> bool:
+        """(b) Did an opponent unit on our half stand right under (tx, ty) in the
+        BADGE_S before t0?"""
+        if ty >= OppPlayDetector.OPP_HALF_Y:
+            return False
+        return any(t0 - self.BADGE_S <= t < t0 - 1e-6 and any(
+            y < OppPlayDetector.OPP_HALF_Y and abs(tx - x) <= self.BADGE_DX
+            and self.BADGE_DY0 <= ty - y <= self.BADGE_DY1 for _c, _f, _cf, x, y in dets)
+            for t, dets in self._hist)
+
+    def _bodies_on(self, w) -> bool:
+        """(b) An opponent body on watch w's spot in the VOTE_S after it."""
+        return any(w.t <= t <= w.t + self.VOTE_S and any(
+            abs(x - w.xy[0]) <= self.BADGE_NEW_DX and -self.BADGE_NEW_DY0 <= y - w.xy[1] <= self.BADGE_NEW_DY1
+            for _c, _f, _cf, x, y in dets) for t, dets in self._hist)
+
+    def _rage_at(self, w) -> bool:
+        """(d) RAGE_N YOLO `rage` boxes within RAGE_R of watch w, RAGE_S either side of it,
+        and no opponent Lumberjack there in the RAGE_LJ_S before it (his death Rage)."""
+        def near(x, y):
+            return np.hypot(x - w.xy[0], y - w.xy[1]) <= self.RAGE_R
+        n = sum(1 for t, x, y in self._rages if abs(t - w.t) <= self.RAGE_S and near(x, y))
+        if n < self.RAGE_N:
+            return False
+        return not any(w.t - self.RAGE_LJ_S <= t <= w.t + 0.5 and near(x, y) for t, x, y in self._ljs)
+
+    def _three_musk(self, bodies, xy) -> bool:
+        """(c) THREE_MUSK_N or more musketeer bodies in one play on their half."""
+        return self.three_musk and xy[1] >= OppPlayDetector.OPP_HALF_Y and \
+            sum(base_class(b) == "musketeer" for b in bodies or ()) >= self.THREE_MUSK_N
+
+    def _musk_cand(self, p) -> bool:
+        """(c) A YOLO birth on their half (the 3M births read as musketeer + bomber, or
+        bomber alone, m4 116.48 s)."""
+        return self.three_musk and p.xy[1] >= OppPlayDetector.OPP_HALF_Y
+
+    def _musk_seen(self, p, now) -> bool:
+        """(c) On two frames within THREE_MUSK_S of birth p, THREE_MUSK_N more
+        simultaneous musketeer boxes near it than in the 2 s before it."""
+        if not self._musk_cand(p):
+            return False
+
+        def counts(t0, t1):
+            return [sum(1 for c, _f, _cf, x, y in dets if c == "musketeer"
+                        and np.hypot(x - p.xy[0], y - p.xy[1]) <= self.THREE_MUSK_R)
+                    for t, dets in self._hist if t0 <= t <= t1]
+        before = max(counts(p.t - 2.0, p.t - 0.25), default=0)
+        return sum(n - before >= self.THREE_MUSK_N
+                   for n in counts(p.t, min(now, p.t + self.THREE_MUSK_S))) >= 2
+
     # -- deck-membership prior
     @property
     def deck(self) -> set | None:
         """The opponent's 8 cards once confirmed (deck_prior), else None."""
+        if self.known_deck is not None:
+            return set(self.known_deck)
         if self.deck_prior and len(self.confirmed) >= self.DECK_SIZE:
             return set(self.confirmed[: self.DECK_SIZE])
         return None
@@ -621,6 +817,7 @@ class OppModel:
         over its first `span` seconds, or None when they hold less than VOTE_MIN."""
         t0, t1 = w.t - 0.25, min(now, w.t + span)
         votes, forms, most, pre = Counter(), {}, Counter(), set()
+        most_grp = Counter()             # (e) GROUP_CARDS name -> most of its bodies in one frame
         for t, dets in self._hist:
             if t < w.t - self.PRE_S - 0.25 or t > t1:
                 continue
@@ -636,11 +833,16 @@ class OppModel:
                 n[cls] += 1
             for c, k in n.items():
                 most[c] = max(most[c], k)
+            for need, name in GROUP_CARDS:
+                most_grp[name] = max(most_grp[name], sum(n[c] for c in need))
+        if self.own_units:
+            ours = self._ours_near(w, t1)
+            votes = Counter({c: v for c, v in votes.items() if c not in ours})
         new = Counter({c: v for c, v in votes.items() if c not in pre}) or votes
         classes = {c for c, v in new.items() if v >= 0.5}
         cands = None
         for need, name in GROUP_CARDS:
-            if need <= classes:
+            if need <= classes and not (self.gang_bodies and most_grp[name] < self.GANG_MIN):
                 cands = [(sum(new[c] for c in need), _BY_NAME[_norm(name)], name)]
                 break
         if cands is None:
@@ -658,6 +860,8 @@ class OppModel:
             return None
         if cls in COUNT_CARDS and most[cls] >= COUNT_CARDS[cls][0]:
             card = _BY_NAME[_norm(COUNT_CARDS[cls][1])]
+        if cls == "musketeer" and self._three_musk(["musketeer"] * most[cls], w.xy):
+            card = _BY_NAME[_norm("Three Musketeers")]
         fvotes = Counter()
         for c, fc in forms.items():
             if self.det._own(c, cls):
@@ -688,35 +892,71 @@ class OppModel:
                 self.dropped.append((e.t, "bomb fuse", (float(tx), float(ty))))
                 continue
             self._wpend.append(Play(e.t, None, "?", [], (float(tx), float(ty)), src="watch"))
+            if self.badge_marks and self._badge(e.t, tx, ty):
+                self._wpend[-1].badge = True     # decided at VOTE_S: a body on the spot?
         out = []
-        for p in yolo:
-            w = next((w for w in self._wpend if self._near(w, p.t, p.xy)), None)
-            if w is not None:
-                if self.allowed(p.card):     # a 9th card's body at a watch is a misread
+        held, self._musk_pend = self._musk_pend, []
+        for p in yolo + held:
+            if not getattr(p, "musk_held", False):
+                if self._three_musk(p.bodies, p.xy):
+                    p.card = _BY_NAME[_norm("Three Musketeers")]
+                if self.known_deck is not None:
+                    p.card = deck_card(p.card, p.bodies, self.known_deck)
+                w = next((w for w in self._wpend if self._near(w, p.t, p.xy)), None)
+                if w is not None:
+                    # a 9th card's body at a watch is a misread; (a) so is our own unit
+                    if self.allowed(p.card) and not (self.own_units and p.cls in self._ours_near(w, match_s)):
+                        self._identify(w, p)
+                    continue
+                if any(self._near(w, p.t, p.xy) for w in self._wdone[-12:]):
+                    continue                     # the play is out already, from its watch
+                w = self._late_target(p) if self.late_id else None
+                if w is not None and self.own_units and p.cls in self._ours_near(w, match_s):
+                    w = None
+                if w is not None and p.card is not None and self.allowed(p.card):
                     self._identify(w, p)
+                    w.card_t = match_s
+                    self._late.append(w)
+                    continue
+                if self.deck_rule and p.card is not None and len(self.known) >= self.DECK_SIZE \
+                        and p.card not in self.known:
+                    self.dropped.append((p.t, "9th card", p.xy))
+                    continue
+                if not self.allowed(p.card):
+                    self.dropped.append((p.t, "9th card (deck prior)", p.xy))
+                    continue
+            musk3 = self._three_musk(p.bodies, p.xy)
+            if not musk3 and self._musk_seen(p, match_s):
+                musk3 = True
+                p.card = _BY_NAME[_norm("Three Musketeers")]
+                if getattr(p, "musk_held", False):
+                    p.emitted_t = match_s
+                if not self.allowed(p.card):
+                    self.dropped.append((p.t, "9th card (deck prior)", p.xy))
+                    continue
+            if not musk3 and getattr(p, "musk_held", False):
+                if match_s < p.t + self.THREE_MUSK_S:
+                    self._musk_pend.append(p)
+                else:                            # no 3M: dropped as it was when held
+                    self.dropped.append((p.t, p.musk_held, p.xy))
                 continue
-            if any(self._near(w, p.t, p.xy) for w in self._wdone[-12:]):
-                continue                     # the play is out already, from its watch
-            w = self._late_target(p) if self.late_id else None
-            if w is not None and p.card is not None and self.allowed(p.card):
-                self._identify(w, p)
-                w.card_t = match_s
-                self._late.append(w)
-                continue
-            if self.deck_rule and p.card is not None and len(self.known) >= self.DECK_SIZE \
-                    and p.card not in self.known:
-                self.dropped.append((p.t, "9th card", p.xy))
-                continue
-            if not self.allowed(p.card):
-                self.dropped.append((p.t, "9th card (deck prior)", p.xy))
-                continue
-            if self.yolo_known and p.card not in self.known:
+            if not musk3 and self._musk_cand(p) and match_s < p.t + self.THREE_MUSK_S:
+                why = ("yolo-only, card not seen at a watch" if self.yolo_known and p.card not in self.known
+                       else "yolo-only, card not confirmed"
+                       if self.evidence and self.YOLO_ONLY_CONFIRMED and p.card not in self.confirmed
+                       else None)
+                if why is not None:
+                    p.musk_held = why            # (c) wait for the other two Musketeers
+                    self._musk_pend.append(p)
+                    continue
+            if self.yolo_known and p.card not in self.known and not musk3:
                 self.dropped.append((p.t, "yolo-only, card not seen at a watch", p.xy))
                 continue
-            if self.evidence and self.YOLO_ONLY_CONFIRMED and p.card not in self.confirmed:
+            if self.evidence and self.YOLO_ONLY_CONFIRMED and p.card not in self.confirmed and not musk3:
                 self.dropped.append((p.t, "yolo-only, card not confirmed", p.xy))
                 continue
-            if self.evidence and self._refound(p):
+            if self.evidence and not musk3 and self._refound(p):
+                # (c) a 3M birth is new by its musketeer count, not lost-and-found
                 self.dropped.append((p.t, "yolo-only, class on the board just before", p.xy))
                 continue
             # A birth with no watch: either a play whose watch was hidden (a
@@ -733,6 +973,26 @@ class OppModel:
             if self.bomb and w.card is None and self._bomb_at(w.t, w.xy):
                 self.dropped.append((w.t, "bomb fuse", w.xy))
                 continue
+            if self.rage and not getattr(w, "rage_seen", False):
+                if match_s - w.t < self.RAGE_S:
+                    keep.append(w)               # (d) wait for the circle
+                    continue
+                w.rage_seen = True
+                if self._rage_at(w) and self.allowed(_BY_NAME[_norm("Rage")]):
+                    w.card, w.cls, w.bodies, w.form, w.form_frac = _BY_NAME[_norm("Rage")], "rage", ["rage"], "", 0.0
+                    w.spell, w.strong = True, False
+                    w.emitted_t = match_s
+                    out.append(w)
+                    self._wdone.append(w)
+                    continue
+            if getattr(w, "badge", False):
+                if match_s - w.t < self.VOTE_S:
+                    keep.append(w)
+                    continue
+                if not self._bodies_on(w):
+                    self.dropped.append((w.t, "unit badge", w.xy))
+                    continue
+                w.badge = False
             if w.card is None:
                 # bodies born at the watch that the YOLO path did not make a play
                 # of (our-deck classes, pocket births, ...): the watch is red, so
@@ -740,8 +1000,13 @@ class OppModel:
                 trs = [tr for tr in self.det.tracks
                        if -0.5 <= tr.born[0] - w.t and len(tr.pts) >= 2
                        and np.hypot(tr.born[1] - w.xy[0], tr.born[2] - w.xy[1]) <= self.WATCH_R]
+                if self.own_units and trs:
+                    ours = self._ours_near(w, match_s)
+                    trs = [tr for tr in trs if tr.cls not in ours]
                 if trs and match_s - min(tr.born[0] for tr in trs) >= self.det.GROUP_S:
                     w.card, w.cls = self.det._group_card(trs)
+                    if self._three_musk([tr.cls for tr in trs], w.xy):
+                        w.card = _BY_NAME[_norm("Three Musketeers")]
                     if not self.allowed(w.card):
                         w.card = None            # a 9th card: the watch stays `??`
                     w.bodies = [tr.cls for tr in trs]
@@ -785,6 +1050,17 @@ class OppModel:
                  float(d["tile"][0]), float(d["tile"][1])) for d in dets or []
                 if d["side"] == 1 and not is_spell_class(d["cls"])
                 and base_class(d["cls"]) not in ("giant-snowball",) + self.TIMER_BODIES])]
+        if self.own_units:
+            self._hist0 = [h for h in self._hist0 if match_s - h[0] <= 20.0] + [(match_s, [
+                (base_class(d["cls"]), float(d["tile"][0]), float(d["tile"][1])) for d in dets or []
+                if d["side"] == 0 and base_class(d["cls"]) in OWN_DECK_BODIES])]
+        if self.rage:
+            self._rages = [b for b in self._rages if match_s - b[0] <= 10.0] + [
+                (match_s, float(d["tile"][0]), float(d["tile"][1])) for d in dets or []
+                if base_class(d["cls"]) == "rage"]
+            self._ljs = [b for b in self._ljs if match_s - b[0] <= 10.0] + [
+                (match_s, float(d["tile"][0]), float(d["tile"][1])) for d in dets or []
+                if d["side"] == 1 and base_class(d["cls"]) == "lumberjack"]
         if self.watch is not None:
             self._bombs = [b for b in self._bombs if match_s - b[0] <= 10.0] + [
                 (match_s, float(d["tile"][0]), float(d["tile"][1])) for d in dets or []

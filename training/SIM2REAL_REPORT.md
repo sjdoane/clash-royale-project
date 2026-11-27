@@ -582,12 +582,12 @@ To turn it on (after reading the patch):
     git apply --check patches/pending/live_elixir_estimate.diff
     git apply patches/pending/live_elixir_estimate.diff
     # recorded frames first, never taps
-    CR_ENGINE=build/gen2_c/engine .venv/bin/python play_live.py \
+    CR_ENGINE=~/cr-robot/build/gen2_c/engine .venv/bin/python play_live.py \
         --checkpoint runs/g2_ppo_s2r/snapshots/ep0030306.pth --temp 1.0 \
         --replay runs/live/20261123-004549/raw --seconds 200 --no-record \
         --driver-flags="--loop-timestamps --ability tap --elixir-est digit"
     # live: a dry run as written; --act added places cards (it asks first)
-    CR_ENGINE=build/gen2_c/engine .venv/bin/python play_live.py \
+    CR_ENGINE=~/cr-robot/build/gen2_c/engine .venv/bin/python play_live.py \
         --checkpoint runs/g2_ppo_s2r/snapshots/ep0030306.pth --temp 1.0 \
         --driver-flags="--ability tap --elixir-est digit"
 

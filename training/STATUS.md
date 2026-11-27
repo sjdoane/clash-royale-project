@@ -30,7 +30,7 @@ count, the curriculum rung and the PFSP state.
 
 **Fetch results to the Mac** (weights and logs only, no data):
 
-    rsync -a -e "ssh -o ControlPath=$HOME/.ssh/cm-balerion" <user>@<gpu-host>:cr-robot-remote/train/{checkpoints,runs} remote_results/
+    rsync -a -e "ssh -o ControlPath=$HOME/.ssh/cm-balerion" user@balerion:cr-robot-remote/train/{checkpoints,runs} remote_results/
 
 **Weights & Biases.** The project is https://wandb.ai/clash-royale/clash-royale-ai.
 - The sidecar is `training/wandb_sidecar.py`. On balerion it lives at `~/cr-robot-remote/train/wandb_sidecar.py`, uses the `~/cr-robot-remote/wbvenv` venv, and writes its log to `~/cr-robot-remote/wandb_sidecar.log`.

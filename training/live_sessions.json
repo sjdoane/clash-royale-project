@@ -1,9 +1,12 @@
 {
- "note": "Live sessions used as replay opponents (training/live_ghost_build.py). The newest session is the held-out one (split val); when a new session is recorded, add it as val and move the previous val session to train.",
+ "note": "Live sessions used as replay opponents (training/live_ghost_build.py). One session is held out (split val). s4 stays the held-out one: on 2026-11-23 Sam asked for the evening session (s5, s6) to be training data, and keeping s4 keeps the held-out evaluation series comparable. The 2026-11-24 morning session (s7, first one on the round-5 detector and --leak-floor) is training data too. s7 match 5 is skipped: a 52 s stretch before the app was left, with no re-read of its own (the ledger deck has no forms). s6 match 9 is skipped: the launcher's time ran out 72 s in, so no battle of the battle log pairs with it and the opponent's deck is not known to the builder.",
  "sessions": [
   {"id": "s1", "run": "20261123-004549", "opp_from": "20261123-030217", "split": "train"},
   {"id": "s2", "run": "20261123-091124", "split": "train"},
   {"id": "s3", "run": "20261123-101008", "split": "train"},
-  {"id": "s4", "run": "20261123-104801", "split": "val"}
+  {"id": "s4", "run": "20261123-104801", "split": "val"},
+  {"id": "s5", "run": "20261123-192303", "split": "train"},
+  {"id": "s6", "run": "20261123-192829", "split": "train", "skip": [9]},
+  {"id": "s7", "run": "20261124-094533", "split": "train", "skip": [5]}
  ]
 }

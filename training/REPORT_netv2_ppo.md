@@ -194,7 +194,7 @@ The control socket `~/.ssh/cm-balerion` is gone, and I may not open a new connec
 
 1. **Copy the newer league checkpoint:**
    ```
-   rsync -a -e "ssh -o ControlPath=~/.ssh/cm-balerion -o BatchMode=yes" <user>@<gpu-host>:cr-robot-remote/train/runs/sweep/ppo_league26_final.pth remote_results/
+   rsync -a -e "ssh -o ControlPath=~/.ssh/cm-balerion -o BatchMode=yes" user@balerion:cr-robot-remote/train/runs/sweep/ppo_league26_final.pth remote_results/
    ```
    Then copy the current `checkpoints/v2_league_{a,b}.pth` the same way.
 2. **Re-run the round-robin** with the newer checkpoints added:

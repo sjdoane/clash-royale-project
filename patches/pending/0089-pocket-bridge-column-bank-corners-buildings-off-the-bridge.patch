@@ -1,0 +1,203 @@
+Patch 0089 (gen2_i -> build/gen2_j), 2026-11-26. Two default-off switches in CR_P0088, matched exactly ("all" does NOT enable them):
+  pocketcells : enemy-half legality = inner bridge column only, no buildings on the bridge, bank corner cells closed, deploy-anywhere not in the river outside the walk corridor.
+  kingpath    : a King-bound unit past the river, |x-8.5|<=3, King in sight, no standing tower on the segment, walks straight to the King instead of the lane waypoint.
+Paths below start at engine/; apply from the build folder: cd build/gen2_X && patch -p1 < this. Also adds pocketcells/kingpath to p0088_active() (src/bindings.cpp).
+Both off = bit-identical to gen2_i (see runs/pocket_1126/verify/VERIFY.txt section D).
+
+diff --git a/engine/include/core/ClashEnv.h b/engine/include/core/ClashEnv.h
+index d5ab2ac..7b3d34c 100644
+--- a/engine/include/core/ClashEnv.h
++++ b/engine/include/core/ClashEnv.h
+@@ -687,7 +687,7 @@ public:
+         if (!def) return false;
+         return game.isValidPlacement(team, x, y, def->isSpell,
+                                      def->placementRadius, def->deployAnywhere,
+-                                     def->rollRange > 0.0f, def->castOwnSideOnly);
++                                     def->rollRange > 0.0f, def->castOwnSideOnly, def->isBuilding);
+     }
+ 
+     std::vector<float> reset() {
+diff --git a/engine/include/core/GameManager.h b/engine/include/core/GameManager.h
+index 660ce06..ebf9fe6 100644
+--- a/engine/include/core/GameManager.h
++++ b/engine/include/core/GameManager.h
+@@ -533,14 +533,28 @@ public:
+     // refused all of them, and a replay moved each to the river bank, 4-7 s
+     // further from the King Tower.
+     static constexpr float POCKET_DEEPEST_ROW_TEAM0_HALF = 11.0f;
+-    bool inPocket(int team, float x, float y) const {
++    // Engine rows 15 and 18 are real rows 14 and 17 (ArenaLayout::realRow).
++    static bool isBankCorner(float x, float y) {
++        const bool edge = x < 0.5f || x > static_cast<float>(ArenaLayout::WIDTH) - 1.5f;
++        const bool bank = std::fabs(y - 15.0f) < 0.5f || std::fabs(y - 18.0f) < 0.5f;
++        return edge && bank;
++    }
++    bool inPocket(int team, float x, float y, bool building = false) const {
+         const int enemy = 1 - team;
+         if (enemy == 0) {
+             if (y < POCKET_DEEPEST_ROW_TEAM0_HALF - Board::CELL_HALF_EXTENT) return false;
+         } else {
+             if (y > ArenaLayout::mirrorY(POCKET_DEEPEST_ROW_TEAM0_HALF) + Board::CELL_HALF_EXTENT) return false;
+         }
+-        if (y > board.getRiverStart() && y < board.getRiverEnd() && !board.isOnBridge(x)) return false;
++        // Patch 0089: in the river band only the lane's inner deck column
++        // (the walk corridor, cells 3 and 14) opens, and never for a building.
++        // Human replays: 9,125 troop plays on the river rows, all on x 3 / 14;
++        // 0 of 2,701 pocket buildings on a river row (royalesim agrees).
++        if (y > board.getRiverStart() && y < board.getRiverEnd()) {
++            if (P0088::pocketCells()) {
++                if (building || !Board::inWalkCorridor(x)) return false;
++            } else if (!board.isOnBridge(x)) return false;
++        }
+         const bool left = ArenaLayout::isLeftLane(x);
+         for (const auto& entity : board.getEntities()) {
+             if (entity->team != enemy || !entity->isAlive() || !entity->isTower()) continue;
+@@ -552,7 +566,7 @@ public:
+ 
+     bool isValidPlacement(int team, float x, float y, bool isSpell, float placedRadius,
+                           bool deployAnywhere = false, bool isRollingSpell = false,
+-                          bool ownSideOnly = false) const {
++                          bool ownSideOnly = false, bool isBuilding = false) const {
+         float maxX = static_cast<float>(board.getWidth() - 1);
+         float maxY = static_cast<float>(board.getHeight() - 1);
+         if (x < 0.0f || x > maxX || y < 0.0f || y > maxY) return false;
+@@ -573,7 +587,15 @@ public:
+ 
+             // Deploy-anywhere cards (Miner, Goblin Drill) skip the own-half
+             // rule but not the building check below.
+-            if (!deployAnywhere && !onOwnHalf(team, y) && !inPocket(team, x, y)) return false;
++            // Patch 0089: the four river-bank corner cells (real rows 14 and 17,
++            // columns 0 and 17) take no card: 0 of 5.2 M human plays on the own
++            // bank row and 0 of ~23 k on the enemy bank row use them.
++            if (P0088::pocketCells() && isBankCorner(x, y)) return false;
++            // Patch 0089: a deploy-anywhere card stays off river water (the
++            // decks' inner column only), like everything else on the ground.
++            if (P0088::pocketCells() && deployAnywhere && y > board.getRiverStart() && y < board.getRiverEnd() &&
++                !Board::inWalkCorridor(x)) return false;
++            if (!deployAnywhere && !onOwnHalf(team, y) && !inPocket(team, x, y, isBuilding)) return false;
+ 
+             // Nothing may be placed on an existing building: the gap is its
+             // radius plus the new card's footprint.
+@@ -648,7 +670,7 @@ public:
+ 
+         if (!isValidPlacement(team, x, y, effectiveDef->isSpell, effectiveDef->placementRadius,
+                               effectiveDef->deployAnywhere, effectiveDef->rollRange > 0.0f,
+-                              effectiveDef->castOwnSideOnly)) return false;
++                              effectiveDef->castOwnSideOnly, effectiveDef->isBuilding)) return false;
+ 
+         PlayerState::PlayCardResult result = player.playCard(handIndex, costOverride);
+         if (result.cardId != -1) {
+diff --git a/engine/include/core/LanePath.h b/engine/include/core/LanePath.h
+index ace09da..9d5bea8 100644
+--- a/engine/include/core/LanePath.h
++++ b/engine/include/core/LanePath.h
+@@ -1,4 +1,5 @@
+ #pragma once
++#include <cmath>
+ #include <memory>
+ #include "ArenaLayout.h"
+ #include "Board.h"
+@@ -32,6 +33,32 @@ inline std::shared_ptr<Entity> laneObjective(const Board& board, int myTeam,
+     return lanePrincess ? lanePrincess : king;
+ }
+ 
++// Patch 0089 kingpath (used by CombatEntity, only for a King in sight): is `from` past the river (on the King's side) with
++// the straight line to the King clear of every other standing tower? Clear =
++// the segment keeps more than the tower's collision radius from its centre.
++inline constexpr float KINGPATH_INNER_HALF_WIDTH = 3.0f;
++inline bool straightToKing(const Board& board, int myTeam, const Vector2D& from,
++                           const std::shared_ptr<Entity>& king) {
++    const bool past = (myTeam == 0) ? (from.y >= board.getRiverEnd())
++                                    : (from.y <= board.getRiverStart());
++    if (!past) return false;
++    // Only from the inner pocket: within KINGPATH_INNER_HALF_WIDTH of the
++    // centre line (engine columns 6-11). Further out the lane walk W1 already
++    // matches royalesim's grid path for a Hog within 0.25 s (verify/j/cmp_table.out).
++    if (std::fabs(from.x - ArenaLayout::CENTER_X) > KINGPATH_INNER_HALF_WIDTH) return false;
++    const float dx = king->position.x - from.x, dy = king->position.y - from.y;
++    const float len2 = dx * dx + dy * dy;
++    for (const auto& e : board.getEntities()) {
++        if (e.get() == king.get() || !e->isAlive() || !e->isTower()) continue;
++        float t = len2 > 0.0f ? ((e->position.x - from.x) * dx + (e->position.y - from.y) * dy) / len2 : 0.0f;
++        t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
++        const float cx = from.x + t * dx - e->position.x, cy = from.y + t * dy - e->position.y;
++        const float r = e->getCollisionRadius();
++        if (cx * cx + cy * cy <= r * r) return false;
++    }
++    return true;
++}
++
+ // Where to walk while approaching `target`. For anything but an enemy King, the
+ // target's own position.
+ //
+diff --git a/engine/include/core/P0088.h b/engine/include/core/P0088.h
+index e5f2f7d..e6864a5 100644
+--- a/engine/include/core/P0088.h
++++ b/engine/include/core/P0088.h
+@@ -78,6 +78,32 @@ inline bool physDist() { static const bool b = on("physdist"); return b; }
+ inline bool jumpCol() { static const bool b = on("jumpcol"); return b; }
+ inline float speedScale() { return speed() ? 0.010f / 0.011045f : 1.0f; }
+ 
++// Patch 0089 switches, read from the same CR_P0088 list but NOT turned on by
++// "all" (so an "all" list keeps meaning the 0088 engine):
++//   pocketcells  the pocket opens only the lane's inner bridge column (cells
++//                3 / 14), no building on a bridge cell, no card on the four
++//                bank corner cells (0|17, 15|18), no deploy-anywhere card on
++//                river water off the bridge (human replays, royalesim)
++//   kingpath     a King-bound unit already past the river walks straight at
++//                the King when that line passes no standing tower, instead of
++//                the lane waypoint W1 (LanePath::approachPoint; royalesim
++//                path2026: no waypoint, the pocket Hog from the centre column
++//                hits the King ~2 s sooner)
++inline bool onExact(const char* name) {
++    const std::string& s = raw();
++    const std::string n(name);
++    size_t i = 0;
++    while (!s.empty() && i <= s.size()) {
++        size_t j = s.find(',', i);
++        if (j == std::string::npos) j = s.size();
++        if (s.substr(i, j - i) == n) return true;
++        i = j + 1;
++    }
++    return false;
++}
++inline bool pocketCells() { static const bool b = onExact("pocketcells"); return b; }
++inline bool kingPath() { static const bool b = onExact("kingpath"); return b; }
++
+ // Tornado (royalesim area_effect_objects Tornado, status ATTRACT_LAW
+ // base_speed): life 1050 ms, every tick a victim in the radius takes an extra
+ // step of attract_percentage 360 % of its own base speed toward the centre.
+diff --git a/engine/include/entities/CombatEntity.h b/engine/include/entities/CombatEntity.h
+index bee6374..cce590e 100644
+--- a/engine/include/entities/CombatEntity.h
++++ b/engine/include/entities/CombatEntity.h
+@@ -1160,7 +1160,16 @@ public:
+                 // Lane-aware approach: a King objective is walked to up this
+                 // unit's own lane; any other target is its own position
+                 // (LanePath::approachPoint).
+-                if (!windowRooted) moveTowards(board, LanePath::approachPoint(board, team, position, target));
++                // Patch 0089 kingpath: a King IN SIGHT from past the river, with
++                // no standing tower on the line, is walked to straight
++                // (royalesim: the blind walk keeps the lane, a seen King is
++                // walked at).
++                if (!windowRooted) {
++                    const bool straight = P0088::kingPath() && target->isTower() && target->symbol == 'R'
++                        && dist <= effectiveSightTo(target)
++                        && LanePath::straightToKing(board, team, position, target);
++                    moveTowards(board, straight ? target->position : LanePath::approachPoint(board, team, position, target));
++                }
+                 if (chargeThreshold > 0.0f) chargeProgress += beforeMove.distanceTo(position);
+             }
+         } else if (stunned || rampGracePeriodTicks <= 0 || ticksSinceLastHit >= rampGracePeriodTicks) {
+diff --git a/engine/src/bindings.cpp b/engine/src/bindings.cpp
+index 52248b6..e829242 100644
+--- a/engine/src/bindings.cpp
++++ b/engine/src/bindings.cpp
+@@ -670,6 +670,7 @@ PYBIND11_MODULE(clash_royale_env, m) {
+         d["evocannon"] = P0088::evoCannon(); d["speed"] = P0088::speed(); d["stomp"] = P0088::stomp();
+         d["bankrows"] = P0088::bankRows(); d["physdist"] = P0088::physDist(); d["jumpcol"] = P0088::jumpCol();
+         d["speed_scale"] = P0088::speedScale();
++        d["pocketcells"] = P0088::pocketCells(); d["kingpath"] = P0088::kingPath();   // patch 0089 (exact names only)
+         return d;
+     }, "Patch 0088: the switches this process's engine has latched (read once from CR_P0088).");
+ 

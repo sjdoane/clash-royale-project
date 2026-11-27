@@ -937,6 +937,16 @@ class TailNoiseConfig:
     # A card without an entry (and every card when this is empty, the default) is shown as before:
     # no tile until thrown_tile_delay_s, never in OPP_SPELLS. Not scaled except "fail".
     flight: dict = field(default_factory=dict)
+    # -- 2026-11-27 (patch 0091): Evolution card ids whose EVOLVED cast never gets a landing estimate --
+    # Live (runs/live_1127/barrel/REPORT.md): 0 of 9 evolved Goblin Barrel throws (card 132) got a tile;
+    # the sprite splits into two barrels at mirrored targets and the side cannot be told in time.
+    # obs_v2.Play names both forms by the face (109), so which casts are evolved is read from the
+    # engine's evolution state (ClashRoyaleEnv.get_evolution_state, build/gen2_l and later) at each
+    # view: a cast of the card moves the state, and it was evolved when the cycles before it were 0.
+    # The plain casts of the same card keep their estimate. Empty (the default): no read, no change,
+    # the RNG stream is the same. Non-empty needs the engine game: TailNoise.attach_game(game), or
+    # it is found as `env.game` in the calling frame (obs_v2.EnvTail.tail); it raises otherwise.
+    evo_no_tile: list = field(default_factory=list)
 
 
 # The reader after 2026-11-22: a thrown Goblin Barrel / Fireball / Giant Snowball gets a landing
@@ -997,6 +1007,10 @@ READER2 = {
         },
         # Rocket (lost by the detector mid-flight), Arrows (2 throws): no entry, shown as before.
     },
+    # 2026-11-27: OFF. [132] makes every evolved Goblin Barrel cast estimate-free, as live (0 of 9);
+    # with it on, flight["Goblin Barrel"]["fail"] 0.07 (the evo throws as a rate) double counts them:
+    # live plain throws without an estimate are 0 of 71.
+    "evo_no_tile": [],
 }
 TAIL_PRESETS = {"reader2": READER2}
 
@@ -1067,8 +1081,15 @@ class TailNoise:
         self.flight = {c: flight[_norm(n)] for c, n in self.bk.name.items() if _norm(n) in flight}
         self.troops = sorted({f for c, f in self.bk.face.items()
                               if not self.bk.spell.get(f, False) and not self.bk.building.get(f, False)})
+        # evo_no_tile: evolution id -> the face its plays carry (obs_v2.Play.card)
+        self.evo_no_tile = {int(c): int(self.bk.face.get(int(c), int(c))) for c in self.cfg.evo_no_tile}
+        self._game = None
         self.stats = {}
         self.reset()
+
+    def attach_game(self, game):
+        """The engine game (ClashRoyaleEnv) whose evolution state evo_no_tile reads."""
+        self._game = game
 
     def reset(self, seed=None):
         if seed is not None:
@@ -1079,6 +1100,10 @@ class TailNoise:
         self.stats = {"plays": 0, "missed": 0, "stacked": 0, "missed_stacked": 0, "spells": 0,
                       "missed_spells": 0, "wrong_name": 0, "tile_shift": 0, "time_shift": 0,
                       "spurious": 0, "seconds": 0.0, "flights": 0, "no_target": 0}
+        self._evo_prev = None           # evo_no_tile: the evolution state at the previous view
+        self._evo_now = False           # evo_no_tile: the play being drawn is an evolved cast
+        if self.evo_no_tile:
+            self.stats.update({"evo_casts": 0, "evo_no_tile": 0, "evo_unknown": 0})
 
     @staticmethod
     def _key(p):
@@ -1102,8 +1127,9 @@ class TailNoise:
                 # no estimate: the reader failed, or the spell lands before its side is known (a
                 # short throw: the sprite is gone, there is nothing more to fit), or the engine
                 # gave no impact time (gen 1)
+                # (evo_no_tile last, after every draw, so the stream is the same with it on)
                 if rng.random() < float(fl["fail"]) * s or p.impact_t is None or p.x is None \
-                        or known > p.impact_t - p.t + 1e-6:
+                        or known > p.impact_t - p.t + 1e-6 or self._evo_now:
                     self.stats["no_target"] += 1
                 else:
                     f["known"], f["z"] = known, (float(z[0]), float(z[1]), float(z[2]))
@@ -1154,17 +1180,61 @@ class TailNoise:
             self.stats["spurious"] += 1
         del self.spurious[:-self.V.SimTracker.KEEP]
 
+    def _find_game(self):
+        """evo_no_tile: the engine game, attached or found as `env.game` up the call stack."""
+        if self._game is not None:
+            return self._game
+        import sys  # noqa: PLC0415
+        fr = sys._getframe(2)
+        for _ in range(6):
+            if fr is None:
+                break
+            env = fr.f_locals.get("env")
+            game = getattr(env, "game", None) if env is not None else fr.f_locals.get("game")
+            if game is not None and hasattr(game, "get_current_tick"):
+                return game
+            fr = fr.f_back
+        raise RuntimeError("tail-noise evo_no_tile needs the engine game: TailNoise.attach_game(game), "
+                           "or call view() from a frame holding `env` (obs_v2.EnvTail.tail)")
+
+    def _evo_casts(self, team):
+        """evo_no_tile: {face: evolved} for the evolution casts made since the previous view
+        (None = no previous view: unknown). A cast moves the card's (cycles, uses)."""
+        game = self._find_game()
+        if not hasattr(game, "get_evolution_state"):
+            raise RuntimeError("tail-noise evo_no_tile needs ClashRoyaleEnv.get_evolution_state "
+                               "(engine build/gen2_l or later)")
+        cur = {int(k): tuple(v) for k, v in game.get_evolution_state(1 - team).items()}
+        prev, self._evo_prev = self._evo_prev, cur
+        out = {}
+        for evo, face in self.evo_no_tile.items():
+            if evo not in cur:
+                continue
+            if prev is None:
+                out[face] = None
+            elif cur[evo] != prev.get(evo):
+                out[face] = prev[evo][0] <= 0
+        return out
+
     def view(self, plays, now, team=0):
         """The opponent plays seat `team` is shown at match second `now`, as new
         obs_v2.Play objects (board frame). `plays`: the true ones (obs_v2.Play)."""
         cfg, V, s = self.cfg, self.V, float(self.cfg.scale)
         plays = sorted(plays, key=lambda p: p.t)
+        evo = self._evo_casts(team) if self.evo_no_tile else None
         out = []
         for p in plays:
             k = self._key(p)
             f = self.fate.get(k)
             if f is None:
+                if evo is not None and p.card in evo:
+                    ev = evo.pop(p.card)
+                    self.stats["evo_casts"] += 1
+                    self.stats["evo_unknown"] += ev is None
+                    self.stats["evo_no_tile"] += bool(ev)
+                    self._evo_now = bool(ev)
                 f = self.fate[k] = self._draw(p, plays)
+                self._evo_now = False
             if f["miss"] or now + 1e-6 < p.t + f["seen"]:
                 continue
             x, y, card = p.x, p.y, p.card
@@ -1229,6 +1299,9 @@ def noise_tail_rows(rows, base_size=None, dt_ticks=10, cfg=True, seed=None, time
     if base < 0:
         return out
     noise = TailNoise(load_tail_config(cfg), seed=seed)
+    if noise.evo_no_tile:
+        raise ValueError("noise_tail_rows: evo_no_tile needs the engine's evolution state, which "
+                         "stored rows do not carry; use a config without it for datasets")
     bk = noise.bk
     true = []                           # obs_v2.Play, the episode's opponent plays so far
     cap = V.AGE_CAP_S - 0.02

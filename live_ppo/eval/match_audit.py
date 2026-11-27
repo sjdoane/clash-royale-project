@@ -50,7 +50,8 @@ sys.path.insert(0, str(REPO / "live_ppo" / "eval"))
 import audit_core as AC  # noqa: E402
 
 OUT = REPO / "runs" / "match_audit"
-DEFAULT_WEIGHTS = REPO / "data" / "det" / "runs" / "r3" / "weights" / "best.pt"   # play_live.DEFAULT_DET
+DEFAULT_WEIGHTS = REPO / "data" / "det" / "runs" / "r5" / "weights" / "best.pt"   # play_live.DEFAULT_DET
+PREV_WEIGHTS = REPO / "data" / "det" / "runs" / "r3" / "weights" / "best.pt"      # default until 2026-11-23
 HI = 0.35                     # the operating confidence (driver.py --det-conf, eval_units --conf)
 
 _EU = None
@@ -153,9 +154,9 @@ def find_tag(name, tag=None) -> str:
         return tag
     if not tags:
         raise SystemExit(f"no detect output in {d}: run `match_audit.py detect` first")
-    dflt = weights_tag(DEFAULT_WEIGHTS)
-    if dflt in tags:
-        return dflt
+    for dflt in (weights_tag(DEFAULT_WEIGHTS), weights_tag(PREV_WEIGHTS)):   # audits made before round 5 keep working
+        if dflt in tags:
+            return dflt
     if len(tags) > 1:
         raise SystemExit(f"several detector runs in {d}: pass --tag one of {tags}")
     return tags[0]

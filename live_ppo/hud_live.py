@@ -55,6 +55,30 @@ TOWER_DIGITS = REPO / "live_ppo" / "assets" / "tower_digits.npz"
 OPP_PRINCESS_X0 = {"opp_princess_left": 110, "opp_princess_right": 397}
 BAR_SEARCH_Y = (40, 230)
 
+# Switch for the robust opponent bar reading (runs/tower_check/REPORT.md). Off: the live loop reads as
+# before. On (the offline re-reader, live_ppo/tower_reread.py): only dark CRIMSON pixels after the fill
+# count as lost-HP track. Any dark pixel used to count, so on arenas with a dark blue-grey floor tile
+# behind the right tower's bar end (hue ~108, V ~110) a FULL bar read 9-10 px of track, the max never
+# latched (it needs track <= 2) and the tower stayed "unmeasured" = full all match (live3 store matches
+# 1, 6, 16, 23, 26, 32, 35). The real track is hue 150-165, S >= 75, V 80-95.
+# Going live = set this to True (or pass robust=True to OppTowers).
+ROBUST_TOWERS = True  # on live since 2026-11-24 (Sam); revert = False
+# Switch for the opponent King reader (OppKing, runs/tower_check/REPORT.md "Opponent King"). Off: the
+# live loop keeps the engine's stock King reading. On (the offline re-reader): OppTowers also reads the
+# King's numeral once its bar is drawn and returns it as "opp_king" next to the Princesses (driver.py
+# then puts it into the observation like them). Going live = set this to True (or pass king=True).
+OPP_KING_READER = True  # on live since 2026-11-24 17:30 PST (Sam); revert = False
+# Switch for the opponent Princess death confirmation (runs/towerfix_1126/REPORT.md). Off: the destroyed
+# latch fires after MISSING_TO_DESTROY frames with no 3-4 digit numeral on a low tower. That latched a
+# STANDING tower dead whenever it sat under 100 HP: its numeral has two digits, which the reader never read,
+# and its fill is too short for the bar test (live 20261125-222630 m1: the left Princess stood at 54 HP from
+# 104 s to the end, latched destroyed at 112 s; the policy sent every later Hog right). On: each frame also
+# looks, at the tower's own bar row, for (a) a 1-2 digit numeral at the numeral's left-aligned column and
+# (b) the bar's lost-HP track (a dark crimson rectangle >= 50 px wide; rubble has none). Either one is
+# evidence the tower stands: it resets the missing count, and UNLATCH_S of it in a row undoes a latch.
+# True falls still latch after MISSING_S: the numeral, the bar and the track vanish together.
+TOWER_DEATH_CONFIRM = True  # 2026-11-26 (towerfix_1126); revert = False
+
 
 @dataclass
 class BarReading:
@@ -79,7 +103,8 @@ class NumeralReading:
     occluded: bool = False   # saturated red (an enemy level badge) in the numeral's box
 
 
-def find_bar(img, x0, y0=BAR_SEARCH_Y[0], y1=BAR_SEARCH_Y[1], every=False):
+def find_bar(img, x0, y0=BAR_SEARCH_Y[0], y1=BAR_SEARCH_Y[1], every=False, red_track=False):
+    """red_track: count only dark crimson px as lost-HP track (see ROBUST_TOWERS)."""
     hsv = cv2.cvtColor(img[y0:y1, x0 - 4:x0 + 70], cv2.COLOR_BGR2HSV)
     h, s, v = (hsv[..., i].astype(np.int16) for i in range(3))
     m = (h >= 165) & (h <= 179) & (s > 105) & (v > 150)
@@ -98,6 +123,9 @@ def find_bar(img, x0, y0=BAR_SEARCH_Y[0], y1=BAR_SEARCH_Y[1], every=False):
                 while w < len(r) and (r[w] or (w + 1 < len(r) and r[w + 1])):
                     w += 1
                 dark = v[mid, 4 + w:] < 125
+                if red_track:
+                    hh, ss = h[mid, 4 + w:], s[mid, 4 + w:]
+                    dark = dark & ((hh >= 140) | (hh <= 10)) & (ss >= 60)
                 # one or two antialiased px between fill and track (iVgm 31710:
                 # V 136-142) used to end the track at 0 and lose a live bar
                 k = 0
@@ -178,9 +206,10 @@ class ExemplarDigits:
 
 
 class OppTowerReader:
-    def __init__(self):
+    def __init__(self, red_track: bool = False):
         self.templates = (ExemplarDigits(TOWER_DIGITS) if TOWER_DIGITS.exists()
                           else DigitTemplates.load(TOWER_TEMPLATES))
+        self.red_track = red_track
 
     def read_numeral(self, img, bar: BarReading) -> NumeralReading:
         patch = img[max(0, bar.y - 15):bar.y + 3, bar.x0 - 3:bar.x0 + 56]
@@ -206,7 +235,7 @@ class OppTowerReader:
             # lowest run with a confident numeral above it; the arena's own pink
             # stripes pass the bar test too (uVf1 58665: y 97 stripe, real bar
             # merged with a unit below it)
-            cands = find_bar(img, x0, every=True)
+            cands = find_bar(img, x0, every=True, red_track=self.red_track)
             bar, num = (cands[0], None) if cands else (None, None)
             for b in cands:
                 n = self.read_numeral(img, b)
@@ -240,6 +269,81 @@ class OppTowerReader:
                         break
             out[key] = (bar, num)
         return out
+
+    # ---- death confirmation (TOWER_DEATH_CONFIRM) -----------------------------------------------
+    SHORT_X = (3, 11)                 # patch columns a 1-2 digit numeral starts at (left-aligned:
+                                      # "371" and "54" both start at 7-8, "688" at 5)
+    SHORT_CONF = 0.4                  # margin of each glyph of a 1-2 digit read
+    SHORT_DY = (-2, -1, 0, 1, 2)      # rows around the tower's bar row; a value must read at 2 of them
+    TRACK_DY = range(-3, 10)          # rows around the bar's top row searched for the track
+    TRACK_RUN = 50                    # px of bar (fill + track) in one run, from the bar's left end
+    TRACK_DARK = 25                   # ... of which dark crimson track at least
+    TRACK_V = 106                     # track brightness: the empty track reads v 82-98; the red/purple
+                                      # screen tint after a kill (m8 frame 16047) v 112-126 over everything
+    TRACK_ROWS = 4                    # rows with such a run, their right ends within 2 px
+    SHORT_RED_MIN = 12                # saturated red px on/next to a short read's columns: an enemy level
+                                      # badge ("11", raw 20261125-222630 f1087 read as 11 at margin 0.44),
+                                      # not the numeral (the real 54 has 0 such px). As OwnTowerReader.RED_MIN
+    SHORT_H = 9                       # px, every glyph of a short read at least: the tower numeral's digits
+                                      # are 9-11 px tall here (54, 48, 14), a level badge's "11" 7 px
+
+    def read_short(self, img, x0, y) -> NumeralReading | None:
+        """A 1-2 digit numeral (a tower under 100 HP) above the bar whose top row is y, at the
+        numeral's left-aligned column. None if no such value reads at two of SHORT_DY's rows."""
+        seen = {}
+        for dy in self.SHORT_DY:
+            yy = y + dy
+            patch = img[max(0, yy - 15):yy + 3, x0 - 3:x0 + 56]
+            if patch.size == 0:
+                continue
+            cells = segment_numeral(patch, with_x=True)
+            if not 1 <= len(cells) <= 2 or not self.SHORT_X[0] <= cells[0][0] <= self.SHORT_X[1]:
+                continue
+            if min(c.shape[0] for _x, c in cells) < self.SHORT_H:
+                continue                      # the badge's digits are 7 px tall
+            txt, confs = "", []
+            for _x, c in cells:
+                g, conf = self.templates.classify(c)
+                txt += g
+                confs.append(conf)
+            if not txt.isdigit() or txt[0] == "0" or min(confs) < self.SHORT_CONF:
+                continue
+            xa, xb = cells[0][0], cells[-1][0] + cells[-1][1].shape[1]
+            hsv = cv2.cvtColor(patch[:, max(0, xa - 4):xb + 6], cv2.COLOR_BGR2HSV)
+            h, s_, v_ = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+            if int((((h <= 8) | (h >= 170)) & (s_ >= 150) & (v_ >= 130)).sum()) >= self.SHORT_RED_MIN:
+                continue                      # a level badge, not the tower's numeral
+            v = int(txt)
+            if v in seen:
+                return NumeralReading(v, txt, min(min(confs), seen[v]), len(cells))
+            seen[v] = min(confs)
+        return None
+
+    def track_alive(self, img, x0, y) -> bool:
+        """The bar of a standing tower near the bar row y: in TRACK_ROWS rows, one run of bar pink or
+        dark crimson track starting at the bar's left end, >= TRACK_RUN px long with >= TRACK_DARK px of
+        track, right ends within 2 px (a rectangle). At 54 HP the run is ~62 px of track in 8+ rows; over
+        rubble, the red deploy tint or the crown animation no row has more than ~15 px."""
+        y0, y1 = max(0, y + self.TRACK_DY[0]), y + self.TRACK_DY[-1] + 1
+        hsv = cv2.cvtColor(img[y0:y1, x0 - 4:x0 + 70], cv2.COLOR_BGR2HSV)
+        h, s, v = (hsv[..., i].astype(np.int16) for i in range(3))
+        dark = (v < self.TRACK_V) & ((h >= 140) | (h <= 10)) & (s >= 60)
+        pink = (h >= 165) & (s > 105) & (v > 150)
+        ends = []
+        for r in range(dark.shape[0]):
+            ok = dark[r] | pink[r]
+            x = next((i for i in range(14) if ok[i]), None)      # starts within x0-4 .. x0+9
+            if x is None:
+                continue
+            e = x
+            while e < ok.shape[0] and (ok[e] or (e + 1 < ok.shape[0] and ok[e + 1])):
+                e += 1
+            if e - x >= self.TRACK_RUN and int(dark[r, x:e].sum()) >= self.TRACK_DARK:
+                ends.append(e)
+        if len(ends) < self.TRACK_ROWS:
+            return False
+        ends.sort()
+        return any(ends[i + self.TRACK_ROWS - 1] - ends[i] <= 2 for i in range(len(ends) - self.TRACK_ROWS + 1))
 
 
 @dataclass
@@ -297,6 +401,16 @@ class TowerHPFilter:
     BAR_STEP = 0.05                  # ... and only for a fall bigger than this (3 px of 60)
     BAR_TRACK_MIN = 3                # px of track after the fill (a badge or a hit flash
                                      # cuts the run with no track after it)
+    # death confirmation (TOWER_DEATH_CONFIRM; the caller passes alive / short to update)
+    _alive_now: bool = False         # this frame shows the tower standing (1-2 digit numeral, bar track)
+    _alive_run: int = 0              # frames in a row with that evidence
+    UNLATCH_NEED = 6                 # ... that undo a destroyed latch (OppTowers: UNLATCH_S at its rate)
+    _pre_latch: tuple | None = None  # (hp, frac) held when the latch fired
+    CONFIRMED_MISSING: int | None = None  # with the cues looked for this frame (TOWER_DEATH_CONFIRM),
+                                     # this many frames with no numeral, no 1-2 digit numeral and no bar
+                                     # track latch the tower (OppTowers: CONFIRMED_S at its rate)
+    _cued: bool = False
+    _short: tuple | None = None      # (value, reads) of a 1-2 digit numeral below the held value
 
     @staticmethod
     def _dropped_digits(cur: int, v: int) -> bool:
@@ -344,13 +458,46 @@ class TowerHPFilter:
         return (bar is not None and self._bar_y is not None and bar.height >= 5
                 and abs(bar.y - self._bar_y) <= 3)
 
-    def update(self, bar: BarReading | None, num: NumeralReading | None):
+    def update(self, bar: BarReading | None, num: NumeralReading | None, alive: bool | None = None,
+               short: NumeralReading | None = None):
+        """alive / short: death-confirmation evidence for this frame (hud_live.TOWER_DEATH_CONFIRM;
+        None = not looked for, the filter behaves as before). alive: the tower's bar track or a 1-2
+        digit numeral is on screen. short: that 1-2 digit numeral (a tower under 100 HP)."""
         self._num_ok = False
+        self._cued = alive is not None
+        self._alive_now = bool(alive) or short is not None
+        # only the bar track undoes a latch (a short numeral keeps a standing tower from latching,
+        # but an unrejected badge "11" over rubble must not bring a dead tower back)
+        self._alive_run = self._alive_run + 1 if alive else 0
+        if self.destroyed and alive and self._alive_run >= self.UNLATCH_NEED:
+            # the tower is on screen again: the latch came from a numeral the reader could not read
+            hp, frac = self._pre_latch or (self.hp, self.frac)
+            self.log.append(("unlatch", hp, None if short is None else short.value))
+            self.destroyed, self.hp, self.frac = False, hp, frac
+            self._missing, self._up, self._cand = 0, None, None
         self._update(bar, num)
+        if short is not None and not self.destroyed:
+            self._see_short(short.value)
+        else:
+            self._short = None
         if self._num_ok:
             self._bar_cand, self.from_bar = None, False
         elif self.bar_bound and num is not None and num.occluded:
             self._bar_fallback(bar)
+
+    def _see_short(self, v):
+        """A 1-2 digit numeral below the held value on a low tower: two equal reads in a row take it."""
+        if (self.max_hp is None or not self.measured or v is None or v >= (self.hp or self.max_hp)
+                or self.frac >= self.LOW_FOR_DESTROY):
+            self._short = None
+            return
+        n = self._short[1] + 1 if self._short and self._short[0] == v else 1
+        self._short = (v, n)
+        if n >= 2:
+            self.log.append(("short", self.hp, v))
+            self.hp, self.frac = v, v / self.max_hp
+            self._cand, self._short = None, None
+            self._num_ok = True
 
     def _bar_fallback(self, bar):
         """The numeral is covered (the reader saw an enemy level badge on it)
@@ -389,10 +536,18 @@ class TowerHPFilter:
             self._missing = 0                 # our bar's fill at the tower's row: standing, its
                                               # numeral hidden (goblins' level badges covered
                                               # ours for 3.2 s, live 093139)
+        if self._alive_now:
+            self._missing = 0                 # the bar's track or a 1-2 digit numeral: standing
         # twice as long above LOW_SURE: troops fighting on a tower hide its numeral
         # for 2 s and more (live 093139, our left tower at 1076 of 3052)
-        if (self._missing >= self.MISSING_TO_DESTROY * (1 if self.frac < self.LOW_SURE else 2)
+        need = self.MISSING_TO_DESTROY * (1 if self.frac < self.LOW_SURE else 2)
+        if self._cued and self.CONFIRMED_MISSING:
+            # every standing cue was looked for and none showed: the frames counted are evidence of
+            # rubble, not just of an unread numeral, so the latch need not wait the full MISSING
+            need = min(need, self.CONFIRMED_MISSING)
+        if (self._missing >= need
                 and self.measured and self.frac < self.LOW_FOR_DESTROY):
+            self._pre_latch = (self.hp, self.frac)
             self.destroyed, self.frac, self.hp = True, 0.0, 0
             return
         if bar is None:
@@ -478,25 +633,81 @@ class OppTowers:
 
     MISSING_S = 1.5                  # seconds with no confident numeral before a low tower is dead
     UP_S = 0.5                       # seconds of one higher reading before it replaces the held one
+    UNLATCH_S = 0.4                  # seconds of a standing tower's bar track in a row that undo a
+                                     # destroyed latch (TOWER_DEATH_CONFIRM)
+    CONFIRMED_S = 1.5                # seconds with no standing cue at all (no 3-4 or 1-2 digit numeral, no
+                                     # bar track) that latch a low tower (TOWER_DEATH_CONFIRM): MISSING_S, the
+                                     # old timing (24 frames at hz 16, ~2.6 s at the live ~9 frames/s). The
+                                     # longest such run on a STANDING tower in all 15 live sessions: 3 frames,
+                                     # 0.27 s (runs/towerfix_1126/analyze.txt); 0.75 s was tried, not kept
 
-    def __init__(self, hz: float = 16.0):
-        self.reader = OppTowerReader()
+    def __init__(self, hz: float = 16.0, robust: bool | None = None, king: bool | None = None,
+                 confirm: bool | None = None):
+        # robust: None = the module switch ROBUST_TOWERS (off live)
+        self.robust = ROBUST_TOWERS if robust is None else bool(robust)
+        self.reader = OppTowerReader(red_track=self.robust)
         self.hz = hz
         self.raw = {}
+        # confirm: None = the module switch TOWER_DEATH_CONFIRM
+        self.confirm = TOWER_DEATH_CONFIRM if confirm is None else bool(confirm)
+        self.cues = {}               # per Princess: {"track": bool, "short": value or None} this frame
+        # king: None = the module switch OPP_KING_READER (off live); on adds "opp_king" to f and raw
+        self.king = OppKing(hz) if (OPP_KING_READER if king is None else king) else None
         self.reset()
 
     def reset(self):
         ex = isinstance(self.reader.templates, ExemplarDigits)
         self.f = {k: TowerHPFilter(exemplar=ex) for k in OPP_PRINCESS_X0}
+        self._cue_y = {}
         for f in self.f.values():
             f.MISSING_TO_DESTROY = max(3, round(self.MISSING_S * self.hz))
             f.UP_NEED = max(3, round(self.UP_S * self.hz))
+            f.UNLATCH_NEED = max(2, round(self.UNLATCH_S * self.hz))
+            f.CONFIRMED_MISSING = max(3, round(self.CONFIRMED_S * self.hz)) if getattr(self, "confirm", False) else None
+        if getattr(self, "king", None) is not None:
+            self.king.reset()
+            self.f["opp_king"] = self.king.f
+
+    def feed(self, img_bgr, r, drift: int = 0):
+        """Feed one frame's Princess readings r (reader.read) to the filters, with the death
+        confirmation cues when it is on. raw keeps (bar, num); a 1-2 digit numeral the 3-4 digit
+        reader missed is reported as num, so callers that log num see the tower standing.
+        drift: also look for the cues up to this many rows from where they were last seen, and follow
+        them (0 live: the HUD does not move in a match; tower_reread passes 3 for the frames after
+        "Match Over", where the arena zooms and the bars slide down ~1 px a frame, m1 tail 141 -> 152)."""
+        self.raw = r
+        self.cues = {}
+        if not hasattr(self, "_cue_y"):
+            self._cue_y = {}
+        for k, (bar, num) in r.items():
+            f = self.f[k]
+            alive = short = None
+            if (getattr(self, "confirm", False) and k in OPP_PRINCESS_X0 and f.measured and f._bar_y is not None
+                    and (f.destroyed or f.frac < f.LOW_FOR_DESTROY)):
+                ok = (num is not None and num.value is not None
+                      and num.confidence >= TowerHPFilter.MIN_CONF)
+                x0 = OPP_PRINCESS_X0[k]
+                y0 = self._cue_y.get(k, f._bar_y) if drift else f._bar_y
+                ys = [y0] + [y0 + s * d for d in range(1, drift + 1) for s in (1, -1)]
+                y = next((yy for yy in ys if self.reader.track_alive(img_bgr, x0, yy)), None)
+                alive = y is not None
+                if drift and alive:
+                    self._cue_y[k] = y
+                short = None if ok else self.reader.read_short(img_bgr, x0, y if alive else y0)
+                held = f._pre_latch[0] if (f.destroyed and f._pre_latch) else f.hp
+                if short is not None and held is not None and short.value > held:
+                    short = None              # a standing tower's HP never goes up
+                self.cues[k] = {"track": alive, "short": None if short is None else short.value}
+                if short is not None:
+                    self.raw[k] = (bar, short)
+            f.update(bar, num, alive=alive, short=short)
+        return self.f
 
     def update(self, img_bgr):
-        r = self.reader.read(img_bgr)
-        self.raw = r
-        for k, (bar, num) in r.items():
-            self.f[k].update(bar, num)
+        self.feed(img_bgr, self.reader.read(img_bgr))
+        if getattr(self, "king", None) is not None:
+            self.f["opp_king"] = self.king.update(img_bgr)
+            self.raw["opp_king"] = self.king.raw
         return self.f
 
 
@@ -880,6 +1091,113 @@ class OwnKing:
         return f
 
 
+# ----------------------------------------------------------------- opponent King
+# The opponent King's bar on the 549x976 live frame (runs/tower_check/REPORT.md "Opponent King"): a
+# gold-framed bar at the top centre, interior x ~244..325 (80-81 px), top row y 20-22 (moves with camera
+# shake; the end screen moves it down). Fill pink (H 170-177, S 100-185, V 150-230), lost-HP track dark
+# brown (H 9-18, S 60-135, V 70-110). The numeral sits above it (rows y-14..y-1), centred, white with a
+# dark outline like the Princess numerals. While the King sleeps at full HP only its level badge is drawn
+# (centred, no bar); the bar appears once the King is hit or activated (a Princess falls), with the
+# badge moved to its left.
+OPP_KING_BOX = (4, 48, 226, 350)      # y0, y1, x0, x1 searched for the bar
+
+
+def find_opp_king_bar(img) -> BarReading | None:
+    y0, y1, xa, xb = OPP_KING_BOX
+    if img.shape[0] < y1 or img.shape[1] < xb:
+        return None
+    hsv = cv2.cvtColor(img[y0:y1, xa:xb], cv2.COLOR_BGR2HSV).astype(np.int16)
+    h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    fill = ((h >= 165) | (h <= 2)) & (s >= 85) & (v >= 140)
+    track = (h >= 3) & (h <= 25) & (s >= 40) & (s <= 160) & (v >= 55) & (v <= 125)
+    m = fill | track
+    for y in range(m.shape[0] - 2):
+        w, x, _e = _gap_run(m[y])
+        if not 74 <= w <= 92:
+            continue
+        w2, x2, e2 = _gap_run(m[y + 1])
+        if not 74 <= w2 <= 92 or abs(x2 - x) > 2:
+            continue
+        r = y + 1
+        f = 0
+        while x2 + f < e2 and (fill[r, x2 + f] or (f < 3 and x2 + f + 1 < e2 and fill[r, x2 + f + 1])):
+            f += 1
+        # height 6 = "a whole bar" to TowerHPFilter (as find_own_king_bar)
+        return BarReading(x2 + xa, y + y0, int(f), int(track[r, x2 + f:e2].sum()), 6)
+    return None
+
+
+class OppKing(OwnKing):
+    """The opponent King's HP from its numeral, the OwnKing way: TowerHPFilter (monotone, max = the
+    first full-bar numeral read twice, or numeral / bar fraction when the bar first shows on a damaged
+    King), no destroyed latch (a dead King ends the match). Until the bar has been seen `f.measured`
+    is False and the caller keeps the stock reading. Behind OPP_KING_READER in OppTowers."""
+
+    PATCH = (-16, 2, 4, 78)           # rows y-16..y+2, cols x0+4..x0+78 (the numeral is centred)
+    THR_DELTAS = (None, 25, 40)       # None = segment_numeral's own threshold (the Princess numerals')
+    SHORT_X = (0, 10 ** 6)            # centred: any start column
+    # King maxima read off a FULL bar (a numeral read twice on a bar with no track). Every full opponent
+    # King in the recorded matches read 4824 (level 11); a full-bar latch adds its value. When the bar
+    # first shows on an already damaged King, the max is numeral / bar fraction, which is only good to a
+    # pixel of 80 (+-60 HP): such an estimate within SNAP of one of these is taken as that max (live3:
+    # 4665 / 78 px -> 4783, 4507 / 75 px -> 4804, both 4824 by the battle log); otherwise it stands.
+    KNOWN_MAX = [4824]
+    SNAP = 0.03
+
+    def __init__(self, hz: float = 16.0):
+        super().__init__(hz)
+        self.templates = ExemplarDigits(TOWER_DIGITS)
+
+    def feed(self, bar, num) -> TowerHPFilter:
+        f = self.f
+        if f.max_hp is None and bar is not None and bar.track > 0:
+            # a full King's bar reads 0 px of track (80-81 px fill); a 3 % hit (4665 of 4824) leaves only
+            # 2-3 px, which TowerHPFilter's full-bar latch (track <= 2) took as full: max 4665 (live3 m5).
+            # Any track: no full-bar latch; the estimate path below takes it
+            bar = replace(bar, track=max(bar.track, TowerHPFilter.BAR_TRACK_MIN))
+            f._max_cand = None
+        had = f.max_hp is not None
+        super().feed(bar, num)
+        if not had and f.max_hp is not None:
+            if self.max_estimated:
+                near = [m for m in self.KNOWN_MAX
+                        if m >= (f.hp or 0) and abs(m - f.max_hp) <= self.SNAP * m]
+                if near:
+                    f.max_hp = min(near, key=lambda m: abs(m - f.max_hp))
+                    f.frac = f.hp / f.max_hp
+            elif f.max_hp not in self.KNOWN_MAX:
+                self.KNOWN_MAX.append(f.max_hp)
+        return f
+
+    def read_numeral(self, img, bar: BarReading) -> NumeralReading:
+        r0, r1, c0, c1 = self.PATCH
+        patch = img[max(0, bar.y + r0):max(0, bar.y + r1), bar.x0 + c0:bar.x0 + c1]
+        best = NumeralReading(None, "", 0.0, 0)
+        if patch.size == 0:
+            return best
+        p95 = float(np.percentile(patch.min(axis=2), 95))
+        for d in self.THR_DELTAS:
+            cells = segment_numeral(patch, thr=None if d is None else p95 - d)
+            if not 1 <= len(cells) <= 4:
+                continue
+            txt, confs = "", []
+            for c in cells:
+                g, conf = self.templates.classify(c)
+                txt += g
+                confs.append(conf)
+            conf = min(confs)
+            rank = lambda n, c: (c >= TowerHPFilter.MIN_CONF, n, c)  # noqa: E731
+            if rank(len(cells), conf) > rank(best.n_cells, best.confidence):
+                val = int(txt) if txt.isdigit() and txt[0] != "0" else None
+                best = NumeralReading(val, txt, conf, len(cells))
+        return best
+
+    def update(self, img_bgr) -> TowerHPFilter:
+        bar = find_opp_king_bar(img_bgr)
+        num = self.read_numeral(img_bgr, bar) if bar is not None else None
+        return self.feed(bar, num)
+
+
 # ----------------------------------------------------------------- clock
 class MatchClock:
     """seconds_elapsed from the on-screen countdown.
@@ -890,9 +1208,24 @@ class MatchClock:
     elapsed time the net sees puts 2x/3x exactly where training did. Overtime: label read as overtime, or the
     countdown jumps up after <= 10 s left; elapsed = regulation + (overtime
     start - left). A reading off the countdown must repeat before it is taken.
+    update(img, t) = feed(*read(img), t); feed() takes readings, for tests and
+    offline replays (live_ppo/eval/clock_replay.py).
     """
 
     RESYNC_S = 3.0
+    # Live fix 2026-11-27 (runs/live_1127pm/LIVE_FIXES.md). A pending reading
+    # (the first of a match, one off the countdown, a restart candidate) is
+    # confirmed only while readings keep coming: once PEND_GAP_S passes with no
+    # reading since it, or since the last one that agreed with it, it is
+    # dropped. In m9 of 20261127-115232 a partial "7" (of 2:07, under an
+    # overlay) waited through 5 s of unread frames, a partial "2" (of 2:02)
+    # "confirmed" it, and the true 2:01 after it then passed for the overtime
+    # jump: overtime from 59 s to the end of the match. None = no expiry.
+    PEND_GAP_S = 2.0
+    # Only a full M:SS reading counts: three digits, seconds 00-59. The HUD
+    # always shows three; every two-digit read in the recordings was a glyph
+    # lost under an overlay. False = hud.read_timer as before.
+    STRICT_READ = True
 
     def __init__(self):
         import hud  # video_dataset/detector/hud.py
@@ -924,18 +1257,36 @@ class MatchClock:
         return self.elapsed_at_read + min(max(0.0, t - self.t_last), 5.0)
 
     def update(self, img_bgr, t: float) -> float | None:
-        left, _conf = self.hud.read_timer(img_bgr)
+        return self.feed(*self.read(img_bgr), t)
+
+    def read(self, img_bgr):
+        """-> (seconds left or None, overtime label, x2/x3 badge) off one frame."""
+        if self.STRICT_READ:
+            left = read_timer_strict(img_bgr, self.hud)
+        else:
+            left, _conf = self.hud.read_timer(img_bgr)
         ot_label, mult = self.hud.read_phase(img_bgr)
+        return left, ot_label, mult
+
+    def _fresh(self, p, t):
+        """A pending (left, t, t_seen), or None once no reading followed it for PEND_GAP_S."""
+        if p is None or self.PEND_GAP_S is None or t - p[2] <= self.PEND_GAP_S:
+            return p
+        return None
+
+    def feed(self, left, ot_label, mult, t: float) -> float | None:
         self.mult_badge = mult
         self.read_ok = False
         if left is None or left > 600:
             return self.elapsed(t)
+        self._pending = self._fresh(self._pending, t)
+        self._restart = self._fresh(self._restart, t)
         if self.last_left is None:
             # first reading: wait for a second consistent one
             if self._pending is not None and 0 <= self._pending[0] - left <= t - self._pending[1] + 2:
                 self._accept(left, t)
             else:
-                self._pending = (left, t)
+                self._pending = (left, t, t)
             return self.elapsed(t)
         prev, dt = self.last_left, t - self.t_last
         ot_jump = prev <= 10 and left <= self.regulation - 55
@@ -954,8 +1305,10 @@ class MatchClock:
                 if t - r[1] >= need:
                     self.restart = True
                     self.restart_read = (left, t)
+                else:
+                    self._restart = (r[0], r[1], t)
             else:
-                self._restart = (left, t)
+                self._restart = (left, t, t)
             return self.elapsed(t)
         self._restart = None
         if not self.overtime and (ot_label or (prev <= 10 and prev + 20 < left <= self.regulation - 55)):
@@ -965,9 +1318,10 @@ class MatchClock:
             # few frames), unless it keeps counting down from there for 3 s
             p = self._pending
             if p is None or not (0 <= p[0] - left <= (t - p[1]) + 2):
-                self._pending = (left, t)
+                self._pending = (left, t, t)
                 return self.elapsed(t)
             if t - p[1] < self.RESYNC_S:
+                self._pending = (p[0], p[1], t)
                 return self.elapsed(t)
         self._accept(left, t)
         return self.elapsed(t)
@@ -979,3 +1333,22 @@ class MatchClock:
         else:
             self.elapsed_at_read = float(self.regulation - left)
         self.last_left, self.t_last, self._pending, self.read_ok = left, t, None, True
+
+
+def read_timer_strict(img_bgr, hud):
+    """hud.read_timer restricted to a full M:SS reading (three digits, seconds
+    00-59), else None. Same glyphs and templates (video_dataset/detector/hud.py)."""
+    x0, y0, x1, y1 = hud.TIMER_ROI
+    gs = hud.glyphs(img_bgr[y0:y1, x0:x1], 12, 26)
+    if not gs:
+        return None
+    tm = hud._tmpl("timer")
+    s = ""
+    for *_, g in gs:
+        lab, _margin, _ = tm.classify(g)
+        if lab != "x":
+            s += lab
+    s = s.replace(":", "")
+    if len(s) != 3 or not s.isdigit() or int(s[1:]) > 59:
+        return None
+    return int(s[0]) * 60 + int(s[1:])

@@ -128,6 +128,44 @@ ap.add_argument("--det-conf", type=float, default=0.35,
 ap.add_argument("--own-deck-prior", action="store_true",
                 help="--track-units: a unit on our side must be one of our deck's (off: no "
                      "measured gain on the held-out videos)")
+ap.add_argument("--cloaked-rows", choices=("on", "off"), default="on",
+                help="on (default since 2026-11-27): give the cloaked cards (Royal Ghost 47 / "
+                     "136) the observation row the engine shows when the ghost is revealed "
+                     "(live_ppo/cloaked_rows.py); the stock card table has none, so every "
+                     "detected ghost was dropped. off: the old behaviour (dropped)")
+ap.add_argument("--cloaked-always", action="store_true",
+                help="with --cloaked-rows on, pass EVERY ghost box, the cloaked (walking) ones "
+                     "too. Off (default): a ghost box reaches the observation only while the "
+                     "simulator would show it, from its first hit to 1.8 s after its last "
+                     "(live_ppo/cloaked_gate.py)")
+ap.add_argument("--body-rows", choices=("on", "on-confirmed", "rows", "off"), default="on-confirmed",
+                help="rows: give the bodies a card leaves behind (Golemite, Lava Pups, Elixir "
+                     "Golem splits, Cursed Hog, the Rascal Boy and Girls, the reborn Phoenix "
+                     "and its egg) the observation row the engine shows for that body instead "
+                     "of the parent card's (live_ppo/body_rows.py); every other unit is "
+                     "encoded byte for byte as before. on: rows, plus the classes dropped "
+                     "today (Elixir Golem big / mid, Goblin Brawler, Phoenix, the Hero "
+                     "Barbarian Barrel's Barbarian) reach the tracker and the observation; "
+                     "they then take part in the tracker's class-agnostic NMS and matching, "
+                     "so units overlapping them can change. on-confirmed is the default since "
+                     "2026-11-27 (coordinator ruling; --body-rows rows is the revert to the earlier "
+                     "default); off: the encoder as before "
+                     "(runs/live_1127/encoder_fixes). on-confirmed: on without Goblin Brawler "
+                     "(39 %% of its boxes wrong), and an Elixir Golem / Phoenix / Hero Barbarian "
+                     "box reaches the tracker only when a box of the same card stood within 1.5 "
+                     "tiles on one of the 3 frames before (body_rows.ProxyConfirm)")
+ap.add_argument("--trained-on", default=os.environ.get("CR_LIVE_TRAINED_ON") or None, metavar="BUILD",
+                help="2026-11-27: the loop's --checkpoint picks the engine, CR_P0088 and the Ghost mode "
+                     "it was trained with from its run's launch.txt (live_ppo/engine_pick.py); the "
+                     "driver refuses an engine / CR_P0088 that differ. A checkpoint without a "
+                     "launch.txt (the main run g2_ppo_s2r) keeps today's behaviour. Use this (or "
+                     "CR_LIVE_TRAINED_ON) only when the launch.txt block cannot be told, e.g. "
+                     "latest.pth: gen2_l names the run's last block on build/gen2_l")
+ap.add_argument("--bush-goblins", choices=("auto", "on", "off"), default="auto",
+                help="the two goblins a Suspicious Bush lets out (boxed as goblin / spear-goblin) "
+                     "get the training engine's Bush Goblin row, id 1011 (live_ppo/bush_goblins.py; "
+                     "needs --track-units). auto (default): on for a checkpoint trained with "
+                     "bushpop (gen2_l), off otherwise, so other checkpoints encode as before")
 ap.add_argument("--compare-yolo", action="store_true",
                 help="run YOLO beside CRBAB for the overlay/log, without feeding it")
 ap.add_argument("--tower-latch", action="store_true")
@@ -217,6 +255,12 @@ ap.add_argument("--tap-mode", choices=("click", "drag"), default="click",
                      "between two taps, so no 'No card selected'")
 ap.add_argument("--drag-ms", type=int, default=60,
                 help="--tap-mode drag: duration of the drag from the card to the target")
+ap.add_argument("--pocket-mask", action="store_true",
+                help="open the policy's WHERE mask to the pocket (engine rows 16-22 of a lane whose enemy "
+                     "Princess is dead) once the death is CONFIRMED (live_ppo/pocket_live.py, needs "
+                     "--hud-towers); a lane closes again after the game refuses a pocket tile. Default off")
+ap.add_argument("--pocket-confirm-s", type=float, default=1.0,
+                help="--pocket-mask: seconds the destroyed latch must hold with no numeral read")
 ap.add_argument("--hud-towers", action="store_true",
                 help="opponent Princess HP fraction from the tower numerals")
 ap.add_argument("--no-own-towers", action="store_true",
@@ -246,6 +290,17 @@ ap.add_argument("--no-opp-evidence", action="store_true",
                 help="--opp-plays without the evidence rules of 2026-11-19 (the readers as before)")
 ap.add_argument("--no-opp-spell-evidence", action="store_true",
                 help="--opp-spells without the spell-cast evidence rules; the troop rules stay")
+ap.add_argument("--opp-rules", default="own_units,badge_marks,three_musk,rage,gang_bodies",
+                help="comma list of play-reader rules of 2026-11-27 to switch on; all five on by "
+                     "default since 2026-11-27 (coordinator ruling); --opp-rules "
+                     "own_units,badge_marks,three_musk is the revert to the earlier default, "
+                     "--opp-rules '' turns every rule off "
+                     "(live_ppo/opp_plays.py, test live_ppo/eval/test_opp_rules.py, replay "
+                     "live_ppo/eval/opp_rules_replay.py): own_units (our own deck's units near "
+                     "their stopwatch do not name it), badge_marks (a red stopwatch drawn over "
+                     "their unit's level badge on our half is not a play), three_musk (2+ "
+                     "musketeers born together on their half are Three Musketeers), rage (a stopwatch with a YOLO rage box on it is their Rage, unless "
+                     "a known deck lacks Rage), gang_bodies (Goblin Gang needs 4 of its bodies)")
 ap.add_argument("--opp-state", action="store_true",
                 help="fill the opponent-state section (engine item 46; needs an engine with "
                      "patch 0012; implies --opp-plays). On by itself, with --opp-spells, for a "
@@ -300,7 +355,22 @@ ap.add_argument("--ability", choices=("off", "log", "tap"), default="log",
                      "send the press (one tap on the button) when the loop runs with --act. "
                      "off = as before this reader existed (the head's draw is logged only). "
                      "Ignored for any other checkpoint")
+ap.add_argument("--afford-project", action="store_true",
+                help="DEFAULT OFF; not for the standard command. Projected affordability "
+                     "(runs/imit_timing_1126/AFFORD_RULE.txt s1/s4): a card is offered when its cost "
+                     "<= P = min(E_view + (1/28)*MULT*13, 10) (E_view = the observation's elixir after "
+                     "the plays in flight; 0 -> no projection), since the game queues a release that is a "
+                     "fraction of a second short. Only for a checkpoint trained with the rule. Refuses "
+                     "--solvency-gate; PlayWatch waits 1.3 s longer for the slot to empty; logs E_view, "
+                     "MULT, P, cost per decision (perception.jsonl 'afford') and RUN/afford.json")
 ours, loop_args = ap.parse_known_args()
+_OPP_RULE_ON = [x.strip() for x in ours.opp_rules.split(",") if x.strip()]
+for _r in _OPP_RULE_ON:
+    if _r not in ("own_units", "badge_marks", "three_musk", "rage", "gang_bodies"):
+        ap.error(f"--opp-rules: unknown rule {_r!r} (known: own_units, badge_marks, three_musk, rage, gang_bodies)")
+if ours.afford_project and ours.solvency_gate:
+    raise SystemExit("--afford-project: the solvency gate checks the bar against the cost; it is not "
+                     "written for the projected rule, so the two cannot be combined (AFFORD_RULE.txt s4b)")
 ours.opp_plays = ours.opp_plays or ours.opp_spells or ours.opp_state
 try:
     # clashroyalebuildabot's detector logs "Setting state..." at DEBUG on every frame.
@@ -331,6 +401,71 @@ import clash_royale_env as E  # noqa: E402
 TRAIN_DECK = [125, 168, 129, 15, 40, 72, 33, 7]
 BASE_TO_TRAIN = {24: 125, 6: 168, 25: 129}
 NAME = {i: E.get_card_info(i)["name"] for i in TRAIN_DECK + [24, 6, 25]}
+
+# ----------------------------------------------------------------- engine per checkpoint
+# 2026-11-27 (gen2_l live prep): the loop's --checkpoint names the engine, the CR_P0088 switches and
+# the Ghost mode it was trained with (live_ppo/engine_pick.py, from its run's launch.txt). Without a
+# launch.txt (the main run runs/g2_ppo_s2r, imitation models) or without --checkpoint (state_pipeline)
+# there is no profile and nothing here changes. A profile must match the engine loaded above
+# (CR_ENGINE) and CR_P0088, or the driver refuses; cloakboard forces --cloaked-always (that sim draws
+# every Ghost, cloaked too); bushboard needs the stock row 85 (the walking Bush); bushpop turns
+# --bush-goblins auto on.
+import engine_pick  # noqa: E402
+
+PROFILE = None
+_P88_ENV = os.environ.get("CR_P0088")
+if "--checkpoint" in loop_args:
+    try:
+        PROFILE = engine_pick.pick(loop_args[loop_args.index("--checkpoint") + 1], ours.trained_on)
+    except engine_pick.PickError as ex:
+        raise SystemExit(f"engine pick refused: {ex}") from ex
+elif ours.trained_on:
+    print(f"--trained-on / CR_LIVE_TRAINED_ON={ours.trained_on}: ignored, no --checkpoint")
+if PROFILE is None:
+    print(f"engine: {ENGINE} (CR_ENGINE), CR_P0088={_P88_ENV!r}; no launch.txt profile for the "
+          f"checkpoint: engine, switches and Ghost mode as given (unchanged behaviour)")
+else:
+    _bad = []
+    if ENGINE != PROFILE.engine:
+        _bad.append(f"CR_ENGINE is {ENGINE}, the checkpoint was trained on {PROFILE.engine}")
+    if not engine_pick.same_sw(_P88_ENV or "", PROFILE.sw):
+        _bad.append(f"CR_P0088={_P88_ENV!r}, the checkpoint was trained with {PROFILE.p0088!r}")
+    elif PROFILE.sw:
+        if not hasattr(E, "p0088_active"):
+            _bad.append(f"the engine {ENGINE} has no CR_P0088 switches (p0088_active)")
+        else:
+            _act = E.p0088_active()
+            _miss = [s for s in PROFILE.sw if s != "all" and _act.get(s) is not True]
+            if not engine_pick.same_sw(str(_act.get("raw", "")), PROFILE.sw) or _miss:
+                _bad.append(f"the engine latched CR_P0088={_act.get('raw')!r}; switches not on: {_miss}")
+    if _bad:
+        raise SystemExit("engine pick refused (" + PROFILE.describe() + "): " + "; ".join(_bad))
+    if PROFILE.has("cloakboard"):
+        if ours.cloaked_rows == "off":
+            raise SystemExit("--cloaked-rows off on a checkpoint trained with cloakboard (the sim draws every "
+                             "Ghost): refusing")
+        if not ours.cloaked_always:
+            ours.cloaked_always = True
+    elif ours.cloaked_always:
+        raise SystemExit("--cloaked-always on a checkpoint trained without cloakboard (its sim shows a Ghost "
+                         "only while revealed, the cloaked gate's job): refusing")
+    if PROFILE.has("bushboard"):
+        from python_ai.models import perception_encoder as _PE  # noqa: PLC0415
+        if 85 not in _PE.card_table():
+            raise SystemExit(f"bushboard profile but the card table of {ENGINE} has no row 85 (Suspicious Bush)")
+    print(f"engine (from the checkpoint's training run): {PROFILE.describe()}")
+    for _n in PROFILE.notes:
+        print(f"  engine pick note: {_n}")
+BUSH_ON = ours.bush_goblins == "on" or (ours.bush_goblins == "auto" and PROFILE is not None
+                                         and PROFILE.has("bushpop"))
+print(f"ghost mode: {'every ghost box (--cloaked-always)' if ours.cloaked_always else 'reveal gate' if ours.cloaked_rows == 'on' else 'dropped (--cloaked-rows off)'}"
+      f"{' [forced by cloakboard]' if PROFILE is not None and PROFILE.has('cloakboard') else ''}; "
+      f"bush goblins: {'on' if BUSH_ON else 'off'} (--bush-goblins {ours.bush_goblins})")
+if PROFILE is not None and PROFILE.has("bushpop") and not BUSH_ON:
+    print("WARNING: --bush-goblins off on a checkpoint trained with bushpop: popped Bush Goblins encode "
+          "as Goblins / Spear Goblins, which its training never showed")
+if BUSH_ON and not ours.track_units:
+    raise SystemExit("--bush-goblins needs --track-units (the rule reads the tracker's tracks)")
 
 
 # ----------------------------------------------------------------- YOLO side-car
@@ -393,6 +528,19 @@ def yolo_card_id(cls: str):
     return cid
 
 
+if ours.body_rows != "off":
+    import body_rows  # noqa: E402
+if ours.body_rows == "on":
+    # live_ppo/body_rows.py: classes that map to no card today get a real proxy id of the
+    # body's own kind (troop / fly), for the unit path only; their rows come in EvoEncoder
+    _YOLO_ID.update(body_rows.PROXY)
+PROXY_GATE = None
+if ours.body_rows == "on-confirmed":
+    # as "on" without goblin-brawler; each proxy box must be confirmed by the frames before
+    _YOLO_ID.update(body_rows.PROXY_CONFIRMED)
+    PROXY_GATE = body_rows.ProxyConfirm()
+
+
 import live.wda_actuator as _WA  # noqa: E402
 _WA.TAP_GAP_S = ours.tap_gap_ms / 1000
 _WA.TOUCH_HOLD_S = ours.tap_hold_ms / 1000
@@ -418,6 +566,14 @@ sys.path.insert(0, str(REPO / "live_ppo"))
 import play_watch  # noqa: E402
 
 PLAYS = None if ours.no_play_watch else play_watch.PlayWatch()
+# --afford-project (AFFORD_RULE.txt; same constants as the sim hook runs/pocket_1126/fix/afford_lead.py)
+AFF_REGEN = 1.0 / 28.0           # elixir per tick at 1x (gen2_j GameManager.h:251; 2.8 s per elixir)
+AFF_DMIN = 13                    # ticks (low end of the trained act delay 13,15,1; a constant)
+AFF_QUEUE_S = AFF_DMIN / 10.0    # longest queue wait the projection allows (shortfall <= G = 13 ticks of regen)
+_AFF = {"last": None, "decisions": 0, "differ": 0, "plays": [], "p_only": 0}
+if ours.afford_project and PLAYS is not None:
+    # a queued release empties its slot up to AFF_QUEUE_S later than usual; its cost stays owed while open
+    PLAYS.LAND_S = play_watch.PlayWatch.LAND_S + AFF_QUEUE_S
 _LAST_DECIDE = {}                # slot -> (card name, tile) of the policy's last choice
 EMPTY_MAX_S = 3.0                # a slot blank longer than this is no longer held back (a card
                                  # left selected reads blank too, and must stay playable)
@@ -457,6 +613,11 @@ def _ckpt():
                                     driver_deck=TRAIN_DECK)
                 except policy_v3.V3Error as ex:
                     raise SystemExit(f"v3 checkpoint refused: {ex}") from ex
+            # afford_lead marker <-> --afford-project (live_ppo/afford_marker.py, 2026-11-26 pm; read-only)
+            import afford_marker  # noqa: PLC0415
+            _am = afford_marker.check(path, blob, ours.afford_project)
+            if _am:
+                raise SystemExit(_am)
         _CK["v"] = (blob, kind)
     return _CK["v"]
 
@@ -904,6 +1065,22 @@ if ours.track_units:
         pocket_open=lambda: _POCKET["open"],
         allowed=(lambda side: _OWN_DECK if side == 0 else None) if ours.own_deck_prior else None)
 
+# A cloaked unit (Royal Ghost) is left out of the simulator's observation while it walks;
+# the detector boxes it in both states. The gate passes a ghost box only while it would be
+# revealed in the simulator (live_ppo/cloaked_gate.py). Off with --cloaked-rows off (the
+# ghost has no row, every box is dropped) or --cloaked-always.
+CLOAK_GATE = None
+if ours.cloaked_rows == "on" and not ours.cloaked_always:
+    import cloaked_gate  # noqa: E402
+    CLOAK_GATE = cloaked_gate.RevealGate(deploy=cloaked_gate.deploy_s(E))
+    print(f"cloaked gate: on (deploy {CLOAK_GATE.deploy:.1f} s, reveal {CLOAK_GATE.reveal:.1f} s)")
+
+# --bush-goblins (live_ppo/bush_goblins.py): goblin tracks born at a Bush's pop are its Bush Goblins
+BUSH_POPS = None
+if BUSH_ON:
+    import bush_goblins  # noqa: E402
+    BUSH_POPS = bush_goblins.BushPops()
+
 # iPhone Mirroring tap path, timed. The stock MirrorClient.tap_sequence activates the
 # app before every placement, and its frontmost check reads NSWorkspace, which never
 # updates in a process without a run loop, so every placement paid activate + a fixed
@@ -1234,6 +1411,9 @@ if ours.hud_clock:
     HUD_CLOCK = hud_live.MatchClock()
 _OPP_RULES = {"evidence": not ours.no_opp_evidence,
               "spell_evidence": False if ours.no_opp_spell_evidence else None}
+_OPP_RULES.update({r: True for r in _OPP_RULE_ON})
+print(f"opp-play rules (--opp-rules): {','.join(_OPP_RULE_ON) or 'none'}"
+      f"{'' if ours.opp_plays else ' (unused: --opp-plays is off)'}; body rows (--body-rows): {ours.body_rows}")
 if ours.opp_plays:
     import opp_plays  # noqa: E402
     OPP = opp_plays.OppModel(TRAIN_DECK, spells=ours.opp_spells, state=ours.opp_state,
@@ -1312,11 +1492,19 @@ def _new_match():
     if ELIXIR_EST is not None:
         ELIXIR_EST.reset()
     _latch.clear()              # a tower latched in the last match is alive again
+    if POCKET_G is not None:
+        POCKET_G.reset()
     _KING.reset()
     if HAND_CYCLE is not None:
         HAND_CYCLE.reset()
     if UNIT_TRACKER is not None:
         UNIT_TRACKER.reset()
+    if CLOAK_GATE is not None:
+        CLOAK_GATE.reset()
+    if BUSH_POPS is not None:
+        BUSH_POPS.reset()
+    if PROXY_GATE is not None:
+        PROXY_GATE.reset()
     if OPP is not None:
         OPP = opp_plays.OppModel(TRAIN_DECK, spells=ours.opp_spells, state=ours.opp_state,
                                  watch=not ours.no_opp_watch, **_OPP_RULES)
@@ -1449,6 +1637,13 @@ def bgs(state, frame, small, **kw):
                                             hp_measured=f.measured, destroyed=f.destroyed)
         if upd:
             gs = replace(gs, **upd)
+    if POCKET_G is not None and in_game:
+        _pt = kw.get("wall_time_ms", 0.0) / 1000.0
+        for _k in pocket_live.LANES:
+            _e = (hud.get("towers") or {}).get(_k)
+            if _e is not None:
+                POCKET_G.see_tower(_k, bool(_e["dead"]), _e["num"], _pt)
+        hud["pocket"] = POCKET_G.snapshot()
     ydets = ydets_all = None
     if YOLO is not None and in_game:
         if hasattr(YOLO, "by_frame"):
@@ -1474,6 +1669,12 @@ def bgs(state, frame, small, **kw):
             from contracts import UnitObservation  # noqa: PLC0415
             units = []
             udets = ydets
+            _bush_marked = ()
+            if PROXY_GATE is not None:          # --body-rows on-confirmed: unconfirmed proxy boxes out
+                _pdrop = PROXY_GATE.drop(ydets_all, kw.get("wall_time_ms", 0.0) / 1000.0)
+                if _pdrop:
+                    udets = [d for d in ydets if id(d) not in _pdrop]
+                    ydets_all = [d for d in ydets_all if id(d) not in _pdrop]
             if UNIT_TRACKER is not None:
                 t0 = time.perf_counter()
                 _POCKET["open"] = any(getattr(gs, k).destroyed for k in (
@@ -1482,24 +1683,44 @@ def bgs(state, frame, small, **kw):
                     [d for d in ydets_all if yolo_card_id(d["cls"]) is not None],
                     t=kw.get("wall_time_ms", 0.0) / 1000.0)
                 hud["track_ms"] = round((time.perf_counter() - t0) * 1000, 3)
+                if BUSH_POPS is not None:       # --bush-goblins: tracks marked as a Bush's goblins
+                    _bush_marked = BUSH_POPS.update(udets, kw.get("wall_time_ms", 0.0) / 1000.0)
+                    if BUSH_POPS.log:
+                        hud["bush_pop"] = BUSH_POPS.log
+            cloak_log = []
             for d in udets:
                 cid = yolo_card_id(d["cls"])
                 if cid is None:
                     continue
+                if CLOAK_GATE is not None and cid in cloaked_gate.CLOAKED_CARDS:
+                    shown = CLOAK_GATE.keep(d, kw.get("wall_time_ms", 0.0) / 1000.0)
+                    cloak_log.append(CLOAK_GATE.log[-1])
+                    if not shown:
+                        continue
                 # the tracker already applied the ground offset (kind=UNIT_KIND)
                 tx, ty = (ground_tile(d, UNIT_KIND(d["cls"])) if UNIT_KIND is not None and UNIT_TRACKER is None
                           else d["tile"])
                 units.append(UnitObservation(
-                    card_sim_id=cid, unit_name=d["cls"], team=int(d["side"]),
+                    card_sim_id=cid, team=int(d["side"]),
+                    unit_name=(bush_goblins.NAME if _bush_marked and d.get("track") in _bush_marked
+                               and d["cls"] in bush_goblins.GOBLIN_CLASSES else d["cls"]),
                     tile_x=int(tx),
                     tile_y=int(det_to_engine_row(int(ty), ours.tile_map)),
                     hp_fraction=1.0, hp_measured=False, confidence=float(d["conf"]),
                     team_from_badge=None))
+            if cloak_log:
+                hud["cloaked"] = cloak_log
             gs = replace(gs, units=tuple(units))
     # the King "no fill" floor on video arenas -> full (state_filter.KingFloor)
     if in_game:
         kupd = {}
         for key in ("own_king", "opp_king"):
+            if key == "opp_king" and HUD_TOWERS is not None and HUD_TOWERS.king is not None \
+                    and HUD_TOWERS.king.f.measured:
+                # the value is OppKing's numeral (hud_live.OPP_KING_READER), not king_hp.py's
+                # bar: the floor is for that bar's "no fill" misread and would turn a King really
+                # under 2.5 % (or one that stays there over HOLD_S) into full
+                continue
             t = getattr(gs, key)
             f = _KING.update(key, float(t.hp_fraction), bool(t.hp_measured), float(match_s))
             if f is not None:
@@ -1771,6 +1992,21 @@ class EvoEncoder:
     def __init__(self, enc):
         self.enc = enc
         from python_ai.models import perception_encoder as PE  # noqa: PLC0415
+        if ours.cloaked_rows == "on":
+            # live_ppo/cloaked_rows.py: rows for cards the stock table skips because the
+            # probe cannot see them cloaked (Royal Ghost). Adds rows only; no other card moves.
+            import cloaked_rows  # noqa: PLC0415
+            added = cloaked_rows.install(enc)
+            print(f"cloaked rows: added {sorted(added)} to the card table")
+        if ours.body_rows != "off":
+            # live_ppo/body_rows.py: rows for spawned / second bodies, measured from the engine;
+            # synthetic ids >= 1000, so no existing row moves
+            added = body_rows.install(enc)
+            print(f"body rows: added {sorted(added)} to the card table")
+        if BUSH_POPS is not None:
+            # live_ppo/bush_goblins.py: the Bush Goblin row (body -30 of card 85), measured from the engine
+            added = bush_goblins.install(enc)
+            print(f"bush goblins: added {sorted(added)} to the card table")
         e = PE.SPATIAL_SIZE + 1 + PE.HAND_SIZE + PE.HAND_SIZE * PE.NUM_CARD_IDS
         C = E.ClashRoyaleEnv
         # the cycle block sits right after the extra scalars in both layouts
@@ -1802,6 +2038,10 @@ class EvoEncoder:
         hand = tuple(BASE_TO_TRAIN.get(c, c) if c is not None else c for c in gs.my_hand)
         # live_ppo/encoder_fixes: a destroyed tower's cells clear in every channel,
         # as the engine's do (live_ppo/eval/live_vs_sim.py)
+        if ours.body_rows != "off":
+            gs = body_rows.remap(gs)        # only units of the body classes change id
+        if BUSH_POPS is not None:
+            gs = bush_goblins.remap(gs)     # only units named bush-goblin change id
         obs = encoder_fixes.encode(replace(gs, my_hand=hand), self.enc)
         if self.lvl is not None:
             obs[self.lvl] = self.lvl_vals
@@ -1887,6 +2127,63 @@ def _load_v3(path, blob):
     return net, info
 
 
+# --pocket-mask (default off): runs/pocket_1126/fix/pocket_mask.py opens the pocket in
+# MicroRoyaleNet.placement_mask; the lanes it may open are the confirmed, not refused ones.
+POCKET_G = None
+_PKT = {"state": 0}       # lanes open on the decision being made (bit 1 LEFT, 2 RIGHT)
+_PK = None
+if ours.pocket_mask:
+    import pocket_live  # noqa: E402
+    sys.path.insert(0, str(REPO / "runs" / "pocket_1126" / "fix"))
+    import pocket_mask as _PK  # noqa: E402
+    if HUD_TOWERS is None:
+        print("WARNING: --pocket-mask without --hud-towers: no tower death can be confirmed, "
+              "the pocket stays closed", flush=True)
+    POCKET_G = pocket_live.PocketGuard(confirm_s=ours.pocket_confirm_s)
+    _PK_ORIG_STATE = _PK._enemy_state
+
+    def _pk_state(self, obs):
+        # obs says dead AND the guard confirmed it AND no refusal closed the lane
+        return _PK_ORIG_STATE(self, obs) & int(POCKET_G.open_bits())
+
+    _PK._enemy_state = _pk_state
+    _PK.install(table="verified")     # the table the pocket-trained models learned under (DATA_SPEC 4)
+    # Refuse an engine with no pocket legality (e.g. build/gen2_c, live_session.sh's default): the table would be empty
+    # and --pocket-mask would silently open nothing. The pocket-trained nets were trained on build/gen2_j.
+    _pk_t = _PK.build_pocket_add(int(E.ClashRoyaleEnv.NUM_CARD_IDS), 32, int(E.ClashRoyaleEnv.BOARD_WIDTH))
+    _pk_w = int(E.ClashRoyaleEnv.BOARD_WIDTH)
+    if int(_pk_t[..., 16 * _pk_w:23 * _pk_w].sum()) == 0:     # pocket rows 16-22 only (gen2_c has 204 deploy cells at rows 25-29)
+        raise SystemExit(f"--pocket-mask: the engine {os.environ.get('CR_ENGINE', 'engine/')} opens no pocket cell "
+                         f"(no pocket legality); run with the training engine set: CR_LIVE_ENGINE=build/gen2_j/engine "
+                         f"CR_P0088=tornado,jump,log,turret,king,speed,bankrows,stomp,jumpcol,pocketcells,kingpath")
+    print(f"pocket mask: ON, table {_PK.TABLE} (confirm {ours.pocket_confirm_s:g} s, closes a lane after a refused pocket tile)",
+          flush=True)
+
+
+class _PocketLegal(dict):
+    """The live loop's third mask (engine legality on a fresh board, mvp_loop._legal_by_card) plus the
+    pocket cells of the lanes open on this decision."""
+    net = None
+
+    def get(self, k, default=None):
+        base = dict.get(self, k, default)
+        st = _PKT["state"]
+        if base is None or not st:
+            return base
+        table = _PK._pocket_table(self.net)
+        cid = BASE_TO_TRAIN.get(k, k)
+        closed = _PK.build_closed(self.net.num_card_ids, self.net.placement_rows, self.net.board_width)
+        return base | (table[st, cid] & ~closed[cid]).unsqueeze(0).to(base.device)
+
+
+def _pocket_lanes(card_id, tile):
+    """Lane bits whose pocket holds this cell for this (training-id) card."""
+    net = POCKET_G.net
+    table = _PK._pocket_table(net)
+    cell = int(tile[1]) * net.board_width + int(tile[0])
+    return [b for b in (1, 2) if bool(table[b, card_id, cell])]
+
+
 #: what a v3 run did, for the end-of-run line (v3_summary)
 _V3 = {"decisions": 0, "plays": 0, "pending": 0, "forced": 0, "ability_want": 0,
        "ability_p_max": 0.0, "obs_len": None}
@@ -1959,6 +2256,34 @@ class PPOPolicy(L.NeuralPolicy):
                   f"unexpected {list(r.unexpected_keys)}; hand remap {BASE_TO_TRAIN}; "
                   f"decision rate {L.DECISION_HZ} Hz")
         self.encoder = EvoEncoder(self.encoder)
+        if POCKET_G is not None:
+            POCKET_G.net, POCKET_G.classify = self.net, _pocket_lanes
+            _PocketLegal.net = self.net
+            self._legal_by_card = _PocketLegal(self._legal_by_card)
+        if ours.afford_project:
+            # Innermost wrapper (the empty-slot, pocket and leak-floor masks stay around it):
+            # cost <= E_view becomes cost <= P (AFFORD_RULE.txt s1); the no-op column is the base's.
+            aff_base, aff_net = self.net.affordability_mask, self.net
+            from python_ai.models import perception_encoder as _PE  # noqa: PLC0415
+            aff_e0 = _PE.SPATIAL_SIZE + 1 + _PE.HAND_SIZE + _PE.HAND_SIZE * _PE.NUM_CARD_IDS   # = C.EXTRA
+            print(f"projected affordability: ON (R 1/28, DMIN {AFF_DMIN}, mult at obs[{aff_e0}+9]; "
+                  f"PlayWatch LAND_S {PLAYS.LAND_S if PLAYS is not None else None} s)")
+
+            def _projected_mask(obs):
+                m = aff_base(obs)
+                s, h = aff_net.spatial_size, aff_net.hand_size
+                e_view = obs[:, s:s + 1] * 10.0
+                mult = obs[:, aff_e0 + 9:aff_e0 + 10] * 3.0
+                p = torch.where(e_view > 0, torch.clamp(e_view + AFF_REGEN * mult * AFF_DMIN, max=10.0),
+                                torch.zeros_like(e_view))
+                costs = obs[:, s + 1:s + 1 + h] * 10.0
+                out = m.clone()
+                out[:, :h] = (costs > 0.0) & (costs <= p + 1e-6)
+                _AFF["last"] = {"e_view": round(float(e_view[0, 0]), 3), "mult": round(float(mult[0, 0]), 3),
+                                "p": round(float(p[0, 0]), 3), "costs": [round(float(c), 1) for c in costs[0]],
+                                "base": [bool(b) for b in m[0, :h]], "proj": [bool(b) for b in out[0, :h]]}
+                return out
+            self.net.affordability_mask = _projected_mask
         if not ours.allow_empty_slot:
             base_mask = self.net.affordability_mask
 
@@ -2072,6 +2397,7 @@ class PPOPolicy(L.NeuralPolicy):
             return d
         if self._hx is None:
             self.reset_hidden()
+        _AFF["last"] = None
         _EMPTY["slots"] = [s for s, e in enumerate((HUDLOG.get(gs.frame_index) or {}).get("empty_slots") or ())
                            if e]
         # One reading of the plays in flight for this decision: the encoder runs
@@ -2084,6 +2410,10 @@ class PPOPolicy(L.NeuralPolicy):
             # one reading of the ability button for this decision, like the plays in flight
             _ABIL["dec"] = _ability_now(gs)
         obs = torch.as_tensor(self.encoder.encode(gs)).unsqueeze(0)
+        if POCKET_G is not None:
+            if PLAYS is not None:
+                POCKET_G.see_plays(list(PLAYS.plays))
+            _PKT["state"] = int(_PK_ORIG_STATE(self.net, obs)[0]) & int(POCKET_G.open_bits())
         v3, forced = None, False
         with torch.no_grad():
             feats, _e, _s = self.net.extract_features(obs)
@@ -2102,6 +2432,18 @@ class PPOPolicy(L.NeuralPolicy):
         if d.slot is not None:
             card = _cname(gs.my_hand[d.slot]) if d.slot < len(gs.my_hand) else None
             _LAST_DECIDE[int(d.slot)] = (card, tuple(d.tile))
+            if POCKET_G is not None and d.slot < len(gs.my_hand) and gs.my_hand[d.slot] is not None:
+                _cid = int(gs.my_hand[d.slot])
+                POCKET_G.note_decision(d.slot, d.tile, BASE_TO_TRAIN.get(_cid, _cid), _PKT["state"])
+                if v3 is not None:
+                    _tid = BASE_TO_TRAIN.get(_cid, _cid)
+                    _tab = _PK._pocket_table(self.net)
+                    _tap = engine_tile_centre(int(d.tile[0]), int(d.tile[1]))
+                    v3["pocket"] = {"state": _PKT["state"], "card": _tid,
+                                    "pocket_cells_legal": int(_tab[_PKT["state"], _tid].sum()) if _PKT["state"] else 0,
+                                    "tile_in_pocket": bool(_PKT["state"] and _tab[_PKT["state"], _tid, int(d.tile[1]) * self.net.board_width + int(d.tile[0])]),
+                                    "tap_display": [int(_tap.x), int(_tap.y)],
+                                    "tap_frame_px": [round(_tap.x / DISPLAY_WIDTH * 549), round(_tap.y / DISPLAY_HEIGHT * 976)]}
             lat("decide", t=t_dec, fi=gs.frame_index, slot=int(d.slot), card=card, tile=list(d.tile))
             _V3["plays"] += v3 is not None
         if ABIL is not None and v3 is not None and v3.get("ability") is not None and "ready" in v3["ability"]:
@@ -2255,6 +2597,18 @@ def log_decision(gs, d, probs, obs, age=0.0, v3=None):
             "opp": [[_cname(p.card), p.x, p.y, round(-p.t, 1)] for p in dec["opp"]],
             "own": [[_cname(p.card), p.x, p.y, round(-p.t, 1)] for p in dec["own"]],
             "next": _cname(dec["next"])}
+    if ours.afford_project and _AFF["last"] is not None:
+        a = dict(_AFF["last"])
+        a["offered_by_p_only"] = [i for i, (b, q) in enumerate(zip(a["base"], a["proj"])) if q and not b]
+        _AFF["decisions"] += 1
+        _AFF["differ"] += bool(a["offered_by_p_only"])
+        if d.slot is not None and d.slot < len(a["costs"]):
+            a["chosen"] = {"slot": int(d.slot), "card": card, "cost": a["costs"][d.slot],
+                           "p_only": d.slot in a["offered_by_p_only"]}
+            _AFF["p_only"] += a["chosen"]["p_only"]
+            _AFF["plays"].append(dict(a["chosen"], t=time.perf_counter(), e_view=a["e_view"], mult=a["mult"],
+                                      p=a["p"], match_s=round(secs, 1)))
+        rec["afford"] = a
     if v3 is not None:
         # a v3 decision: p(play now), the cards by p(card | play), the cell, the ability
         v3["chosen"] = None if d.slot is None else {"slot": int(d.slot), "card": card,
@@ -2401,6 +2755,28 @@ if __name__ == "__main__":
                       "\"THE GAME REFUSED IT\", \"issued plays never confirmed\" - under-count: "
                       "they miss units among other units and bar drops spread over two frames.)")
             (RUN / "plays.json").write_text(json.dumps(PLAYS.rows(), indent=1))
+        if ours.afford_project:
+            rows = PLAYS.rows() if PLAYS is not None else []
+            used = set()
+            for a in _AFF["plays"]:
+                # the PlayWatch issue for this decision: same slot, issued within 1 s after it
+                hit = next((p for p in (PLAYS.plays if PLAYS is not None else ())
+                            if p.i not in used and p.slot == a["slot"] and 0 <= p.t - a["t"] < 1.0), None)
+                if hit is not None:
+                    used.add(hit.i)
+                    r = rows[hit.i]
+                    a["seq"], a["state"] = hit.i, r["state"]
+                    a["tap_to_blank_s"] = (None if hit.t_tap is None or hit.t_blank is None
+                                           else round(hit.t_blank - hit.t_tap, 3))
+                a["t"] = round(a["t"] - _t0, 2)
+            q = [a for a in _AFF["plays"] if a["cost"] > a["e_view"] + 1e-6]
+            print(f"\nprojected affordability: {_AFF['decisions']} decisions, P offered a card the base mask "
+                  f"did not on {_AFF['differ']}; {len(_AFF['plays'])} plays chosen, {_AFF['p_only']} of them "
+                  f"only under P; {len(q)} chosen with cost > E_view (queued in the game)")
+            (RUN / "afford.json").write_text(json.dumps(
+                {"regen": AFF_REGEN, "dmin": AFF_DMIN, "land_s": None if PLAYS is None else PLAYS.LAND_S,
+                 "decisions": _AFF["decisions"], "differ": _AFF["differ"], "p_only": _AFF["p_only"],
+                 "plays": _AFF["plays"]}, indent=1))
         if v3_summary():
             print("\n" + v3_summary())
         if ABIL is not None:

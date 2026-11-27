@@ -1,4 +1,4 @@
 [submodule "engine"]
 	path = engine
 	url = https://github.com/sjdoane/ClashRoyaleAi.git
-	branch = gen2
+	branch = gen2-patches-0088-0091

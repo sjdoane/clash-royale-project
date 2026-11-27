@@ -395,8 +395,25 @@ def _mmean(x, m):
     return torch.where(m, x, torch.zeros_like(x)).sum() / m.sum().clamp(min=1)
 
 
+def when_kept(obs, free_elixir=None, free_behind=False):
+    """Rows that keep their WHEN reference (bool, obs: (..., obs_dim)).
+    free_elixir: rows reading that much elixir or more lose it (a full bar).
+    free_behind: rows where more of our Princess Towers are down than of the opponent's lose it. The human
+    matches include players who stop playing once a match looks lost; live, 2026-11-23, the policy sat at a
+    full bar with p(play) 0.004 whenever our towers were down and theirs untouched."""
+    keep = torch.ones(obs.shape[:-1], dtype=torch.bool, device=obs.device)
+    if free_elixir is not None:
+        keep = keep & (obs[..., C.SPATIAL_SIZE] * 10.0 < float(free_elixir) - 1e-4)
+    if free_behind:
+        x = int(C.EXTRA)
+        own = (obs[..., x + 4] <= 0.0).long() + (obs[..., x + 5] <= 0.0).long()
+        opp = (obs[..., x + 7] <= 0.0).long() + (obs[..., x + 8] <= 0.0).long()
+        keep = keep & (own <= opp)
+    return keep
+
+
 def forward_losses(net, batch, what_h=10, what_on_when=True, weights=None, detail=False,
-                   when_free_elixir=None):
+                   when_free_elixir=None, when_free_behind=False):
     """One forward pass and every loss term. Returns (total, parts dict[, detail])."""
     W = dict(LOSS_W, **(weights or {}))
     obs = batch["obs"]
@@ -408,9 +425,9 @@ def forward_losses(net, batch, what_h=10, what_on_when=True, weights=None, detai
 
     grid = (batch["kind"] & D.K_GRID) != 0
     wm = grid & (batch["t_when"] >= 0) & o["has_legal"]
-    if when_free_elixir is not None:
-        # no WHEN target at a full bar (ppo_pool --anchor-free-elixir)
-        wm = wm & (obs[:, C.SPATIAL_SIZE] * 10.0 < float(when_free_elixir) - 1e-4)
+    if when_free_elixir is not None or when_free_behind:
+        # no WHEN target at a full bar / behind on towers (ppo_pool --anchor-free-elixir, --anchor-free-behind)
+        wm = wm & when_kept(obs, when_free_elixir, when_free_behind)
     y_when = (batch["t_when"] == 1).float()
     parts["when"] = _mmean(F.binary_cross_entropy_with_logits(o["when"], y_when, reduction="none"), wm)
 

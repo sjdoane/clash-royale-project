@@ -1,0 +1,3 @@
+#!/bin/sh
+# Run a command on balerion over the existing SSH master socket (never opens a new connection).
+exec ssh -o ControlPath=$HOME/.ssh/cm-balerion -o BatchMode=yes user@balerion "$@"

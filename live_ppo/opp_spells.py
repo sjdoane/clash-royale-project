@@ -224,8 +224,17 @@ class OppSpellDetector:
     # predicts (the explosion box still tells where a Fireball landed).
     EST_AFTER_S = 0.25
 
-    def __init__(self, deck, skip=None, evidence: bool = True):
+    # Offline re-read: `own_casts` = [(t, card id)] of every spell WE cast, on the
+    # clock of update(). A track of a card of our deck is then ours when one of our
+    # casts of it falls OWN_BEFORE_S before to OWN_AFTER_S after its first sighting,
+    # and otherwise judged like a card we cannot cast (the "motion or nothing"
+    # rule exists only because live we cannot tell the two apart). None: live.
+    OWN_BEFORE_S = 5.0       # our decision up to this long before the sprite shows
+    OWN_AFTER_S = 1.0
+
+    def __init__(self, deck, skip=None, evidence: bool = True, own_casts=None):
         self.own = {int(c) for c in deck}
+        self.own_casts = None if own_casts is None else [(float(t), int(c)) for t, c in own_casts]
         self.evidence = evidence
         self.strong: set[int] = set()                # cards with a strong cast this match (deck memory)
         self._verdict: dict[int, str] = {}           # tid -> verdict of a shared-sprite group
@@ -322,6 +331,11 @@ class OppSpellDetector:
             self._verdict[o.tid] = v if o is best else "fold"
         return self._verdict.pop(tr.tid)
 
+    def _our_cast(self, tr: SpellTrack) -> bool:
+        t0 = tr.first[0]
+        return any(c == tr.card and -self.OWN_AFTER_S <= t0 - t <= self.OWN_BEFORE_S
+                   for t, c in self.own_casts)
+
     def _relabel(self, tr: SpellTrack) -> bool:
         """The track began on the very box of a sprite already accounted for."""
         return any(o.tid in tr.relabel_of and o.state in ("emitted", "merged", "ours")
@@ -340,7 +354,11 @@ class OppSpellDetector:
         if tr.card in self.own or _rolls(tr.card):           # as before: motion or nothing
             if flight:
                 return "opp"
-            return "drop" if ended else None
+            if self.own_casts is None:
+                return "drop" if ended else None
+            if tr.card in self.own and self._our_cast(tr):   # offline: our casts are known
+                # ... but not on first sight: theirs, thrown as ours leaves, flies toward us
+                return "ours" if ended else None
         if tr.cls in self.FLYING and not ended and t - tr.last[0] <= self.STEP_S:
             a, b = tr.pts[-2] if n >= 2 else None, tr.pts[-1]
             if a is None or b[0] - a[0] > self.STEP_S or \

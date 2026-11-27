@@ -1,3 +1,5 @@
+> **Agents and new readers: start with [AGENTS.md](AGENTS.md)** (current state 2026-11-27, layout, checkpoints, latest reports).
+
 # Clash Royale agent: simulator, training, live play
 
 A Hog 2.6 agent trained in a C++ Clash Royale simulator. It learns first from

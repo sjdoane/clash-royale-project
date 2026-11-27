@@ -16,8 +16,8 @@ frame perception saw, so a run can be audited afterwards:
     python play_live.py --stock               # the old path: mvp_loop alone, stock perception
 
 Flags that choose what runs:
-    --checkpoint P     default checkpoints/ppo_ep0121202.pth (driver path; the gen-2 PPO
-                       snapshot deployed live on 2026-11-23, from scripts/fetch_assets.sh) or
+    --checkpoint P     default remote_results/ppo_league26_ep138708.pth (driver path;
+                       the round-robin winner, training/REPORT_netv2_ppo.md) or
                        checkpoints/partner/model_weights_ep76728.pth (--stock)
     --temp T           sampling temperature of the driver's policy (default 0.5, the
                        setting that checkpoint was selected at; also 0.5 for a generation-2
@@ -108,10 +108,9 @@ from state_pipeline import DEFAULT_FLAGS  # noqa: E402  the production driver fl
 # --stock: the partner checkpoint, base-id 2.6 deck, stock net.
 STOCK_CKPT = REPO / "checkpoints" / "partner" / "model_weights_ep76728.pth"
 DECK_26 = [15, 6, 25, 40, 24, 72, 33, 7]
-# Driver path: the gen-2 PPO snapshot deployed live on 2026-11-23 (scripts/fetch_assets.sh).
-# Before that the default was the gen-1 round-robin winner remote_results/ppo_league26_ep138708.pth
-# (training/REPORT_netv2_ppo.md), not shipped.
-DRIVER_CKPT = REPO / "checkpoints" / "ppo_ep0121202.pth"
+# Driver path: the round-robin winner among the ppo_bc26-deck checkpoints
+# (training/REPORT_netv2_ppo.md, remote_results/rr/final.log), selected at T = 0.5.
+DRIVER_CKPT = REPO / "remote_results" / "ppo_league26_ep138708.pth"
 DRIVER_TEMP = 0.5
 # A generation-2 (v3) checkpoint: WHAT / WHERE temperature 0.5 (WHEN stays 1.0, bias 0). Until 2026-11-23
 # this was 1.0, the training temperature, and both live sessions of that day ran at 1.0. Measured on
@@ -125,7 +124,10 @@ DET_B = REPO / "runs" / "det_v3_pod" / "ab" / "B" / "weights" / "last.pt"  # 198
 # Round 3 (2026-11-20): a copy of runs/det_r3_pod/train/weights/last.pt, 198 classes.
 # Why it is the default: LIVE.md "Detector".
 DET_R3 = REPO / "data" / "det" / "runs" / "r3" / "weights" / "best.pt"
-DEFAULT_DET = DET_R3
+# Round 5 (2026-11-23): round 3 fine-tuned on our own live matches, a copy of
+# runs/det_r5_pod_live2/live/weights/last.pt, same 198 classes. Default since 2026-11-23.
+DET_R5 = REPO / "data" / "det" / "runs" / "r5" / "weights" / "best.pt"
+DEFAULT_DET = DET_R5
 SIDECAR_PYTHON = REPO / ".venv-det" / "bin" / "python"
 SCREEN = (1080, 1920)
 IOS_GEOMETRY = REPO / "ios" / "geometry.json"

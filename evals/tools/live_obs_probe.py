@@ -1,6 +1,6 @@
 """Recompute p(play) from a replay's dumped observations (obs.f32 + obs_tail.f32) and test what moves it.
 
-usage: CR_ENGINE=$PWD/build/gen2_c/engine .venv/bin/python evals/tools/live_obs_probe.py RUN_DIR CKPT
+usage: CR_ENGINE=$PWD/build/gen2_c/engine .venv/bin/python evals/tools/live_obs_probe.py RUN_DIR CKPT [quick]
 Each named intervention edits one group of inputs for every decision of every match, then the whole match
 is run through the network again (the LSTM carries state), and p(play) is reported for the decisions at
 8+ elixir with one or more of our towers down.
@@ -21,6 +21,10 @@ CE = C.CE
 
 def load(d):
     rows = [json.loads(l) for l in open(d + "/perception.jsonl")]
+    n = np.fromfile(d + "/obs_tail.f32", dtype=np.float32).size // 148
+    if n != len(rows):                       # rows the driver passed without a policy step have no observation
+        rows = [r for r in rows if r.get("v3")]
+        assert n == len(rows), (n, len(rows))
     o = np.fromfile(d + "/obs.f32", dtype=np.float32).reshape(len(rows), -1)
     t = np.fromfile(d + "/obs_tail.f32", dtype=np.float32).reshape(len(rows), -1)
     O = np.concatenate([o, t], 1)
@@ -71,6 +75,8 @@ def main():
         print(f"  {name:44s} 8+ elixir, tower down: {p[sel].mean():.3f} (n={int(sel.sum())}) | no tower down: {p[sel0].mean():.3f} | {per}")
 
     rep("as recorded", O)
+    if len(sys.argv) > 3 and sys.argv[3] == "quick":     # the per-snapshot regression line only
+        return
     for name, lo, hi, val in (
             ("clock -> 60 s", X, X + 1, None),
             ("spend scalars -> 0", X + 1, X + 3, 0.0),
@@ -87,6 +93,32 @@ def main():
         else:
             O2[:, lo:hi] = val
         rep(name, O2)
+    # the opponent's towers, cells of the building channel (7) and scalars together (a state the simulator can
+    # produce): all three at a fraction of their health, and one princess tower gone
+    nb0 = C.BOARD_H * C.BOARD_W
+    cells = {"king": (8, 30), "left": (3, 27), "right": (14, 27)}
+    sc = {"king": X + 6, "left": X + 7, "right": X + 8}
+
+    def tower(O2, name, f):
+        x, y = cells[name]
+        i = 7 * nb0 + y * C.BOARD_W + x
+        O2[:, i] = O[:, i] * f
+        O2[:, sc[name]] = O[:, sc[name]] * f
+
+    for f in (0.75, 0.5, 0.25):
+        O2 = O.copy()
+        for nm in cells:
+            tower(O2, nm, f)
+        rep(f"enemy towers x{f} (cells and scalars)", O2)
+    for nm in ("left", "right"):
+        O2 = O.copy()
+        tower(O2, nm, 0.0)
+        rep(f"enemy {nm} princess tower gone", O2)
+    for nm in cells:
+        O2 = O.copy()
+        x, y = cells[nm]
+        O2[:, 7 * nb0 + y * C.BOARD_W + x] = 0.0
+        rep(f"enemy {nm} tower cell only -> 0", O2)
     # each first-match row's group written over the same-index row of later matches is not meaningful; instead
     # per-channel board ablations
     nb = C.BOARD_H * C.BOARD_W

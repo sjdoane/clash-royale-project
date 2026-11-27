@@ -1,8 +1,9 @@
 """Recorded live sessions -> a ghost cache (same format as data/ghost/v1) of the opponents Sam played.
 
-    CR_ENGINE=$PWD/build/gen2_c/engine .venv/bin/python training/live_ghost_build.py [--out data/ghost/live1] [--report]
+    CR_ENGINE=$PWD/build/gen2_e/engine .venv/bin/python training/live_ghost_build.py [--out data/ghost/live1] [--report]
 
-Sessions are listed in training/live_sessions.json: {"id", "run", "split": "train" | "val", "opp_from"?}.
+Sessions are listed in training/live_sessions.json: {"id", "run", "split": "train" | "val", "opp_from"?,
+"skip"?: [match numbers of this report that are left out]}.
 "run" is the directory under runs/live of the session as it was played (our plays are the decisions that chose
 a slot there); "opp_from" names a later no-tap replay of the same frames whose opponent-play read is used
 instead (a newer reader). The newest session is "val": it is the held-out set until the next session arrives.
@@ -10,7 +11,15 @@ instead (a newer reader). The newest session is "val": it is the held-out set un
 One match is one stretch of decisions without a gap over 3 s that was observed from its start (clock under
 10 s). A stretch that ends early (app left) is kept up to there; a stretch that starts mid-match is dropped.
 
-The opponent's plays come from the live reader's ledger (`opp_plays`), which is not ground truth. Cleaning:
+The opponent's plays come from the offline re-read of the match (live_ppo/reread.py, one JSON per
+recorded match in runs/live/<run>/reread/) when there is one: every frame read again with what is known
+afterwards - the opponent's true deck with its forms (official battle log), the card cycle, the elixir
+budget and our own plays. The re-read of a stretch is the one whose frames overlap it. On two matches
+counted by hand it had 37 of 37 and 19 of 20 named plays right with no extra play (the live ledger: 32 kept
+of 39 read on the first). Plays it could only infer from the cycle ("implied", no position) and hero
+ability taps are reported, not replayed.
+
+Without a re-read the plays come from the live reader's ledger (`opp_plays`), which is not ground truth. Cleaning:
   1. the same card read twice within 3 s (two sources) counts once;
   2. a card of OUR deck read on their side shortly after we played it, where our own card would be, is
      ours (see ours());
@@ -20,13 +29,23 @@ The per-match report (meta.json "live", and --report) gives what was dropped and
 cost against what the opponent can have had: far below 1 means missed plays, above 1 means false ones.
 
 Times: the reader dates a play on the on-screen clock (seconds from 3:00), which is the clock the policy is
-fed; engine tick = 10 x that (ghost timing "clock0"). Our own plays land 0.5 s after their decision.
+fed; engine tick = 10 x that (ghost timing "clock0"). Our own plays are dated 0.5 s after their decision
+frame by the readers (the card leaving the hand) and stored OWN_LAND_S later, when the unit lands.
+
+Tiles: the store keeps RoyaleAPI's 32 rows. Our own plays are the driver's decision tiles, which are engine
+rows (34): inv_row() takes them back. The opponent's plays are reader tiles, and those are already the 32
+visual rows with whole numbers at tile centres (video_dataset/detector/common.py ref_to_tile; stopwatches
+sit at 10.9 / 17.0 / 31.0 = deepest pocket row / their bridge row / their back row): they are rounded, not
+converted. (Until 2026-11-23 they went through inv_row() and int(): everything behind their bridge row
+landed 2-3 rows nearer the river.)
 The split uses the store's own rule (ghost.is_val_tag, a hash of the tag): each tag gets a suffix chosen so
 the hash puts it in the split the session asks for, which keeps every existing tool (--split val) working.
 """
 import argparse
 import collections
+import glob
 import json
+import math
 import os
 import time
 
@@ -45,6 +64,13 @@ OUR_ORDER = ("skeletons-ev1", "musketeer-hero", "cannon-ev1", "hog-rider", "ice-
 FILLERS = ("knight", "archers", "arrows", "zap", "bomber", "minions", "giant", "valkyrie", "musketeer", "goblins")
 KING_MAX, PRINCESS_MAX = 4824.0, 3052.0          # level 11
 ACT_S = 0.5
+# From the card leaving the hand to the unit landing (its deploy stopwatch appearing), which is where the
+# engine starts the 1 s deploy and where the opponent's plays are dated. Measured 2026-11-23 on about 330 of
+# our own troop and building plays in three sessions: stopwatch first seen a median 1.65-1.72 s after the
+# decision frame (10th-90th percentile 1.58-1.84), so 1.2 s after the 0.5 s the readers already add. Spells
+# take the same shift: in the raw frames our Fireball first shows at our King Tower a median 1.74 s after the
+# decision frame (26 casts, 10th-90th percentile 1.64-1.88) and explodes 1.65 s later, the simulator's flight.
+OWN_LAND_S = 1.2
 OWN = ("own_king", "own_princess_left", "own_princess_right")
 OPP = ("opp_king", "opp_princess_left", "opp_princess_right")
 
@@ -75,6 +101,47 @@ def inv_row(e):
     if e == 19:
         return 18
     return e - 2
+
+
+def col18(x):
+    """Reader tile x -> column 0..17 (whole numbers are tile centres)."""
+    return int(min(max(math.floor(float(x) + 0.5), 0), 17))
+
+
+def row32(y):
+    """Reader tile y -> RoyaleAPI row 0..31 (the reader's rows are the 32 visual rows)."""
+    return int(min(max(math.floor(float(y) + 0.5), 0), 31))
+
+
+def form_key(name, form):
+    """Card key of a battle-log card: with its form when the engine has that form, else the base card
+    -> (key or None, True when the form is missing in the engine)."""
+    base = slug(name)
+    if form and G.engine_id(base + "-" + form) is not None:
+        return base + "-" + form, False
+    return (base if G.engine_id(base) is not None else None), bool(form)
+
+
+REREAD_LAG_S = 0.32          # a perception row's t is its frame's wall time + this
+
+
+def load_rereads(run):
+    """The offline re-reads of a run (live_ppo/reread.py): [dict], each with "wall" = [first, last frame s]."""
+    out = []
+    for p in sorted(glob.glob(os.path.join(REPO, "runs", "live", run, "reread", "m*.json"))):
+        out.append(json.load(open(p)))
+    return out
+
+
+def reread_of(rereads, S):
+    """The re-read whose frames are this stretch of rows: most of it must lie inside the stretch."""
+    best, most = None, 0.0
+    for J in rereads:
+        w0, w1 = J["wall"][0] + REREAD_LAG_S, J["wall"][1] + REREAD_LAG_S
+        ov = min(S[-1]["t"], w1) - max(S[0]["t"], w0)
+        if ov > most and ov >= 0.6 * (w1 - w0):
+            best, most = J, ov
+    return best
 
 
 def clock(r):
@@ -266,11 +333,73 @@ def read_match(S, opp_rows, start_elixir, clk):
                            dropped_cards=dict(collections.Counter(p["key"] for p in dropped)))}, None
 
 
+def read_reread(J, S, start_elixir, clk):
+    """One stretch of rows and its offline re-read -> the same dict as read_match(), or (None, why).
+    Deck, plays and our own plays are the re-read's; tower health stays the measured series of the rows."""
+    live_rows = [r for r in S if r.get("screen", "in_game") == "in_game"] or S
+    t_end = float(J["end_s"])
+    own = [(float(o["t"]), OUR_KEYS[o["card"]], int(o["xy"][0]), int(o["xy"][1])) for o in J["own"]
+           if o["card"] in OUR_KEYS]
+    deck, no_form = [], []
+    for name, form in J["battle"]["deck"]:
+        key, miss = form_key(name, form)
+        if key is None:
+            return None, f"card not in the engine: {name}"
+        deck.append(key)
+        if miss:
+            no_form.append(f"{name} ({form})")
+    order = arrange([G.engine_id(k) for k in deck])
+    demoted = []
+    while order is None:                      # a form the slot rules refuse: play the base card instead
+        i = next((i for i, k in enumerate(deck) if k != G.base_key(k) and G.engine_id(G.base_key(k)) is not None
+                  and arrange([G.engine_id(x) for x in deck[:i] + [G.base_key(k)] + deck[i + 1:]]) is not None), None)
+        if i is None:
+            i = next((i for i, k in enumerate(deck) if k != G.base_key(k)
+                      and G.engine_id(G.base_key(k)) is not None), None)
+        if i is None:
+            return None, "deck does not fit the slot rules: " + ", ".join(deck)
+        demoted.append(deck[i])
+        deck[i] = G.base_key(deck[i])
+        order = arrange([G.engine_id(k) for k in deck])
+    by_base = {G.base_key(k): k for k in deck}
+    deck = sorted(deck, key=lambda k: order.index(G.engine_id(k)))
+    plays, off = [], 0
+    for p in J["plays"]:
+        key = by_base.get(slug(p["card"]))
+        if key is None:
+            off += 1
+            continue
+        plays.append({"t": float(p["t"]), "key": key, "id": int(G.engine_id(key)), "x": float(p["xy"][0]),
+                      "y": float(p["xy"][1]), "src": p.get("kind")})
+    if len(plays) < 4:
+        return None, f"only {len(plays)} opponent plays kept"
+    spent, worst = 0.0, 0.0
+    for p in plays:
+        spent += float(G.card_info(p["id"])["cost"])
+        worst = max(worst, spent - available(p["t"], start_elixir))
+    series = tower_series(live_rows[:-1], clk, t_end)
+    tw = {k: float(series[j, -1]) for j, k in enumerate(OWN + OPP)}
+    crowns = []
+    for names in (OPP, OWN):                       # crowns taken by us, by them, in the recorded part
+        crowns.append(3 if tw[names[0]] <= 0 else sum(1 for k in names[1:] if tw[k] <= 0))
+    kinds = collections.Counter(p["src"] for p in plays)
+    rep = {"source": "reread", "read": len(J.get("events") or []), "kept": len(plays),
+           "cards_seen": len({p["key"] for p in plays}), "kinds": dict(kinds), "off_deck": off,
+           "implied": [x.get("card") for x in J.get("implied") or []], "abilities": len(J.get("abilities") or []),
+           "blind": list(J.get("blind") or []), "forms_missing": no_form, "forms_demoted": demoted,
+           "unexplained_elixir": (J.get("elixir") or {}).get("unexplained"),
+           "crowns_battle": list(J["battle"]["crowns"]),
+           "spend_ratio": round(spent / available(t_end, start_elixir), 2), "over_budget": round(worst, 1)}
+    return {"own": own, "opp": plays, "deck": deck, "end_s": t_end, "towers": tw, "crowns": crowns,
+            "tower_series": series, "report": rep}, None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=OUT)
     ap.add_argument("--sessions", default=SESSIONS)
     ap.add_argument("--report", action="store_true", help="print the per-match report, write nothing")
+    ap.add_argument("--no-reread", action="store_true", help="live reader ledger only (the store before 2026-11-23)")
     a = ap.parse_args()
     start_elixir = float(G.TIMINGS[G.DEFAULT_TIMING][1] or 5.0)
     keys, kidx = [], {}
@@ -289,12 +418,16 @@ def main():
         RO = R
         if s.get("opp_from"):
             RO = [json.loads(l) for l in open(os.path.join(REPO, "runs", "live", s["opp_from"], "perception.jsonl"))]
+        rereads = [] if a.no_reread else load_rereads(s["run"])
         n = 0
         for S in segments(R):
             if len(S) < 40:
                 continue
             n += 1
             name = f"{s['id']} match {n} ({s['run']} t {S[0]['t']:.0f}-{S[-1]['t']:.0f} s)"
+            if n in s.get("skip", ()):                  # listed by hand: a recording that cannot be used
+                print(f"skip {name}: listed in the session's skip")
+                continue
             opp_rows = [r for r in RO if S[0]["t"] - 1.0 <= r["t"] <= S[-1]["t"] + 1.0]
             if RO is not R:                             # the replay's clock read (a newer reader), by frame time
                 ts = np.array([r["t"] for r in opp_rows])
@@ -314,18 +447,32 @@ def main():
                 print(f"skip {name}: starts at clock {min(first) if first else float('nan'):.0f} s")
                 continue
             S = S[i0:]
-            m, why = read_match(S, opp_rows, start_elixir, clk)
+            J = reread_of(rereads, S)
+            if J is not None:
+                m, why = read_reread(J, S, start_elixir, clk)
+                name += f" re-read m{J['match']}"
+            else:
+                m, why = read_match(S, opp_rows, start_elixir, clk)
             if m is None:
                 print(f"skip {name}: {why}")
                 continue
             want_val = s["split"] == "val"
             tag = next(t for t in (f"L{s['id']}m{n}x{i}" for i in range(1000)) if G.is_val_tag(t) == want_val)
             r = m["report"]
-            print(f"{tag:10s} {s['split']:5s} {name}: {m['end_s']:.0f} s, crowns {m['crowns'][0]}-{m['crowns'][1]}, "
-                  f"own plays {len(m['own'])}, opponent plays kept {r['kept']} of {r['read']} "
-                  f"(twice {r.get('read twice', 0)}, ours {r.get('ours, read on their side', 0)}, "
-                  f"off-deck {r['not in the deck of eight']} {r['dropped_cards'] or ''}), cards seen {r['cards_seen']}, "
-                  f"elixir spent/available {r['spend_ratio']}, over budget by {r['over_budget']}")
+            head = (f"{tag:10s} {s['split']:5s} {name}: {m['end_s']:.0f} s, crowns {m['crowns'][0]}-{m['crowns'][1]}, "
+                    f"own plays {len(m['own'])}, opponent plays ")
+            if J is not None:
+                print(head + f"{r['kept']} {r['kinds']} (implied, not placed: {len(r['implied'])}; ability taps "
+                      f"{r['abilities']}; cards the detector did not show: {len(r['blind'])}), cards seen "
+                      f"{r['cards_seen']}, battle log crowns {r['crowns_battle'][0]}-{r['crowns_battle'][1]}, "
+                      f"elixir spent/available {r['spend_ratio']}, over budget by {r['over_budget']}"
+                      + (f", forms missing {r['forms_missing']}" if r["forms_missing"] else "")
+                      + (f", forms demoted {r['forms_demoted']}" if r["forms_demoted"] else ""))
+            else:
+                print(head + f"kept {r['kept']} of {r['read']} "
+                      f"(twice {r.get('read twice', 0)}, ours {r.get('ours, read on their side', 0)}, "
+                      f"off-deck {r['not in the deck of eight']} {r['dropped_cards'] or ''}), cards seen "
+                      f"{r['cards_seen']}, elixir spent/available {r['spend_ratio']}, over budget by {r['over_budget']}")
             print("           deck: " + ", ".join(m["deck"]))
             fth = [[round(m["towers"][x] * mx) for x, mx in zip(names, (KING_MAX, PRINCESS_MAX, PRINCESS_MAX))]
                    for names in (OWN, OPP)]
@@ -333,8 +480,9 @@ def main():
             M.append({"tag": tag, "result": (c[0] > c[1]) - (c[0] < c[1]), "duration": m["end_s"] + G.ROLL_S,
                       "deck": [[k(x) for x in OUR_ORDER], [k(x) for x in m["deck"]]], "fth": fth, "crowns": c,
                       "series": m["tower_series"]})
-            pl = [(0, k(key), t, x, y) for t, key, x, y in m["own"]]
-            pl += [(1, k(p["key"]), p["t"], int(min(max(p["x"], 0), 17)), int(min(max(p["y"], 0), 33))) for p in m["opp"]]
+            # (side, key, clock s, column, RoyaleAPI row): see "Tiles" in the module text
+            pl = [(0, k(key), t + OWN_LAND_S, x, inv_row(y)) for t, key, x, y in m["own"]]
+            pl += [(1, k(p["key"]), p["t"], col18(p["x"]), row32(p["y"])) for p in m["opp"]]
             plays.append(sorted(pl, key=lambda p: p[2]))
             live.append({"tag": tag, "session": s["id"], "run": s["run"], "match": n, "split": s["split"],
                          "t": [round(S[0]["t"], 1), round(S[-1]["t"], 1)], "deck": m["deck"], "report": r})
@@ -357,7 +505,7 @@ def main():
     np.save(os.path.join(a.out, "play_key.npy"), np.array([p[1] for p in flat], np.int16))
     np.save(os.path.join(a.out, "play_tick20.npy"), np.array([int(round(p[2] * 20)) for p in flat], np.int32))
     np.save(os.path.join(a.out, "play_x.npy"), np.array([p[3] * 1000 + 500 for p in flat], np.int32))
-    np.save(os.path.join(a.out, "play_y.npy"), np.array([inv_row(p[4]) * 1000 + 500 for p in flat], np.int32))
+    np.save(os.path.join(a.out, "play_y.npy"), np.array([p[4] * 1000 + 500 for p in flat], np.int32))
     # Tower health over the match clock (1 s grid; own king, left, right, then theirs; left = columns
     # 0..8 = engine tower slot 1), held at its last value after the end: training/pool_env.py sets the
     # towers of a mid-match start to it.
@@ -372,6 +520,7 @@ def main():
         json.dump({"version": 1, "source": "runs/live via training/live_ghost_build.py", "matches": n,
                    "plays": len(flat), "abilities": 0, "keys": keys, "battle_types": ["friendly"],
                    "game_modes": ["Friendly"], "skipped": {}, "sides": ["team", "opponent"],
+                   "opponent_rows": "reader rows rounded (32-row frame)",
                    "built": time.strftime("%Y-%m-%d %H:%M:%S"), "live": live}, f, indent=1)
     print(f"wrote {n} matches, {len(flat)} plays -> {a.out}")
 

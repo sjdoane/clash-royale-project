@@ -48,6 +48,7 @@ pool_episode, and `priv`: the privileged-critic vector (PRIV layout below).
 """
 import bisect
 import collections
+import functools
 import json
 import math
 import os
@@ -76,8 +77,39 @@ DEFAULT_POOL = {
     "p_midmatch": 0.30,
     "midmatch": {"start": [200, 2400], "kinds": ["ghost", "clone"], "guard": True},
     "ghost": {"split": "train", "faced": "any"},
-    "clone": {"ckpts": [], "temp": 1.0, "decks": "ghost", "meta_share": 0.0},
-    "teacher": {"rungs": {"8": 1.0, "9": 1.0, "10": 2.0}, "decks": "ghost", "meta_share": 0.0},
+    # "build_answer_p" (clone): the teacher's committed building answer (below) on the clone seat
+    # (_install_net_build_answer; 0 = off, bit for bit). The network still decides every step; a
+    # commitment only masks the building before its row and puts it on the pull cell with the largest
+    # geometric margin over the lane tower when the unit's landing row reaches the drawn row.
+    "clone": {"ckpts": [], "temp": 1.0, "decks": "ghost", "meta_share": 0.0, "build_answer_p": 0.0},
+    # "lag_share": the share of teacher episodes in which the teacher's cards take as long to land as ours
+    # (the act delay; name suffix "+lag"). Why (2026-11-24): it decides on the true state and its card is
+    # on the board the same tick, so its answer to our Hog Rider lands within 0.5 s of it (0.99 plays per
+    # Hog in the first 2 s, 0.47 by chance). In the 26 recorded live matches no answer lands before 2 s
+    # (0.26 per Hog in the first 2 s, 0.31 by chance; peak 2.5-3.5 s): a person has to see the card land,
+    # react, and wait out the game's own placement lag (evals/tools/answer_time.py). The search teacher
+    # piloting OUR deck wins 50 % of teacher episodes with no delay and 8 % with ours
+    # (evals/tools/pilot_probe.py), so against the instant teacher the delay decides, not the play.
+    # "build_answer_p": the chance, per enemy building-only win condition, that the teacher commits to
+    # answering it with a defensive building from its hand (_install_build_answer; 0 = off, bit for bit:
+    # no draw). Why (2026-11-24, scratch bld_probe/bld_ana): when a building comes, the teacher defends
+    # our Hog like people (0.71 hits a play against 0.71), but it comes in 22-34 % of our Hog plays
+    # against people's 70 %. The teacher decides with the Hog on the bridge (row 15) and 2.9 elixir and
+    # has spent the building's price by then; people put it down with the Hog at row 20.9 (world y).
+    # "build_reserve": once an enemy building-only win condition has been on the board, while a
+    # defensive building is in hand and none of the teacher's own stands, a play that takes the elixir
+    # (less the plays in flight) below the building's price gets a margin nothing clears, unless enemy
+    # troops on the teacher's half pass tactics.DECK_COVERAGE_THREAT_HP (an answer is due) (no draw).
+    "teacher": {"rungs": {"8": 1.0, "9": 1.0, "10": 2.0}, "decks": "ghost", "meta_share": 0.0, "lag_share": 0.0,
+                "build_answer_p": 0.0, "build_reserve": False, "attack_bank": 0.0},
+    # "attack_bank" (elixir; 0 = off, bit for bit: no draw, no state): while enemy troop HP on the
+    # teacher's half is at most tactics.DECK_COVERAGE_THREAT_HP, a play that starts an attack (a win
+    # condition, or a troop or combo whose first placement is at or past its bridge row, own y >= 14;
+    # not a spell, not a building, not a plan's due second half) and would leave less than this much
+    # elixir (less the plays in flight) gets a margin nothing clears. Why (2026-11-24, scratch r7_ana):
+    # in the 8 s before our Hog lands the teacher spends 2.45 elixir on such plays against people's 1.15,
+    # starting them at a median 4.9 elixir, and is at 3.2 elixir (median) when the Hog lands against
+    # people's 4.5-6.5; answers to our cheap cards are 0-1 % of its spend there, not the cause.
     # Decks in use on the ladder now (official API battle logs, training/meta_decks_api.py), drawn by
     # their counts. "meta_share" of a clone / teacher section is the share of that kind's episodes from
     # tick 0 that take such a deck (level 11) instead of a recorded side's deck. The recordings stop
@@ -98,6 +130,16 @@ DEFAULT_POOL = {
     # matches, hand-overs at 1/3 and 2/3 of the match, 2026-11-23).
     # The trainer's per-checkpoint table has the rows ghost:live and ghost:live+mid.
     "live": {"path": "data/ghost/live1", "share": 0.0, "p_mid": None, "spend": [0.6, 1.1], "towers": True},
+    # Episodes that start with the six towers as a live match had them. "share" of the episodes of
+    # "kinds" (0 = off: no extra random draw, old streams stand) take the tower health the live reader
+    # measured at one second of one training match of the live store (its towers.npy): a start from
+    # tick 0 takes a second between "window" shares of that match, a mid-match start of the recorded
+    # store the second of its own hand-over. Why (2026-11-23): in the live matches we are behind on
+    # towers 47 % of the seconds from a third of the match on, in the simulator 8 % of the decisions, and
+    # "our towers down, theirs untouched" is 2-5 % of the simulator's tower-down decisions; there the
+    # policy stops playing (p(play) 0.004 at 8+ elixir live). The trainer's per-checkpoint table has
+    # its own rows for these episodes (name suffix "+behind"). Live-store episodes are never touched.
+    "behind": {"share": 0.0, "kinds": ["teacher", "clone", "ghost"], "window": [0.33, 0.85]},
     "self": {"ckpts": [], "temp": 1.0},
     "opp_inference": "worker",
     "priv": True,
@@ -269,6 +311,408 @@ def get_policy(path):
     return pol
 
 
+class _LaggedTeacher:
+    """The scripted teacher with a player's placement lag. `delayable`, so with act_delay RewardEnv sends
+    its card plays through ActuationDelay like ours (same delay of the episode). The teacher reads its hand
+    and elixir from the game, where a card on its way is still in the hand and not yet paid for: such a
+    card is not offered again, and a second card must be affordable after the ones in flight."""
+
+    delayable = True
+
+    def __init__(self, env):
+        self.env = env
+        self.inner = None
+        self._obs = None
+
+    def begin(self, inner):
+        self.inner, self._obs = inner, None
+        return self
+
+    def __getattr__(self, name):                       # set_deck, reset, debug fields: the teacher's own
+        if name == "inner":
+            raise AttributeError(name)
+        return getattr(self.inner, name)
+
+    def act(self, game, obs1):
+        if obs1 is None:                               # the delayed path passes no observation
+            obs1 = np.asarray(game.get_observation_for_team(1), dtype=np.float32)
+        self._obs = obs1
+        slot, x, y = self.inner.act(game, obs1)
+        slot = int(slot)
+        dl = getattr(self.env, "_delay", None)
+        fly = dl.pending[1] if dl is not None else ()
+        if slot == C.NOOP or not fly:
+            return slot, x, y
+        hand = [int(c) for c in game.get_hand_for_team(1)]
+        cid = hand[slot] if 0 <= slot < len(hand) else -1
+        spare = float(game.get_elixir_for_team(1)) - sum(float(C.E.get_card_info(int(e[1]))["cost"]) for e in fly)
+        if cid < 0 or any(int(e[1]) == cid for e in fly) or float(C.E.get_card_info(cid)["cost"]) > spare + 1e-6:
+            return C.NOOP, 0.0, 0.0
+        return slot, x, y
+
+    def ability_flags(self, game, obs1):
+        if obs1 is None:
+            obs1 = self._obs if self._obs is not None else np.asarray(
+                game.get_observation_for_team(1), dtype=np.float32)
+        return self.inner.ability_flags(game, obs1)
+
+
+#: The rows (world y, the enemy's forward axis; river 15-18, the teacher's Princess Towers at 27) at
+#: which the enemy win condition stands when the building lands: people's quartiles against our Hog in
+#: the clean live3 matches (n 36; 10th, 25th, 50th, 75th, 90th percentile), drawn piecewise linearly.
+BUILD_ROW_Q = ([0.0, 0.25, 0.5, 0.75, 1.0], [17.9, 18.9, 20.9, 21.9, 23.4])
+#: Past this row no building cell still pulls a Hog off the tower (engine probe, Cannon: the centre
+#: cell up to 21.6 with no hit, cells nearer the lane up to 23.7 after one hit); the commitment ends.
+BUILD_LAST_ROW = 23.5
+#: The pull cells offered besides best_building_cell (own frame, for a left-lane unit): the teacher's
+#: centre pull (8, 11) and the two cells towards the lane, where people put it (mirrored x 6-8).
+BUILD_PULL_XS, BUILD_PULL_ROW = (6, 7, 8), 11.0
+
+
+@functools.lru_cache(maxsize=None)
+def _wincon_targeter(cid):
+    """A building-only targeter that is a real win condition (card stats, then the teacher's own tower
+    probe): Hog Rider, Giant, Balloon, Ram Rider ...; not an Ice Golem or a Skeleton Barrel."""
+    from python_ai.opponents import teacher as T  # noqa: PLC0415
+    try:
+        b = C.E.get_card_stats(int(cid))["base"]
+    except (ValueError, KeyError, IndexError):
+        return False
+    return (str(b.get("archetype", "")).endswith("BuildingTargeter")
+            and T.wincon_damage_per_elixir(int(cid)) >= T.WINCON_WEAK_DAMAGE_PER_ELIXIR)
+
+
+@functools.lru_cache(maxsize=None)
+def _defensive_building(cid):
+    """A building that stands in the way: it shoots or spawns defenders. Not siege (X-Bow, Mortar),
+    deploy-anywhere (Goblin Drill) or a collector."""
+    from python_ai.opponents import teacher as T  # noqa: PLC0415
+    info = C.E.get_card_info(int(cid))
+    if not info["is_building"] or info.get("deploy_anywhere", False) or T.siege_building(int(cid)):
+        return False
+    return float(C.E.get_card_stats(int(cid))["base"].get("damage", 0)) > 0 or T.building_spawns_bodies(int(cid)) > 0
+
+
+def _regen_per_tick(tick):
+    return (1 + (tick >= 1200) + (tick >= 2400)) / 28.0
+
+
+def _bld():
+    """training/bld_teacher.py, the building-heavy teacher variant (pool section "bld"; imported only when on)."""
+    from training import bld_teacher  # noqa: PLC0415
+    return bld_teacher
+
+
+class _BuildCommit:
+    """The commitment of the building answer for one seat (`team`), shared by the teacher
+    (_install_build_answer) and the clone seat (_install_net_build_answer).
+
+    When an enemy win-condition building-targeter is on the board, a defensive building is in the hand
+    and none of the seat's buildings already stands nearer to the unit's path than the tower, the seat
+    rolls once for that unit with probability p. On a hit it draws a row (BUILD_ROW_Q) and is committed
+    until it fires, or the unit dies, is pulled by a building, passes BUILD_LAST_ROW, or the building
+    leaves the hand or is on its way. `log` holds (event, tick, ...) for probes."""
+
+    def __init__(self, env, team):
+        self.env, self.me = env, int(team)
+        self.begin(0.0, 0, False)
+
+    def begin(self, p, seed, lagged):
+        self.p = float(p)
+        self.rng = random.Random(int(seed) + 61211)
+        self.lagged = bool(lagged)
+        self.rolled = set()
+        self.unit, self.row = None, 0.0
+        self.log = []
+
+    def fwd(self, y):                                  # the enemy's progress towards the seat
+        return float(y) if self.me == 1 else float(C.BOARD_H - 1) - float(y)
+
+    def world_y(self, own_y):                          # own-frame y -> world y (x is not mirrored)
+        return float(own_y) if self.me == 0 else float(C.BOARD_H - 1) - float(own_y)
+
+    def inflight(self):
+        dl = getattr(self.env, "_delay", None)
+        return list(dl.pending[self.me]) if (dl is not None and self.lagged) else []
+
+    def lead_ticks(self):
+        dl = getattr(self.env, "_delay", None)
+        return float(dl.d + dl.jitter / 2.0) if (dl is not None and self.lagged) else 0.0
+
+    def step_ticks(self):
+        return float(getattr(self.env, "decision_ticks", 5) or 5)
+
+    @staticmethod
+    def speed(u):
+        return float(C.E.get_card_stats(int(u["card_id"]))["base"].get("speed_tiles_per_tick", 0.0))
+
+    def landing(self, u):
+        """The row the unit stands at when a building sent now lands."""
+        return self.fwd(u["y"]) + self.speed(u) * self.lead_ticks()
+
+    def builds_in_hand(self, game, fly):
+        hand = [int(c) for c in game.get_hand_for_team(self.me)][:C.HAND_SIZE]
+        busy = {int(e[1]) for e in fly}
+        return [(s, c) for s, c in enumerate(hand) if c >= 0 and c not in busy and _defensive_building(c)]
+
+    def standing_pull(self, units, u, row):
+        """True if a building of ours is nearer to the unit (at the drawn row) than our nearest tower."""
+        me = self.me
+        px, py = float(u["x"]), float(u["y"])
+        py = max(py, row) if me == 1 else min(py, float(C.BOARD_H - 1) - row)
+        mine = [v for v in units if v["team"] == me and v.get("building") and v["hp"] > 0]
+        d = [((v["x"] - px) ** 2 + (v["y"] - py) ** 2) ** 0.5 for v in mine if v["tower"]]
+        return any(((v["x"] - px) ** 2 + (v["y"] - py) ** 2) ** 0.5 < min(d or [99.0])
+                   for v in mine if not v["tower"]) or any(v["id"] == u.get("target_id") for v in mine
+                                                           if not v["tower"])
+
+    def update(self, game):
+        """Release or start a commitment; returns (unit, builds, fly) while committed, else None."""
+        me = self.me
+        units = game.get_units()
+        fly = self.inflight()
+        builds = self.builds_in_hand(game, fly)
+        by_id = {v["id"]: v for v in units}
+        u = by_id.get(self.unit) if self.unit is not None else None
+        if self.unit is not None:
+            mine = {v["id"] for v in units if v["team"] == me and v.get("building") and not v["tower"]}
+            why = ("gone" if u is None or u["hp"] <= 0 else "past" if self.landing(u) > BUILD_LAST_ROW
+                   else "no building" if not builds else "pulled" if u.get("target_id") in mine else None)
+            if why:
+                self.log.append(("release", int(game.get_current_tick()), why))
+                self.unit, u = None, None
+        if self.unit is None and builds:
+            for v in units:
+                if (v["team"] == me or v["tower"] or v["id"] in self.rolled or v["hp"] <= 0
+                        or not _wincon_targeter(v["card_id"]) or self.landing(v) > BUILD_LAST_ROW):
+                    continue
+                row = float(np.interp(self.rng.random(), *BUILD_ROW_Q))
+                if self.standing_pull(units, v, row):
+                    continue                           # (no roll: an answer already stands)
+                self.rolled.add(v["id"])
+                if self.rng.random() < self.p:
+                    self.unit, self.row = v["id"], row
+                    self.log.append(("commit", int(game.get_current_tick()), int(v["card_id"]),
+                                     round(self.fwd(v["y"]), 2), round(row, 2)))
+                    u = v
+                    break
+        return (u, builds, fly) if self.unit is not None else None
+
+    def timing(self, game, u, builds, fly):
+        """(due, y, trigger, elixir, cost, spare): `due` at the decision nearest to the unit's landing
+        row reaching the drawn row (from half a decision before it), or at the last decision whose
+        building still lands before BUILD_LAST_ROW; due but not affordable, it stays due every decision
+        until then (update releases it "past" after). `spare`: the elixir that may go on other plays
+        meanwhile (None when due and affordable)."""
+        tick = int(game.get_current_tick())
+        speed = self.speed(u)
+        lead, step = self.lead_ticks(), self.step_ticks()
+        trigger = self.row - speed * lead              # the row to send it at, so that it lands at row
+        elixir = float(game.get_elixir_for_team(self.me)) - sum(float(C.E.get_card_info(int(e[1]))["cost"])
+                                                                for e in fly)
+        cost = min(float(C.E.get_card_info(c)["cost"]) for _, c in builds)
+        y = self.fwd(u["y"])
+        # (the half decision keeps the placement median at the drawn row's: firing only at or past
+        # it would land half a decision's travel later on average)
+        last = y + speed * (lead + step) > BUILD_LAST_ROW   # waiting one more decision overshoots
+        if y < trigger - speed * step / 2.0 and not last:
+            ticks = (trigger - y) / speed if speed > 0 else 0.0
+            return False, y, trigger, elixir, cost, elixir + _regen_per_tick(tick) * ticks - cost
+        if elixir + 1e-6 < cost:                       # due, not yet affordable: wait and spend nothing
+            return False, y, trigger, elixir, cost, elixir - cost
+        return True, y, trigger, elixir, cost, None
+
+    def cells(self, obs_own, u):
+        """Own-frame cells: best_building_cell, plus the pull row in front of the King from its centre
+        cell out towards the unit's lane (a Hog goes for the nearest building: past row ~21.6 only a cell
+        nearer the lane is nearer than the tower), mirrored to that lane."""
+        from python_ai.advisors import tactics  # noqa: PLC0415
+        x0, y0, _ = tactics.best_building_cell(obs_own)
+        cells = {(float(int(x0)), float(int(y0)))}
+        right = float(u["x"]) > float(tactics.OWN_KING[0])
+        for mx in BUILD_PULL_XS:
+            cells.add((float(C.BOARD_W - 1 - mx if right else mx), BUILD_PULL_ROW))
+        return sorted(cells)
+
+
+ATTACK_ROW = 14.0      # own-frame row from which a first placement counts as starting an attack
+
+
+def _install_build_answer(teacher, env):
+    """Give a UtilityTeacher `build_answer_begin(p, seed, lagged, reserve=False)` (p 0 and no reserve =
+    its own behaviour, bit for bit): see "build_answer_p" and "build_reserve" in DEFAULT_POOL. Wraps the
+    instance's act and margin_for.
+
+    Committed (_BuildCommit): a play that would leave it unable to pay for the building when the unit
+    reaches the drawn row, and the building itself before then, get a margin nothing clears; when the
+    unit's landing row (the unit's speed times the act delay ahead in lagged episodes) reaches the drawn
+    row it plays the building on the best of the _BuildCommit cells by rollout score, without the play
+    margin.
+
+    Reserve: once an enemy win-condition building-targeter has been on the board, while a defensive
+    building is in hand (not in flight), none of the teacher's buildings stands and enemy troop HP on its
+    half is at most tactics.DECK_COVERAGE_THREAT_HP, a play that takes the elixir (less the plays in
+    flight) below the cheapest such building's price gets a margin nothing clears."""
+    from python_ai.advisors import tactics  # noqa: PLC0415
+    from python_ai.opponents import teacher as T  # noqa: PLC0415
+    act, margin_for = teacher.act, teacher.margin_for
+    me = int(teacher.team)
+    bc = _BuildCommit(env, me)
+    st = {"spare": None, "reserve": False, "seen": False, "room": None, "abank": 0.0, "aroom": None}
+
+    def begin(p, seed, lagged, reserve=False, attack_bank=0.0):
+        bc.begin(p, seed, lagged)
+        st.update(spare=None, reserve=bool(reserve), seen=False, room=None, abank=float(attack_bank), aroom=None)
+        teacher.build_answer_log = bc.log
+
+    def reserve_room(game, obs_own):
+        """The elixir a non-building play may take while the reserve holds, else None."""
+        units = game.get_units()
+        if not st["seen"]:
+            st["seen"] = any(v["team"] != me and not v["tower"] and v["hp"] > 0 and _wincon_targeter(v["card_id"])
+                             for v in units)
+        if not st["seen"]:
+            return None
+        fly = bc.inflight()
+        builds = bc.builds_in_hand(game, fly)
+        if not builds or any(v["team"] == me and v.get("building") and not v["tower"] and v["hp"] > 0
+                             for v in units):
+            return None
+        if tactics.threat_level(obs_own) > tactics.DECK_COVERAGE_THREAT_HP:
+            return None                                # an answer on its side is due
+        elixir = float(game.get_elixir_for_team(me)) - sum(float(C.E.get_card_info(int(e[1]))["cost"])
+                                                           for e in fly)
+        cost = min(float(C.E.get_card_info(c)["cost"]) for _, c in builds)
+        return elixir - cost
+
+    def attack_room(game, obs_own):
+        """The elixir an attack may take while the bank holds, else None (a threat on its half)."""
+        if tactics.threat_level(obs_own) > tactics.DECK_COVERAGE_THREAT_HP:
+            return None
+        elixir = float(game.get_elixir_for_team(me)) - sum(float(C.E.get_card_info(int(e[1]))["cost"])
+                                                           for e in bc.inflight())
+        return elixir - st["abank"]
+
+    def act_ba(game, obs_own):
+        st["spare"], st["room"], st["aroom"] = None, None, None
+        if st["reserve"]:
+            st["room"] = reserve_room(game, obs_own)
+        if st["abank"] > 0.0:
+            st["aroom"] = attack_room(game, obs_own)
+        if bc.p <= 0.0:
+            return act(game, obs_own)
+        com = bc.update(game)
+        if com is None:
+            return act(game, obs_own)
+        u, builds, fly = com
+        due, y, trigger, elixir, _, spare = bc.timing(game, u, builds, fly)
+        if not due:
+            st["spare"] = spare
+            return act(game, obs_own)
+        tick = int(game.get_current_tick())
+        cells = bc.cells(obs_own, u)
+        legal = [T.Candidate.single(s, c, x, yy, "building") for s, c in builds
+                 if float(C.E.get_card_info(c)["cost"]) <= elixir + 1e-6
+                 for x, yy in cells if game.is_valid_placement(c, x, teacher.to_absolute_y(yy), me)]
+        if not legal:                                  # no cell: the teacher's own act, once
+            return act(game, obs_own)
+        # Due: the bookkeeping of teacher.act, then the best building cell by rollout score.
+        teacher.cycle.observe(game.get_hand_for_team(me))
+        teacher._observe_opponent_spend(game)
+        if teacher.pending is not None and not teacher.tick_plan():
+            teacher.pending, teacher.pending_ticks = None, 0
+        baseline = teacher.rollout_stats(game, T.NOOP)
+        best, best_sc = None, None
+        for cand in legal:
+            sc = teacher.score(game, cand, baseline, obs_own)
+            if best is None or sc > best_sc:
+                best, best_sc = cand, sc
+        bc.unit = None                                 # sent: the commitment is done
+        bc.log.append(("fire", tick, int(best.card_id), best.x, best.y, round(y, 2), round(trigger, 2)))
+        teacher.last_kind = "build_answer"
+        return best.slot, best.x, best.y
+
+    def margin_ba(cand, elixir):
+        if cand.steps:
+            has_b = any(_defensive_building(int(c)) for c in cand.cards)
+            sp = st["spare"]
+            if sp is not None and (has_b or float(cand.total_cost) > sp + 1e-6):
+                return float("inf")                    # committed: the building waits for its row,
+            rm = st["room"]                            # and nothing may eat its price
+            if rm is not None and not has_b and float(cand.total_cost) > rm + 1e-6:
+                return float("inf")                    # the reserve
+            ar = st["aroom"]
+            if (ar is not None and cand.kind != "followup" and cand.role not in ("spell", "building")
+                    and (cand.role == "wincon" or float(cand.y) >= ATTACK_ROW)
+                    and float(cand.total_cost) > ar + 1e-6):
+                return float("inf")                    # the attack bank
+        return margin_for(cand, elixir)
+
+    teacher.act, teacher.margin_for, teacher.build_answer_begin = act_ba, margin_ba, begin
+    begin(0.0, 0, False)
+    return teacher
+
+
+def _install_net_build_answer(net, env):
+    """Give the network seat (_NetTeacher) `build_answer_begin(p, seed)` (p 0 = the network alone, bit for
+    bit): see the clone's "build_answer_p" in DEFAULT_POOL. Wraps the instance's act.
+
+    The network is asked every step as before (its state and random stream move the same). While
+    committed (_BuildCommit; the lead is always the act delay: the seat is delayable) its choice of a
+    defensive building is replaced by no play until the unit's landing row reaches the drawn row; then,
+    if the elixir less the plays in flight pays for it, the building goes on the _BuildCommit cell with
+    the largest margin dist(P, nearest tower of ours) - dist(P, cell), P = (unit x, drawn row)."""
+    act = net.act
+    bc = _BuildCommit(env, 1)
+
+    def begin(p, seed):
+        bc.begin(p, seed, bool(getattr(net, "delayable", True)))   # lead = the act delay only when delayed
+        net.build_answer_log = bc.log
+
+    def act_ba(game, obs1):
+        out = act(game, obs1)
+        if bc.p <= 0.0:
+            return out
+        com = bc.update(game)
+        if com is None:
+            return out
+        u, builds, fly = com
+        due, y, trigger, elixir, _, _ = bc.timing(game, u, builds, fly)
+        slot = int(out[0])
+        hand = [int(c) for c in game.get_hand_for_team(1)][:C.HAND_SIZE]
+        masked = 0 <= slot < len(hand) and hand[slot] >= 0 and _defensive_building(hand[slot])
+        if not due:
+            return (C.NOOP, 0.0, 0.0) if masked else out
+        if obs1 is None:
+            obs1 = game.get_observation_for_team(1)
+        obs_own = np.asarray(obs1, dtype=np.float32)
+        px = float(u["x"])
+        py = bc.row if bc.me == 1 else float(C.BOARD_H - 1) - bc.row
+        towers = [v for v in game.get_units() if v["team"] == 1 and v["tower"] and v["hp"] > 0]
+        dt = min([((v["x"] - px) ** 2 + (v["y"] - py) ** 2) ** 0.5 for v in towers] or [99.0])
+        best, best_m = None, None
+        for s, c in builds:
+            if float(C.E.get_card_info(c)["cost"]) > elixir + 1e-6:
+                continue
+            for x, yy in bc.cells(obs_own, u):
+                wy = bc.world_y(yy)
+                if not game.is_valid_placement(c, x, wy, 1):
+                    continue
+                m = dt - ((x - px) ** 2 + (wy - py) ** 2) ** 0.5
+                if best is None or m > best_m:
+                    best, best_m = (s, c, x, yy), m
+        if best is None:
+            return (C.NOOP, 0.0, 0.0) if masked else out
+        bc.unit = None                                 # sent: the commitment is done
+        bc.log.append(("fire", int(game.get_current_tick()), int(best[1]), best[2], best[3], round(y, 2),
+                       round(trigger, 2)))
+        return best[0], best[2], best[3]
+
+    net.act, net.build_answer_begin = act_ba, begin
+    begin(0.0, 0)
+    return net
+
+
 class _NetTeacher:
     """Team 1 as a network, in the worker. The teacher interface the engine env
     calls; `delayable`, so with act_delay its plays go through ActuationDelay."""
@@ -364,9 +808,10 @@ class PoolEnv(G.GhostEnv):
         self._pool = None
         self._pending = None
         self._apply_pool(pool)
-        self._net = _NetTeacher(self)
+        self._net = _install_net_build_answer(_NetTeacher(self), self)
         self._stub = _StubTeacher()
         self._util = None
+        self._lagged = _LaggedTeacher(self)
         self._driver = "ghost"
         self._active = None
         self._episode = 0
@@ -423,6 +868,16 @@ class PoolEnv(G.GhostEnv):
         pm = live.get("p_mid")
         if pm is not None and not 0.0 <= float(pm) <= 1.0:
             raise ValueError(f"live.p_mid must be in [0, 1] or null, got {pm}")
+        bh = pool.get("behind") or {}
+        bs = float(bh.get("share", 0.0))
+        if not 0.0 <= bs <= 1.0:
+            raise ValueError(f"behind.share must be in [0, 1], got {bs}")
+        if any(k not in ("ghost", "clone", "teacher") for k in bh.get("kinds", ())):
+            raise ValueError("behind starts are for ghost, clone and teacher episodes")
+        if bs > 0:
+            self._behind_table(live)                 # a store without towers.npy is refused here
+        if float((pool.get("bld") or {}).get("share", 0.0)) > 0:
+            _bld().check(self, pool, w)              # (off: nothing imported)
         return w, ck
 
     def _apply_pool(self, pool):
@@ -445,7 +900,28 @@ class PoolEnv(G.GhostEnv):
             self._rungs = ([int(k) for k in r], [float(v) for v in r.values()])
         else:
             self._rungs = (list(range(int(r[0]), int(r[1]) + 1)), [1.0] * (int(r[1]) - int(r[0]) + 1))
+        self._lag = float(pool["teacher"].get("lag_share", 0.0))
+        if not 0.0 <= self._lag <= 1.0:
+            raise ValueError(f"teacher.lag_share must be in [0, 1], got {self._lag}")
+        self._build_p = float(pool["teacher"].get("build_answer_p", 0.0))
+        if not 0.0 <= self._build_p <= 1.0:
+            raise ValueError(f"teacher.build_answer_p must be in [0, 1], got {self._build_p}")
+        self._build_reserve = bool(pool["teacher"].get("build_reserve", False))
+        self._attack_bank = float(pool["teacher"].get("attack_bank", 0.0))
+        if not 0.0 <= self._attack_bank <= 10.0:
+            raise ValueError(f"teacher.attack_bank must be in [0, 10], got {self._attack_bank}")
+        self._clone_build_p = float(pool["clone"].get("build_answer_p", 0.0))
+        self._clone_no_delay = bool(pool["clone"].get("no_delay", False))
+        if not 0.0 <= self._clone_build_p <= 1.0:
+            raise ValueError(f"clone.build_answer_p must be in [0, 1], got {self._clone_build_p}")
+        if self._clone_build_p > 0 and self._inference != "worker":
+            raise ValueError("clone.build_answer_p needs opp_inference 'worker' (the seat runs in the env)")
         self._want_priv = bool(pool.get("priv", True))
+        # "bld" (2026-11-26, training/bld_teacher.py): share of ALL episodes, out of the teacher kind's, played by
+        # the building-heavy teacher variant. 0 / absent = off: nothing imported, no extra random draw.
+        self._p_bld = 0.0
+        if float((pool.get("bld") or {}).get("share", 0.0)) > 0:
+            self._p_bld = _bld().check(self, pool, w)
         self._pool = pool
 
     def _side_codes(self, faced):
@@ -486,10 +962,31 @@ class PoolEnv(G.GhostEnv):
         if tw is False:
             return False
         sec = min(int(self.start_tick) // 10, tw.shape[2] - 1)
+        return self._set_towers(tw[m, :, sec])
+
+    def _behind_table(self, live):
+        """(towers [matches, 6, seconds], [(match, seconds of the match)]) of the live store's
+        training matches that pass the spend range."""
+        store, codes = self._live_codes(live)
+        t = getattr(store, "_behind_t", None)
+        if t is None:
+            path = os.path.join(store.path, "towers.npy")
+            if not os.path.exists(path):
+                raise ValueError(f"behind starts need {live['path']}/towers.npy")
+            tw, rows = np.load(path), store.meta.get("live") or []
+            ms = sorted({int(c) // 2 for c in codes})
+            t = store._behind_t = (tw, [(m, min(tw.shape[2] - 1, int(rows[m]["t"][1] - rows[m]["t"][0])))
+                                        for m in ms])
+        return t
+
+    def _set_towers(self, fracs):
+        """Set the six towers (own King, left, right, then theirs) to shares of their
+        health. -> True if the board changed. A tower that is down stays down; the
+        King is never destroyed here."""
         game, changed = self.game, False
         for team in (0, 1):
             for sl in range(3):
-                frac = float(tw[m, 3 * team + sl, sec])
+                frac = float(fracs[3 * team + sl])
                 hp, mx = float(game.get_tower_hp(team, sl)), float(game.get_tower_max_hp(team, sl))
                 if hp <= 0:
                     continue
@@ -525,10 +1022,32 @@ class PoolEnv(G.GhostEnv):
     # -- the opponent of one episode ---------------------------------------------------
     def _draw(self, rng):
         """The episode's opponent spec (JSON-able), from `rng` alone."""
+        spec = self._draw0(rng)
+        if spec.get("lag"):
+            spec["name"] = f"{spec['name']}+lag" if spec["name"] else "lag"
+        bh = self._pool.get("behind") or {}
+        share = float(bh.get("share", 0.0))
+        if (share > 0 and spec.get("store") != "live" and spec["kind"] in bh.get("kinds", ())
+                and rng.random() < share):                 # (no draw when the share is 0: old streams stand)
+            tw, ms = self._behind_table(self._pool["live"])
+            m, n = ms[rng.randrange(len(ms))]
+            start = int(spec.get("start_tick") or 0)
+            if start > 0:
+                sec = min(start // 10, n)
+            else:
+                lo, hi = (float(x) for x in bh.get("window", (0.33, 0.85)))
+                sec = int(round(n * (lo + (hi - lo) * rng.random())))
+            spec["towers"] = [round(float(x), 4) for x in tw[m, :, sec]]
+            spec["name"] = f"{spec['name']}+behind" if spec["name"] else "behind"
+        return spec
+
+    def _draw0(self, rng):
         pool = self._pool
         kind = _weighted(rng, range(len(KIND_NAMES)), self._w)
         spec = {"kind": KIND_NAMES[kind], "ghost": None, "start_tick": 0, "deck": None,
                 "level": [11, 11], "ckpt": None, "name": "", "temp": 1.0, "rung": -1}
+        if kind == TEACHER and self._p_bld > 0 and rng.random() < self._p_bld:   # (no draw when off)
+            return _bld().draw_spec(self, rng, spec)
         if kind in NEURAL:
             path, _, name = _weighted(rng, self._ck[kind], [c[1] for c in self._ck[kind]])
             sec = pool[KIND_NAMES[kind]]
@@ -538,6 +1057,16 @@ class PoolEnv(G.GhostEnv):
                     spec[k] = float(sec[k])
         if kind == TEACHER:
             spec["rung"] = int(_weighted(rng, *self._rungs))
+            if self._lag > 0 and rng.random() < self._lag:     # (no draw when the share is 0: old streams stand)
+                spec["lag"] = True
+            if self._build_p > 0:                              # (no draw: the stream stands)
+                spec["build_answer"] = self._build_p
+            if self._build_reserve:                            # (no draw)
+                spec["build_reserve"] = True
+            if self._attack_bank > 0:                          # (no draw)
+                spec["attack_bank"] = self._attack_bank
+        if kind == CLONE and self._clone_build_p > 0:          # (no draw)
+            spec["build_answer"] = self._clone_build_p
         if kind == SELF:
             spec["deck"] = [int(c) for c in self.ai_deck]
             return spec
@@ -591,7 +1120,7 @@ class PoolEnv(G.GhostEnv):
     def _util_teacher(self):
         if self._util is None:
             from python_ai.opponents.teacher import UtilityTeacher  # noqa: PLC0415
-            self._util = UtilityTeacher(list(self.ai_deck), team=1, seed=0)
+            self._util = _install_build_answer(UtilityTeacher(list(self.ai_deck), team=1, seed=0), self)
         return self._util
 
     def reset(self, seed=None, options=None):
@@ -648,6 +1177,8 @@ class PoolEnv(G.GhostEnv):
             if (spec.get("store") == "live" and self.start_tick > 0 and int(spec["ghost"][1]) == 1
                     and self._pool["live"].get("towers", True) and self._set_live_towers(int(spec["ghost"][0]))):
                 obs = self._refresh(seed, info)                # the first observation, read again
+            if spec.get("towers") and self._set_towers(spec["towers"]):
+                obs = self._refresh(seed, info)
             if self._driver == "teacher":                      # (not drawn by _draw; a hand-made spec)
                 t = self._util_teacher()
                 t.set_deck(deck)
@@ -656,16 +1187,28 @@ class PoolEnv(G.GhostEnv):
                 t.reset()
         else:
             if self._driver == "teacher":
-                self.teacher = self._util_teacher()
+                self.teacher = _bld().teacher(self) if spec.get("bld") else self._util_teacher()
                 self.teacher.set_stage(int(spec.get("rung", 10)))
             else:
                 self.teacher = G._IdleTeacher()
             obs, info = self._reset_plain(seed, deck, spec.get("level") or (11, 11))
-        if self._driver == "teacher":
-            self.teacher = self._util
+            if spec.get("towers") and self._set_towers(spec["towers"]):
+                obs, extra = self.reobserve(seed)              # the first observation, read again
+                info = dict(info)
+                info.update(extra)
+        if self._driver == "teacher" and spec.get("bld"):
+            self.teacher = _bld().begin(self, spec, seed)
+        elif self._driver == "teacher":
+            self._util.build_answer_begin(float(spec.get("build_answer") or 0.0), seed, bool(spec.get("lag")),
+                                          bool(spec.get("build_reserve")), float(spec.get("attack_bank") or 0.0))
+            self.teacher = self._lagged.begin(self._util) if spec.get("lag") else self._util
         elif self._driver == "net":
+            # clone.no_delay (2026-11-25, measurement option, default off): the clone seat's plays skip the
+            # act delay (it acts at its decision tick, as the humans it was cloned from); our seat keeps it.
+            self._net.delayable = not (kind == CLONE and self._clone_no_delay)
             self._net.begin(policy, deck, float(spec.get("temp", 1.0)), seed,
                             float(spec.get("when_temp", 1.0)), float(spec.get("when_bias", 0.0)))
+            self._net.build_answer_begin(float(spec.get("build_answer") or 0.0) if kind == CLONE else 0.0, seed)
             self.teacher = self._net
         elif self._driver == "stub":
             self._stub.reset()

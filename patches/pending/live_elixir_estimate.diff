@@ -1,0 +1,83 @@
+--- a/live_ppo/driver.py	2026-11-23 01:05:39
++++ b/live_ppo/driver.py	2026-11-23 01:07:34
+@@ -38,6 +38,12 @@
+                     OwnKing; --no-own-king-num keeps the stock bar reading)
+     --hud-clock     seconds_elapsed from the on-screen countdown, overtime aware
+                     (falls back to the --fill-clock wall clock until it locks)
++    --elixir-est    digit | bar: the policy's elixir is a fractional estimate
++                    (live_ppo/elixir_estimate.py: dead reckoning between the
++                    integer reading's tick-overs; bar: plus the purple bar's
++                    fill) instead of the integer. Needs a match clock
++                    (--hud-clock or --fill-clock) for the 2x / 3x rate. Default
++                    off. The simulator's twin is --sim2real-elixir-est.
+     --opp-plays     opponent plays from YOLO enemy births (live_ppo/opp_plays.py)
+                     -> engine play recorder: fills the opponent cycle block and
+                     opp_elixir_spent (stock: both always zero)
+@@ -175,6 +181,10 @@
+ ap.add_argument("--elixir-bar", action="store_true",
+                 help="cross-check the elixir digit against the purple bar; replace a "
+                      "misread (drop flash read 0, a '0' read 1) by the bar's value")
++ap.add_argument("--elixir-est", choices=("off", "digit", "bar"), default="off",
++                help="the policy's elixir: a fractional estimate (live_ppo/elixir_estimate.py) "
++                     "instead of the integer reading. digit: dead reckoning between the "
++                     "reading's tick-overs; bar: plus the purple bar's fill")
+ ap.add_argument("--ledger-tol", type=float, default=None,
+                 help="ElixirLedger cost tolerance (stock 1.0: with 1-cost cards in the deck "
+                      "every non-rising frame books a fake 1-elixir play)")
+@@ -1202,6 +1212,12 @@
+         return st
+ 
+     L.Detector.run = _detector_run
++ELIXIR_EST = None
++if ours.elixir_est != "off":
++    # The policy was trained on the fractional bar; the reading is its floor.
++    # One estimator class here and in training/sim2real.py (--sim2real-elixir-est).
++    import elixir_estimate  # noqa: E402
++    ELIXIR_EST = elixir_estimate.ElixirEstimator()
+ HAND_CYCLE = (state_filter.HandCycle([getattr(c, "name", c) for c in L.DECK], hz=ours.hud_hz)
+               if ours.hand_cycle else None)
+ HUD_TOWERS = HUD_OWN = HUD_KING = HUD_CLOCK = OPP = _OWN_KING = None
+@@ -1293,6 +1309,8 @@
+         HUD_KING.reset()
+     if HUD_CLOCK is not None:
+         HUD_CLOCK.reset()
++    if ELIXIR_EST is not None:
++        ELIXIR_EST.reset()
+     _latch.clear()              # a tower latched in the last match is alive again
+     _KING.reset()
+     if HAND_CYCLE is not None:
+@@ -1379,6 +1397,24 @@
+             _SPENT.update(match=_match["id"], base=float(kw["my_elixir_spent"]))
+         kw["my_elixir_spent"] = max(0.0, float(kw["my_elixir_spent"]) - _SPENT["base"])
+     gs, rep = _orig_bgs(state, frame, small, **kw)
++    elixir_est = None
++    if ELIXIR_EST is not None and in_game:
++        # Every frame, on the capture clock. The reading stays the integer for
++        # the ledger, PlayWatch and the logs; mvp_loop takes PlayWatch.owed()
++        # off this value afterwards, as it does off the integer.
++        te = kw.get("wall_time_ms", 0.0) / 1000.0
++        if (PLAYS is not None and any(p.state == "open" or (p.state == "landed" and not p.paid)
++                                      for p in PLAYS.plays[-6:])) \
++                or (ABIL is not None and ABIL.owed() > 0):
++            ELIXIR_EST.own_play(te)       # whole-elixir changes of the reading are ours for now
++        fill = None
++        if ours.elixir_est == "bar":
++            fill = elixir_estimate.bar_fill(state_filter.to_ref(bgr, rgb=False))[0]
++        elixir_est = ELIXIR_EST.update(te, digit=float(state.numbers.elixir.number), fill=fill,
++                                       mult=elixir_estimate.multiplier(float(match_s)))
++        if elixir_est is not None:
++            gs = replace(gs, my_elixir=float(elixir_est))
++            hud["elixir_est"] = round(float(elixir_est), 3)
+     if HAND_CYCLE is not None and in_game:
+         # per-window match details (AltDeckHandDetector) for the soft-blank rules
+         names, nxt = HAND_CYCLE.update([c.name for c in state.cards[1:5]], state.cards[0].name,
+@@ -1536,7 +1572,8 @@
+                         [c.name for c in state.cards[1:5]], float(state.numbers.elixir.number))
+         lat("board", fi=fi, cap=cap, proc=time.perf_counter(),
+             hand=[c.name for c in state.cards[1:5]],
+-            elixir=float(state.numbers.elixir.number))
++            elixir=float(state.numbers.elixir.number),
++            **({} if elixir_est is None else {"elixir_est": round(float(elixir_est), 3)}))
+     return gs, rep
+ 
+ 

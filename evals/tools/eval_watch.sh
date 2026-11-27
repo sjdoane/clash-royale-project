@@ -2,7 +2,7 @@
 # usage: eval_watch.sh <date> <target_episode> [<target_episode> ...]
 # For each target, wait for the first g2_ppo_s2r snapshot at or past it, then run eval_pair.sh on it.
 # Stops early if the trainer is no longer running and no such snapshot exists.
-cd "$(dirname "$0")/../.." || exit 1
+cd $HOME/cr-robot || exit 1
 day=$1; shift
 for target in "$@"; do
   while true; do

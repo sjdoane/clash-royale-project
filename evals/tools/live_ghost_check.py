@@ -1,7 +1,7 @@
 """Fidelity of the live ghost store: every recorded live match re-simulated with both sides scripted
 (our recorded plays against the opponent's read plays), simulator outcome against what really happened.
 
-usage: CR_ENGINE=$PWD/build/gen2_c/engine .venv/bin/python evals/tools/live_ghost_check.py [STORE]
+usage: CR_ENGINE=$PWD/build/gen2_e/engine .venv/bin/python evals/tools/live_ghost_check.py [STORE]
 "dealt" / "taken" are the share of all tower hit points lost by the opponent / by us. A ghost that misses
 real plays shows up as taken(sim) well below taken(real); false plays as the opposite.
 """

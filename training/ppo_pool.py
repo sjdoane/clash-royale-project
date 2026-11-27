@@ -104,6 +104,14 @@ def _parse(argv=None):
                         "2026-11-22: landing estimates for thrown spells in the opponent-spell block, "
                         "fewer missed follow-up plays). Default: the reader of 2026-11-20, which shows "
                         "no opponent spell in flight.")
+    # 2026-11-27 (gen2_l switch, runs/sim_0091/SWITCH_PLAN.md): default off; unset = the tail noise as before.
+    p.add_argument("--tail-evo-no-tile", default="", metavar="IDS",
+                   help="comma list of Evolution card ids whose EVOLVED cast never gets a landing estimate in "
+                        "the tail (obs_noise TailNoiseConfig.evo_no_tile; 132 = Evo Goblin Barrel, live 0 of 9). "
+                        "Needs --tail-preset reader2 and an engine with get_evolution_state (build/gen2_l). With "
+                        "132 the preset's flight['Goblin Barrel']['fail'] goes 0.07 -> 0.02: 0.07 was the evolved "
+                        "throws as a rate; live plain throws without an estimate are 0 of 71 (0.02 = the file's "
+                        "ASSUMED floor).")
     # pool
     p.add_argument("--pool", default=os.path.join("training", "pool_gen2_default.json"))
     p.add_argument("--pool-override", default="", help="JSON merged over --pool")
@@ -134,6 +142,8 @@ def _parse(argv=None):
     p.add_argument("--kl-mix", type=float, default=0.5,
                    help="0 = KL(pi||clone) only, 1 = KL(clone||pi) only")
     p.add_argument("--kl-head-weights", default="1,1,1,1", help="when,what,where,ability")
+    p.add_argument("--bc-head-weights", default="1,1,1",
+                   help="when,what,where: multiplies the cloning loss weights of these heads (default: as trained)")
     p.add_argument("--kl-max", type=float, default=0.0,
                    help="> 0: raise the KL coefficient while the pre-update KL exceeds this")
     p.add_argument("--bc-start", type=float, default=0.5)
@@ -153,11 +163,26 @@ def _parse(argv=None):
                         "sit at a full bar (2026-11-23: 41%% of 3-crown losses hold 10 s or more of "
                         "it), and the anchor held the learner to that; the reward decides there instead. "
                         "Default: off")
+    p.add_argument("--anchor-free-behind", action="store_true",
+                   help="decisions where more of the learner's Princess Towers are down than of the "
+                        "opponent's carry no WHEN reference either (same treatment as "
+                        "--anchor-free-elixir). Live, 2026-11-23: p(play) 0.004 at 8+ elixir once our "
+                        "towers were down and theirs untouched (0.22 with theirs shown at half health), "
+                        "the human habit of giving up a match that looks lost. Default: off")
     p.add_argument("--bc-data", default=None, help="bcdata2 root (default: the checkpoint's dataset)")
     p.add_argument("--bc-batch", type=int, default=512, help="human rows per PPO minibatch")
     p.add_argument("--bc-block", type=int, default=2, help="shards read per block")
     p.add_argument("--bc-procs", type=int, default=5)
     p.add_argument("--bc-allow-unready", action="store_true")
+    # 2026-11-27 (imit_shift agent): both default off; unset = the behaviour before they existed.
+    p.add_argument("--anchor-ckpt", default=None, metavar="PATH",
+                   help="NetV3 checkpoint for the frozen KL reference (ref_net) instead of the init checkpoint. "
+                        "The init (fresh-run weights, meta, the cloning rows' dataset/lead/train cfg) is "
+                        "unchanged; PATH must match its cfg, names, lead, dataset_fp, decision_ticks.")
+    p.add_argument("--bc-noise-root", default=None, metavar="DIR",
+                   help="root of the cloning rows' noise cache (bc_train.NoiseCache root; default "
+                        "runs/bc3/_cache). Every needed shard must already be under DIR: the trainer "
+                        "refuses to start rather than build missing shards with the default reader.")
     # guard
     p.add_argument("--guard-play-lo", type=float, default=0.6)
     p.add_argument("--guard-play-hi", type=float, default=1.6)
@@ -310,6 +335,46 @@ from training import bcdata2 as D2  # noqa: E402
 REPO = C.REPO
 log_interp = PB.log_interp
 parse_delay = PB.parse_delay
+
+
+def tail_evo_spec(ids, preset):
+    """--tail-evo-no-tile (2026-11-27, default off): the keys it adds to the envs' obs_v2_noise dict;
+    {} when unset, so the dict (and every worker's TailNoise) is exactly as before. Workers get the
+    keys through the pickled env thunk, not from a module default."""
+    ids = sorted({int(x) for x in str(ids or "").replace(",", " ").split()})
+    if not ids:
+        return {}
+    import copy  # noqa: PLC0415
+    from training import obs_noise  # noqa: PLC0415
+    if preset not in obs_noise.TAIL_PRESETS:
+        raise SystemExit(f"--tail-evo-no-tile needs --tail-preset reader2 (got {preset!r})")
+    if not hasattr(C.E.ClashRoyaleEnv, "get_evolution_state"):
+        raise SystemExit(f"--tail-evo-no-tile needs an engine with get_evolution_state (build/gen2_l); "
+                         f"CR_ENGINE is {C.ENGINE}")
+    out = {"evo_no_tile": ids}
+    if 132 in ids:
+        fl = copy.deepcopy(obs_noise.TAIL_PRESETS[preset]["flight"])
+        if fl.get("Goblin Barrel", {}).get("fail") != 0.07:
+            raise SystemExit(f"--tail-evo-no-tile 132: preset {preset} Goblin Barrel fail is "
+                             f"{fl.get('Goblin Barrel', {}).get('fail')!r}, expected 0.07 (preset changed?)")
+        fl["Goblin Barrel"]["fail"] = 0.02
+        out["flight"] = fl
+    return out
+
+
+def tail_noise_spec(a, names):
+    """The envs' obs_v2_noise value (None = clean tail): names, --tail-preset, --tail-evo-no-tile."""
+    evo = getattr(a, "tail_evo_no_tile", "")
+    if a.no_tail_noise:
+        if evo:
+            raise SystemExit("--tail-evo-no-tile needs the tail noise (drop --no-tail-noise)")
+        return None
+    spec = {"names": names}
+    if getattr(a, "tail_preset", ""):
+        spec["preset"] = a.tail_preset
+    if evo:
+        spec.update(tail_evo_spec(evo, getattr(a, "tail_preset", "")))
+    return spec
 
 
 # ------------------------------------------------------ factorised policy ---
@@ -620,9 +685,18 @@ class PoolTrainer(bt.BaseTrainer):
         board = None if a.no_board_noise else obs_noise.cli_spec("default", a.obs_noise_scale,
                                                                  hp_live=bool(a.board_hp_live))
         if not a.no_tail_noise and self.net_cfg.get("use_tail", True):
-            extra["obs_v2_noise"] = {"names": self.init_blob.get("names") or "spells"}
-            if getattr(a, "tail_preset", ""):
-                extra["obs_v2_noise"]["preset"] = a.tail_preset
+            extra["obs_v2_noise"] = tail_noise_spec(a, self.init_blob.get("names") or "spells")
+            if "evo_no_tile" in extra["obs_v2_noise"]:
+                obs_noise.load_tail_config(extra["obs_v2_noise"])       # refuse a bad spec here, not in a worker
+                if not getattr(self, "_evo_logged", False):
+                    self._evo_logged = True
+                    fl = extra["obs_v2_noise"].get("flight", {}).get("Goblin Barrel", {})
+                    print(f">>> tail evo_no_tile {extra['obs_v2_noise']['evo_no_tile']} (--tail-evo-no-tile): "
+                          f"evolved casts get no landing estimate; flight Goblin Barrel fail "
+                          f"{fl.get('fail', 'unchanged')} (preset {a.tail_preset} 0.07); engine {C.ENGINE} "
+                          f"has get_evolution_state", flush=True)
+        elif getattr(a, "tail_evo_no_tile", ""):
+            raise SystemExit("--tail-evo-no-tile needs the tail noise and a net that uses the tail")
         s2r = self._sim2real_spec()
         if s2r is not None:
             extra["sim2real"] = s2r
@@ -759,7 +833,7 @@ class PoolTrainer(bt.BaseTrainer):
                 p.requires_grad_(False)
             self._hx, self._cx = self._hx.to(self.act_device), self._cx.to(self.act_device)
         self.updater = PB.AnchoredUpdater(self.net, self.optimizer, self.cfg, self)
-        self.ref_net, _ = N3.load_v3(self.init_blob, self.device)
+        self.ref_net, _ = N3.load_v3(self._anchor_blob(), self.device)
         for p in self.ref_net.parameters():
             p.requires_grad_(False)
         self.deck = [int(c) for c in C.deck_ids()]
@@ -808,6 +882,22 @@ class PoolTrainer(bt.BaseTrainer):
               f"    pool weights {self.pool['weights']}, p_midmatch {self.pool['p_midmatch']}"
               + (f"\n    POOL NOTE: {self.pool_note}" if self.pool_note else ""), flush=True)
 
+    def _anchor_blob(self):
+        """The frozen KL reference's checkpoint: the init, or --anchor-ckpt (2026-11-27, default off)."""
+        path = getattr(self.args, "anchor_ckpt", None)
+        if not path:
+            return self.init_blob
+        path = path if os.path.isabs(path) else os.path.join(REPO, path)
+        blob = torch.load(path, map_location="cpu", weights_only=False)
+        if not N3.is_v3(blob):
+            raise SystemExit(f"--anchor-ckpt {path}: not a NetV3 checkpoint")
+        for k in ("cfg", "names", "lead", "dataset_fp", "decision_ticks", "base_obs_dim"):
+            if blob.get(k) != self.init_blob.get(k):
+                raise SystemExit(f"--anchor-ckpt {path}: {k} {blob.get(k)!r} differs from the init's "
+                                 f"{self.init_blob.get(k)!r} ({self.init_path})")
+        print(f">>> KL anchor (ref_net): {path} (--anchor-ckpt); the init stays {self.init_path}", flush=True)
+        return blob
+
     def _setup_bc(self):
         a = self.args
         if a.bc_start <= 0 and a.bc_end <= 0:
@@ -826,14 +916,34 @@ class PoolTrainer(bt.BaseTrainer):
         tg = BT.Targets(ds, int(self.init_blob["lead"]), tr.get("interval"))
         cache = None
         if tr.get("noise", True):
+            nroot = getattr(a, "bc_noise_root", None)
+            nkw = {}
+            if nroot:
+                nkw["root"] = nroot if os.path.isabs(nroot) else os.path.join(REPO, nroot)
             cache = BT.NoiseCache(ds, seed=int(tr.get("noise_seed", 0)),
-                                  names=self.init_blob.get("names") or "spells", p=float(tr.get("noise_p", 1.0)))
-            cache.ensure(ds.select("train", None, flt.groups), procs=a.bc_procs, log=print)
+                                  names=self.init_blob.get("names") or "spells", p=float(tr.get("noise_p", 1.0)),
+                                  **nkw)
+            if nroot:
+                need = list(ds.select("train", None, flt.groups))
+                miss = [ds.metas[int(i)]["name"] for i in need if not os.path.exists(cache.path(i))]
+                if miss:
+                    raise SystemExit(f"--bc-noise-root: {len(miss)} of {len(need)} shards missing in {cache.dir} "
+                                     f"(e.g. {miss[:3]}); not building them with the default reader")
+                print(f">>> cloning noise cache: {cache.dir} (--bc-noise-root, all {len(need)} shards present)",
+                      flush=True)
+            else:
+                cache.ensure(ds.select("train", None, flt.groups), procs=a.bc_procs, log=print)
         grid = BT.dataset_grid(ds)
         self.bc = {"ds": ds, "flt": flt, "tg": tg, "cache": cache, "root": root, "grid": grid,
                    "what_h": tr.get("what_h", 10), "what_on_when": tr.get("what_on_when", True),
                    # the critic is fitted to this run's returns, not to human outcomes
                    "weights": dict(tr.get("loss_weights") or {}, value=0.0)}
+        _bw = [float(v) for v in a.bc_head_weights.split(",")]
+        if _bw != [1.0, 1.0, 1.0]:
+            _W = dict(BT.LOSS_W, **self.bc["weights"])
+            for _h, _v in zip(("when", "what", "where"), _bw):
+                self.bc["weights"][_h] = _W[_h] * _v
+            print(f">>> cloning head weights (--bc-head-weights {a.bc_head_weights}): {self.bc['weights']}", flush=True)
         print(f">>> cloning rows: {root} (train split, groups {groups}, grid {grid} ticks, "
               f"lead {self.init_blob['lead']}, noise {'on' if cache is not None else 'off'})", flush=True)
         if grid != self.dt:
@@ -988,10 +1098,10 @@ class PoolTrainer(bt.BaseTrainer):
     def when_ref(self, obs):
         """1.0 where a decision keeps its WHEN reference, 0.0 where
         --anchor-free-elixir exempts it (obs: (..., obs_dim), the learner's rows)."""
-        e = self.args.anchor_free_elixir
-        if e is None:
+        e, b = self.args.anchor_free_elixir, self.args.anchor_free_behind
+        if e is None and not b:
             return None
-        return (obs[..., C.SPATIAL_SIZE] * 10.0 < float(e) - 1e-4).float()
+        return BT.when_kept(obs, e, b).float()
 
     # -- the anchor terms of one minibatch ---------------------------------------------
     def anchor_terms(self, loc):
@@ -1052,7 +1162,8 @@ class PoolTrainer(bt.BaseTrainer):
             b = self.bc
             lbc, parts = BT.forward_losses(self.net, next(self._bc_iter), what_h=b["what_h"],
                                            what_on_when=b["what_on_when"], weights=b["weights"],
-                                           when_free_elixir=a.anchor_free_elixir)
+                                           when_free_elixir=a.anchor_free_elixir,
+                                           when_free_behind=a.anchor_free_behind)
             total = total + bc_c * lbc
             self._mb.setdefault("bc", []).append(float(lbc.detach()))
             for k, v in parts.items():
